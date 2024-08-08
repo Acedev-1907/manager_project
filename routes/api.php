@@ -12,6 +12,7 @@ Route::get('/user', function (Request $request) {
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->name('login');
-Route::post('/projects', [ProjectController::class, 'store'])->name('store');
+Route::post('/projects', [ProjectController::class, 'store'])->name('createProject');
 Route::put('/projects', [ProjectController::class, 'update'])->name('update');
-Route::get('/projects', [ProjectController::class,'index'])->name('index');
+Route::get('/projects', [ProjectController::class,'index'])->name('indexProject');
+Route::post('/projects/pinned', [ProjectController::class,'pinnendProject'])->name('pinnendProject');
