@@ -28,4 +28,8 @@ class Project extends Model
     public function task_progress(){
       return $this->hasOne(TaskProgress::class,'projectId');
     }
+
+    public function task(){
+      return $this->hasMany(Task::class,'projectId');
+    }
 }

@@ -9,8 +9,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
-use function Laravel\Prompts\password;
-
 class AuthController extends Controller
 {
     public function register(Request $req){
