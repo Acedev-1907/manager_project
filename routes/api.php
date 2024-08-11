@@ -21,7 +21,8 @@ Route::controller(ProjectController::class)->group(function () {
     Route::put('/projects', 'update')->name('update');
     Route::get('/projects', 'index')->name('indexProject');
     Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
-    Route::get('projects/{slug}','getProject')->name('getProject');
+    Route::get('projects/{slug}', 'getProject')->name('getProject');
+    Route::get('/count/projects', 'countProject')->name('countProject');
 });
 
 Route::controller(MemberContrller::class)->group(function () {
@@ -32,4 +33,11 @@ Route::controller(MemberContrller::class)->group(function () {
 
 Route::controller(TaskController::class)->group(function () {
     Route::post('/tasks', 'createTask')->name('createTask');
+    Route::post('task/not_started_to_peeding', 'TaskToNotStartedToPending')->name('TaskToNotStartedToPending');
+    Route::post('task/not_started_to_completed', 'TaskToNotStartedToCompleted')->name('TaskToNotStartedToCompleted');
+    Route::post('task/pending_to_completed', 'TaskToPendingToCompleted')->name('TaskToPendingToCompleted');
+
+    Route::post('task/pending_to_not_started', 'TaskToPendingToNotStarted')->name('TaskToPendingToNotStarted');
+    Route::post('task/completed_to_pending', 'TaskToCompletedToPending')->name('TaskToCompletedToPending');
+    Route::post('task/complete_to_not_started', 'TaskToCompletedToNotStarted')->name('TaskToCompletedToNotStarted');
 });
