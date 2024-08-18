@@ -1,14 +1,41 @@
 {
+  "__plugin-vue_export-helper-DlAUqK2U.js": {
+    "file": "assets/_plugin-vue_export-helper-DlAUqK2U.js",
+    "name": "_plugin-vue_export-helper"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-l0sNRNKZ.js",
-    "name": "app",
+    "file": "assets/app-DfhEtVV8.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
-  "resources/js/app.js": {
-    "file": "assets/app-DlAHZF5Y.js",
+  "resources/js/app.ts": {
+    "file": "assets/app-DiRtAEks.js",
     "name": "app",
-    "src": "resources/js/app.js",
-    "isEntry": true
+    "src": "resources/js/app.ts",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/src/pages/auth/AuthPage.vue",
+      "resources/js/src/pages/auth/RegisterPage.vue"
+    ]
+  },
+  "resources/js/src/pages/auth/AuthPage.vue": {
+    "file": "assets/AuthPage-jVw3HONF.js",
+    "name": "AuthPage",
+    "src": "resources/js/src/pages/auth/AuthPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-DlAUqK2U.js",
+      "resources/js/app.ts"
+    ]
+  },
+  "resources/js/src/pages/auth/RegisterPage.vue": {
+    "file": "assets/RegisterPage-Cd2PCxXQ.js",
+    "name": "RegisterPage",
+    "src": "resources/js/src/pages/auth/RegisterPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "__plugin-vue_export-helper-DlAUqK2U.js",
+      "resources/js/app.ts"
+    ]
   }
 }
