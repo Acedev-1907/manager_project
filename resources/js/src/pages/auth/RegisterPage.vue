@@ -3,6 +3,8 @@ import useVuelidate from '@vuelidate/core';
 import { required, email } from '@vuelidate/validators';
 import { registerInput, useRegisterUser } from './action/register';
 import Error from '../../components/Error.vue';
+import BaseInput from '../../components/BaseInput.vue';
+import BaseBtn from '../../components/BaseBtn.vue';
 
 const rules = {
     email: { required, email },
@@ -15,6 +17,9 @@ async function submitRegister() {
     const result = await v$.value.$validate();
 
     if (!result) return;
+
+    await register();
+    v$.value.$reset()
 }
 
 </script>
@@ -30,23 +35,25 @@ async function submitRegister() {
                             Register
                         </h2>
                         <br />
-                        <br />
+                        {{ registerInput }}
                         <form @submit.prevent="submitRegister">
                             <div class="form-group">
                                 <Error label="Email" :errors="v$.email.$errors">
-                                    <input v-model="registerInput.email" type="text" name="" class="form-control"
-                                        placeholder="">
+                                    <BaseInput v-model="registerInput.email" />
                                 </Error>
                             </div>
 
                             <div class="form-group">
                                 <Error label="Password" :errors="v$.password.$errors">
-                                    <input v-model="registerInput.password" type="text" name="" class="form-control"
-                                        placeholder="">
+                                    <BaseInput v-model="registerInput.password" type="password" />
                                 </Error>
                             </div>
+                            </br>
+                            <div class="form-group">
+                                <RouterLink to="/login">Login into your account</RouterLink>
+                            </div>
                             <div class="form-group mt-3">
-                                <button class="btn btn-primary form-control">Register</button>
+                                <BaseBtn label="register" :loading="loading"></BaseBtn>
                             </div>
                         </form>
                     </div>

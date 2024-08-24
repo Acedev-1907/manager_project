@@ -25,10 +25,13 @@ export function useRegisterUser() {
             const data = await makeHttpReq<RegisterUserType, RegisterResponseType>('register', 'POST', registerInput.value)
 
             loading.value = false
-
+            registerInput.value = {} as RegisterUserType
             successMsg(data.message);
         } catch (error) {
-            showError((error as Error).message);
+            loading.value = false
+            for (const message of error as string) {
+                showError(message);
+            }
         }
     }
     return { register, loading }

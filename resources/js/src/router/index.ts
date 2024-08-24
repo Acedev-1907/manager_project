@@ -13,7 +13,30 @@ const router = createRouter({
                     path: '/register',
                     name: "register",
                     component: () => import('../pages/auth/RegisterPage.vue'),
-                }
+                },
+                {
+                    path: '/login',
+                    name: "login",
+                    component: () => import('../pages/auth/LoginPage.vue'),
+                },
+            ]
+        },
+        {
+            path: '/admin',
+            name: "admin",
+            component: () => import('../pages/admin/AdminPage.vue'),
+
+            children: [
+                {
+                    path: '/admin',
+                    name: "admin",
+                    component: () => import('../pages/admin/dashborad/DashboradPage.vue'),
+                },
+                {
+                    path: '/members',
+                    name: "members",
+                    component: () => import('../pages/admin/member/MemberPage.vue'),
+                },
             ]
         }
     ]
