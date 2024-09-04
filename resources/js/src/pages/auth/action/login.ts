@@ -31,7 +31,7 @@ export function useLoginUser() {
             successMsg(data.message);
             if (data.isLoggedIn) {
                 localStorage.setItem('userData', JSON.stringify(data))
-                window.location.href = '/app/dashborad'
+                window.location.href = '/app/admin'
             }
         } catch (error) {
             showErrorResponse(error);

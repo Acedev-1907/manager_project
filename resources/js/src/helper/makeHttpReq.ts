@@ -5,7 +5,7 @@ type HttpVerbType = 'GET' | 'POST' | 'PUT' | 'DELETE';
 export function makeHttpReq<TInput, TResponse>(
     endpoint: string,
     verb: HttpVerbType,
-    input: TInput
+    input?: TInput
 ) {
     return new Promise<TResponse>(async (resole, reject) => {
         try {

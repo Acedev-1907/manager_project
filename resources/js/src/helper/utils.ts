@@ -9,3 +9,14 @@ export function showErrorResponse(err: unknown) {
         showError((err as Error).message)
     }
 }
+
+export function myDebounce<T>(func: () => Promise<T>, delay: number) {
+
+    let time: any;
+
+    return function () {
+        clearTimeout(time);
+
+        setTimeout(() => func(), delay);
+    }
+}

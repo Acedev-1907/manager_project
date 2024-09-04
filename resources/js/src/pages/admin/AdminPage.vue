@@ -13,7 +13,8 @@ function logoutUser() {
         <div class="container-fluid">
             <div class="row">
 
-                <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" />
+                <!-- <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" /> -->
+                <NarBar @logout="logoutUser" />
                 <main class="col-md-9 ms-sm-auto col-lg-10  bg-pages">
                     <br /><br />
                     <router-view v-slot="{ Component, route }">

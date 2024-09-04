@@ -10,19 +10,20 @@ use Illuminate\Support\Facades\Validator;
 
 class MemberContrller extends Controller
 {
-    public function index(Request $req)
+    public function index(Request $request)
     {
-        $query = $req->get('query');
+        $query = $request->get('query');
+        // $members=Member::select('name','email');
+
         $members = DB::table('members');
 
-        if (!is_null($query) && $query !== '') {
+        if (!is_null($query)  && $query !== '') {
             $members->where('name', 'like', '%' . $query . '%')
                 ->orderBy('id', 'desc');
 
-            return response(['data' => $members->paginate(10)], 200);
+            return response(['data' => $members->paginate(3)], 200);
         }
-
-        return response(['data' => $members->paginate(10)], 200);
+        return response(['data' => $members->paginate(3)], 200);
     }
 
     public function store(Request $req)
@@ -66,7 +67,8 @@ class MemberContrller extends Controller
         return response(['message' => 'member updated'], 200);
     }
 
-    public function pinnendProject(Request $req){
+    public function pinnendProject(Request $req)
+    {
         $fields = $req->all();
 
         $errs = Validator::make($fields, [
@@ -74,14 +76,14 @@ class MemberContrller extends Controller
         ]);
 
         if ($errs->fails()) {
-            return response($errs->errors()->all(),422);
+            return response($errs->errors()->all(), 422);
         }
 
         TaskProgress::where('projectId', $fields['projectId'])
-        ->update([
-            'pinned_on_dashboard' => TaskProgress::PINNED_ON_DASHBOARD
-        ]);
+            ->update([
+                'pinned_on_dashboard' => TaskProgress::PINNED_ON_DASHBOARD
+            ]);
 
-        return response(['message'=>'project pinned on dashboard']);
+        return response(['message' => 'project pinned on dashboard']);
     }
 }
