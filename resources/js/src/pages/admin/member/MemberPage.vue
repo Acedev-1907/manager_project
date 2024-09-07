@@ -1,8 +1,11 @@
 <script lang="ts" setup>
 import { onMounted } from 'vue';
 import MemberTable from './components/MemberTable.vue';
-import { useGetMembers } from './actions/getMember';
+import { MemberType, useGetMembers } from './actions/getMember';
 import { Bootstrap5Pagination } from 'laravel-vue-pagination';
+import { memberStore } from './store/MemberStore';
+import router from '../../../router';
+import { MemberInputType } from './actions/createMember';
 
 
 const { getMembers, memberData, loading } = useGetMembers()
@@ -12,8 +15,15 @@ async function showListOfMembers() {
 }
 console.log('Pagination Data:', memberData.value);
 
+function editMember(member: MemberType) {
+    memberStore.memberInput = member
+    memberStore.edit = true
+    router.push('/create-members')
+}
 onMounted(async () => {
     showListOfMembers()
+    memberStore.edit = false
+    memberStore.memberInput = {} as MemberInputType
 })
 
 </script>
@@ -27,7 +37,8 @@ onMounted(async () => {
                         </RouterLink>
                     </div>
                     <div class="card-body">
-                        <MemberTable :loading="loading" @getMember="getMembers" :members="memberData">
+                        <MemberTable @editMember="editMember" :loading="loading" @getMember="getMembers"
+                            :members="memberData">
                             <template #pagination>
                                 <Bootstrap5Pagination v-if="memberData?.data" :data="memberData.data"
                                     @pagination-change-page="getMembers" />

@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { showError, successMsg } from "../../../../helper/toast-notificaltion";
 import { showErrorResponse } from "../../../../helper/utils";
+import { memberStore } from "../store/MemberStore";
 
 export type MemberInputType = {
     name: string
@@ -11,8 +12,6 @@ export type MemberResponseType = {
     message: string
 }
 
-export const MemberInput = ref<MemberInputType>({} as MemberInputType)
-
 export function useCreateOrUpdateMember() {
 
     const loading = ref(false)
@@ -20,16 +19,29 @@ export function useCreateOrUpdateMember() {
     async function createOrUpdate() {
         try {
             loading.value = true
-
-            const data = await makeHttpReq<MemberInputType, MemberResponseType>('members', 'POST', MemberInput.value)
-
+            const data =
+                memberStore.edit ?
+                    await updateMember() : await createMember()
             loading.value = false
-            MemberInput.value = {} as MemberInputType
-            successMsg(data.message);
+            memberStore.memberInput = {} as MemberInputType
+
+            successMsg(data.message)
         } catch (error) {
             loading.value = false
             showErrorResponse(error);
         }
     }
     return { createOrUpdate, loading }
+}
+
+async function createMember() {
+    const data = await makeHttpReq<MemberInputType, MemberResponseType>
+        ('members', 'POST', memberStore.memberInput)
+    return data;
+}
+async function updateMember() {
+    const data = await makeHttpReq<MemberInputType, MemberResponseType>
+        ('members', 'PUT', memberStore.memberInput)
+    memberStore.edit = false
+    return data;
 }
