@@ -27,7 +27,7 @@ onMounted(async () => {
                         </RouterLink>
                     </div>
                     <div class="card-body">
-                        <MemberTable :loading="loading" @getMembers="getMembers" :members="memberData">
+                        <MemberTable :loading="loading" @getMember="getMembers" :members="memberData">
                             <template #pagination>
                                 <Bootstrap5Pagination v-if="memberData?.data" :data="memberData.data"
                                     @pagination-change-page="getMembers" />

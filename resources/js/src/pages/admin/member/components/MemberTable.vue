@@ -10,14 +10,14 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-    (e: 'editMember', member: MemberType): void
-    (e: 'getMember', query: string): Promise<void>;
-}>()
+    (e: "editMember", member: MemberType): void;
+    (e: "getMember", page: number, query: string,): Promise<void>;
+}>();
 
-const query = ref('')
+const query = ref("");
 const search = myDebounce(async function () {
-    await emit('getMember', query.value)
-}, 200)
+    await emit("getMember", 1, query.value,);
+}, 200);
 
 </script>
 <template>
