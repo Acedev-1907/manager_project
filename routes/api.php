@@ -7,14 +7,17 @@ use App\Http\Controllers\TaskController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-
-
 Route::controller(AuthController::class)->group(function () {
     Route::post('/register', 'register');
     Route::post('/login', 'login');
 });
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
+
+    Route::controller(AuthController::class)->group(function () {
+        Route::post('/logout', 'logoutUser');
+    });
+
     Route::controller(ProjectController::class)->group(function () {
         Route::post('/projects', 'store')->name('createProject');
         Route::put('/projects', 'update')->name('update');

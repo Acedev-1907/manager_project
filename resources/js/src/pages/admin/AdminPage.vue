@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import NarBar from './components/NarBar.vue';
+import { useLogOutUser } from './actions/Logout';
+import { getUserData } from '../../helper/getUserData';
 
+const { logout } = useLogOutUser()
 
-function logoutUser() {
-    console.log('logout');
+const userData = getUserData()
+async function logoutUser() {
+    const userId = userData?.user?.id
+    if (typeof userId !== 'undefined') {
+        await logout(userId)
+        localStorage.clear()
+        setTimeout(() => window.location.href = "/app/login", 1000)
+    }
 }
 </script>
 
@@ -13,8 +22,7 @@ function logoutUser() {
         <div class="container-fluid">
             <div class="row">
 
-                <!-- <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" /> -->
-                <NarBar @logout="logoutUser" />
+                <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" />
                 <main class="col-md-9 ms-sm-auto col-lg-10  bg-pages">
                     <br /><br />
                     <router-view v-slot="{ Component, route }">

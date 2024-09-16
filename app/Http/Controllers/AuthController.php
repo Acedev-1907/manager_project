@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\NewUserCreated;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -84,5 +85,15 @@ class AuthController extends Controller
             'token' => $token,
             'isLoggedIn' => true
         ], 200);
+    }
+
+
+    public function logoutUser(Request $req)
+    {
+        DB::table('personal_access_tokens')
+            ->where('tokenable_id', $req->userId)
+            ->delete();
+
+        return response(['message' => 'logout user'], 200);
     }
 }

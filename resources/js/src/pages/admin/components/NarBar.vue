@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
 
 defineProps<{
-    // loggedInUserEmail: string | undefined
+    loggedInUserEmail: string | undefined
 }>()
 
 </script>
@@ -41,7 +41,7 @@ defineProps<{
             <div align="center">
                 <img :src="`${APP.baseURL}/others/logo.png`" style="height: 55px" alt="">
                 <h4>TaskMgr</h4>
-                <!-- {{ loggedInUserEmail }} -->
+                {{ loggedInUserEmail }}
             </div>
             <br />
             <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
