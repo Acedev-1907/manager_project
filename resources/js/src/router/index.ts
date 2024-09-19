@@ -53,7 +53,7 @@ router.beforeEach((to, from, next) => {
     const token = userData ? JSON.parse(userData).token : null; // Lấy token từ dữ liệu
     const isAuthenticated = !!token; // Chuyển token thành boolean
 
-    console.log(token);
+    // console.log(token);
 
     // console.log('Navigating to:', to.fullPath); // Kiểm tra đường dẫn
     // console.log('isAuthenticated:', isAuthenticated); // Kiểm tra xem đã đăng nhập chưa
