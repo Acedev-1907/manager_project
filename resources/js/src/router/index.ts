@@ -25,7 +25,7 @@ const router = createRouter({
             path: '/admin',
             name: "admin",
             component: () => import('../pages/admin/AdminPage.vue'),
-
+            meta: { requiresAuth: true },
             children: [
                 {
                     path: '/admin',
@@ -46,5 +46,25 @@ const router = createRouter({
         }
     ]
 })
+
+// Navigation Guard Check login
+router.beforeEach((to, from, next) => {
+    const userData = localStorage.getItem('userData'); // Lấy toàn bộ dữ liệu từ localStorage
+    const token = userData ? JSON.parse(userData).token : null; // Lấy token từ dữ liệu
+    const isAuthenticated = !!token; // Chuyển token thành boolean
+
+    console.log(token);
+
+    // console.log('Navigating to:', to.fullPath); // Kiểm tra đường dẫn
+    // console.log('isAuthenticated:', isAuthenticated); // Kiểm tra xem đã đăng nhập chưa
+
+    if (to.meta.requiresAuth && !isAuthenticated) {
+        console.log('Redirecting to login because user is not authenticated');
+        next({ path: '/login' });
+    }
+    else {
+        next();
+    }
+});
 
 export default router

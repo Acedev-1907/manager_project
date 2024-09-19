@@ -2,9 +2,6 @@
 import useVuelidate from '@vuelidate/core';
 import { required, email } from '@vuelidate/validators';
 import { useCreateOrUpdateMember } from './actions/createMember';
-import Error from '../../../components/Error.vue';
-import BaseInput from '../../../components/BaseInput.vue';
-import BaseBtn from '../../../components/BaseBtn.vue';
 import { memberStore } from './store/MemberStore';
 const rules = {
     email: { required, email },
@@ -48,7 +45,7 @@ async function submitMember() {
                     <RouterLink to="/members">See members list</RouterLink>
                     <div class="form-group mt-3">
                         <BaseBtn :class="memberStore.edit ? 'btn btn-warning' : 'btn btn-primary'"
-                            :label="memberStore.edit ? 'Update Membre' : 'Create Member'" :loading="loading" />
+                            :label="memberStore.edit ? 'Update Membrer' : 'Create Member'" :loading="loading" />
                     </div>
                 </form>
             </div>

@@ -15,6 +15,14 @@ async function logoutUser() {
         setTimeout(() => window.location.href = "/app/login", 1000)
     }
 }
+
+async function tryLogoutUser() {
+    await logout(undefined)
+}
+
+onMounted(async () => {
+    await tryLogoutUser()
+})
 </script>
 
 <template>

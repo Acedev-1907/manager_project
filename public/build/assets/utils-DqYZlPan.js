@@ -1,1 +1,0 @@
-import{a as s}from"./toast-notificaltion-BEiIHqqv.js";function n(o){if(Array.isArray(o))for(const e of o)s(e);else s(o.message)}function a(o,e){let r;return function(){clearTimeout(r),setTimeout(()=>o(),e)}}export{a as m,n as s};
