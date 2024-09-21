@@ -41,7 +41,17 @@ const router = createRouter({
                     path: '/create-members',
                     name: "create-members",
                     component: () => import('../pages/admin/member/CreateMember.vue'),
-                }
+                },
+                {
+                    path: '/projects',
+                    name: "projects",
+                    component: () => import('../pages/admin/project/ProjectPage.vue'),
+                },
+                {
+                    path: '/create-projects',
+                    name: "create-projects",
+                    component: () => import('../pages/admin/project/components/CreateProject.vue'),
+                },
             ]
         }
     ]
