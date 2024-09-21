@@ -11,11 +11,12 @@ use Illuminate\Support\Facades\Validator;
 
 class ProjectController extends Controller
 {
-    public function getProject(Request $rep, $slug){
-        $project=Project::with(['task.task_members.member'])
-        ->where('projects.slug',$slug)
-        ->first();
-        return response(['data'=>$project]);
+    public function getProject(Request $rep, $slug)
+    {
+        $project = Project::with(['task.task_members.member'])
+            ->where('projects.slug', $slug)
+            ->first();
+        return response(['data' => $project]);
     }
 
     public function index(Request $req)
@@ -25,7 +26,7 @@ class ProjectController extends Controller
 
         if (!is_null($query) && $query !== '') {
             $projects->where('name', 'like', '%' . $query . '%')
-                ->orderBy('id', 'desc'); 
+                ->orderBy('id', 'desc');
 
             return response(['data' => $projects->paginate(10)], 200);
         }
@@ -59,7 +60,7 @@ class ProjectController extends Controller
                 'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
                 'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
             ]);
-            return response(['message' => 'user created'], 200);
+            return response(['message' => 'Project created'], 200);
         });
     }
 
@@ -83,7 +84,8 @@ class ProjectController extends Controller
         return response(['message' => 'member updated'], 200);
     }
 
-    public function pinnendProject(Request $req){
+    public function pinnendProject(Request $req)
+    {
         $fields = $req->all();
 
         $errs = Validator::make($fields, [
@@ -91,19 +93,20 @@ class ProjectController extends Controller
         ]);
 
         if ($errs->fails()) {
-            return response($errs->errors()->all(),422);
+            return response($errs->errors()->all(), 422);
         }
 
         TaskProgress::where('projectId', $fields['projectId'])
-        ->update([
-            'pinned_on_dashboard' => TaskProgress::PINNED_ON_DASHBOARD
-        ]);
+            ->update([
+                'pinned_on_dashboard' => TaskProgress::PINNED_ON_DASHBOARD
+            ]);
 
-        return response(['message'=>'project pinned on dashboard']);
+        return response(['message' => 'project pinned on dashboard']);
     }
 
-    public function countProject(){
-       $count = Project::count();
-       return response(['count'=>$count]);
+    public function countProject()
+    {
+        $count = Project::count();
+        return response(['count' => $count]);
     }
 }

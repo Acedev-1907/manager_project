@@ -2,7 +2,7 @@ import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { showError, successMsg } from "../../../../helper/toast-notificaltion";
 import { showErrorResponse } from "../../../../helper/utils";
-import { projectStore } from "../store/ProjectStore";
+import { projectStore } from "../store/projectStore";
 
 export type ProjectInputType = {
     name: string

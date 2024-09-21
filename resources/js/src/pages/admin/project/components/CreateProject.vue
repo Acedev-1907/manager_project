@@ -2,7 +2,7 @@
 import useVuelidate from '@vuelidate/core';
 import { required } from '@vuelidate/validators';
 import { useCreateOrUpdateProject } from '../actions/createtProject';
-import { projectStore } from '../store/ProjectStore';
+import { projectStore } from '../store/projectStore';
 const rules = {
     name: { required },
     startDate: { required },
