@@ -1,14 +1,21 @@
 {
-  "_MemberStore-CNmS-ugz.js": {
-    "file": "assets/MemberStore-CNmS-ugz.js",
+  "_MemberStore-BKczrErB.js": {
+    "file": "assets/MemberStore-BKczrErB.js",
     "name": "MemberStore",
     "imports": [
       "resources/js/app.ts"
     ]
   },
-  "_index-B_rufATu.js": {
-    "file": "assets/index-B_rufATu.js",
+  "_index-6z7teoso.js": {
+    "file": "assets/index-6z7teoso.js",
     "name": "index",
+    "imports": [
+      "resources/js/app.ts"
+    ]
+  },
+  "_laravel-vue-pagination.es-1FsGsNxG.js": {
+    "file": "assets/laravel-vue-pagination.es-1FsGsNxG.js",
+    "name": "laravel-vue-pagination.es",
     "imports": [
       "resources/js/app.ts"
     ]
@@ -17,18 +24,25 @@
     "file": "assets/makeHttpReq-IEoXqM35.js",
     "name": "makeHttpReq"
   },
-  "_toast-notificaltion-Cc3Mv6Zn.js": {
-    "file": "assets/toast-notificaltion-Cc3Mv6Zn.js",
+  "_projectStore-CrgIw_v8.js": {
+    "file": "assets/projectStore-CrgIw_v8.js",
+    "name": "projectStore",
+    "imports": [
+      "resources/js/app.ts"
+    ]
+  },
+  "_toast-notificaltion-S-mg22Rk.js": {
+    "file": "assets/toast-notificaltion-S-mg22Rk.js",
     "name": "toast-notificaltion",
     "imports": [
       "resources/js/app.ts"
     ]
   },
-  "_utils-Dc91b2uC.js": {
-    "file": "assets/utils-Dc91b2uC.js",
+  "_utils-DeFJ5rtO.js": {
+    "file": "assets/utils-DeFJ5rtO.js",
     "name": "utils",
     "imports": [
-      "_toast-notificaltion-Cc3Mv6Zn.js"
+      "_toast-notificaltion-S-mg22Rk.js"
     ]
   },
   "resources/css/app.css": {
@@ -37,7 +51,7 @@
     "isEntry": true
   },
   "resources/js/app.ts": {
-    "file": "assets/app-CADoG00p.js",
+    "file": "assets/app-CIMN4Q9B.js",
     "name": "app",
     "src": "resources/js/app.ts",
     "isEntry": true,
@@ -49,14 +63,15 @@
       "resources/js/src/pages/admin/dashborad/DashboradPage.vue",
       "resources/js/src/pages/admin/member/MemberPage.vue",
       "resources/js/src/pages/admin/member/CreateMember.vue",
-      "resources/js/src/pages/admin/project/ProjectPage.vue"
+      "resources/js/src/pages/admin/project/ProjectPage.vue",
+      "resources/js/src/pages/admin/project/components/CreateProject.vue"
     ],
     "css": [
       "assets/app-NmPimCJu.css"
     ]
   },
   "resources/js/src/pages/admin/AdminPage.vue": {
-    "file": "assets/AdminPage-DtqoLkt3.js",
+    "file": "assets/AdminPage-QPAbtpr_.js",
     "name": "AdminPage",
     "src": "resources/js/src/pages/admin/AdminPage.vue",
     "isDynamicEntry": true,
@@ -69,7 +84,7 @@
     ]
   },
   "resources/js/src/pages/admin/dashborad/DashboradPage.vue": {
-    "file": "assets/DashboradPage-DCsqdZOH.js",
+    "file": "assets/DashboradPage-GNhpgKhE.js",
     "name": "DashboradPage",
     "src": "resources/js/src/pages/admin/dashborad/DashboradPage.vue",
     "isDynamicEntry": true,
@@ -78,43 +93,63 @@
     ]
   },
   "resources/js/src/pages/admin/member/CreateMember.vue": {
-    "file": "assets/CreateMember-D6Yaq0dN.js",
+    "file": "assets/CreateMember-DwVqeDsw.js",
     "name": "CreateMember",
     "src": "resources/js/src/pages/admin/member/CreateMember.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.ts",
-      "_index-B_rufATu.js",
+      "_index-6z7teoso.js",
       "_makeHttpReq-IEoXqM35.js",
-      "_toast-notificaltion-Cc3Mv6Zn.js",
-      "_utils-Dc91b2uC.js",
-      "_MemberStore-CNmS-ugz.js"
+      "_toast-notificaltion-S-mg22Rk.js",
+      "_utils-DeFJ5rtO.js",
+      "_MemberStore-BKczrErB.js"
     ]
   },
   "resources/js/src/pages/admin/member/MemberPage.vue": {
-    "file": "assets/MemberPage-BLgNINI_.js",
+    "file": "assets/MemberPage-DuLq_vjN.js",
     "name": "MemberPage",
     "src": "resources/js/src/pages/admin/member/MemberPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.ts",
-      "_utils-Dc91b2uC.js",
+      "_utils-DeFJ5rtO.js",
       "_makeHttpReq-IEoXqM35.js",
-      "_MemberStore-CNmS-ugz.js",
-      "_toast-notificaltion-Cc3Mv6Zn.js"
+      "_laravel-vue-pagination.es-1FsGsNxG.js",
+      "_MemberStore-BKczrErB.js",
+      "_toast-notificaltion-S-mg22Rk.js"
     ]
   },
   "resources/js/src/pages/admin/project/ProjectPage.vue": {
-    "file": "assets/ProjectPage-DcR5Fmjn.js",
+    "file": "assets/ProjectPage-BnTiCKbX.js",
     "name": "ProjectPage",
     "src": "resources/js/src/pages/admin/project/ProjectPage.vue",
     "isDynamicEntry": true,
     "imports": [
-      "resources/js/app.ts"
+      "_laravel-vue-pagination.es-1FsGsNxG.js",
+      "_makeHttpReq-IEoXqM35.js",
+      "_utils-DeFJ5rtO.js",
+      "resources/js/app.ts",
+      "_projectStore-CrgIw_v8.js",
+      "_toast-notificaltion-S-mg22Rk.js"
+    ]
+  },
+  "resources/js/src/pages/admin/project/components/CreateProject.vue": {
+    "file": "assets/CreateProject-8oz09lQM.js",
+    "name": "CreateProject",
+    "src": "resources/js/src/pages/admin/project/components/CreateProject.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.ts",
+      "_index-6z7teoso.js",
+      "_makeHttpReq-IEoXqM35.js",
+      "_toast-notificaltion-S-mg22Rk.js",
+      "_utils-DeFJ5rtO.js",
+      "_projectStore-CrgIw_v8.js"
     ]
   },
   "resources/js/src/pages/auth/AuthPage.vue": {
-    "file": "assets/AuthPage-C6ND4QuX.js",
+    "file": "assets/AuthPage-TurYsfM0.js",
     "name": "AuthPage",
     "src": "resources/js/src/pages/auth/AuthPage.vue",
     "isDynamicEntry": true,
@@ -123,28 +158,28 @@
     ]
   },
   "resources/js/src/pages/auth/LoginPage.vue": {
-    "file": "assets/LoginPage-B7oem-KQ.js",
+    "file": "assets/LoginPage-BlO1OBke.js",
     "name": "LoginPage",
     "src": "resources/js/src/pages/auth/LoginPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.ts",
-      "_index-B_rufATu.js",
+      "_index-6z7teoso.js",
       "_makeHttpReq-IEoXqM35.js",
-      "_toast-notificaltion-Cc3Mv6Zn.js",
-      "_utils-Dc91b2uC.js"
+      "_toast-notificaltion-S-mg22Rk.js",
+      "_utils-DeFJ5rtO.js"
     ]
   },
   "resources/js/src/pages/auth/RegisterPage.vue": {
-    "file": "assets/RegisterPage-DbiDH4fS.js",
+    "file": "assets/RegisterPage-B2ydIsd4.js",
     "name": "RegisterPage",
     "src": "resources/js/src/pages/auth/RegisterPage.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.ts",
-      "_index-B_rufATu.js",
+      "_index-6z7teoso.js",
       "_makeHttpReq-IEoXqM35.js",
-      "_toast-notificaltion-Cc3Mv6Zn.js"
+      "_toast-notificaltion-S-mg22Rk.js"
     ]
   }
 }

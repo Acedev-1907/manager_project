@@ -1,0 +1,1 @@
+import{Q as t}from"./app-CIMN4Q9B.js";const o=t.useToast();function r(s){o.error(s,{position:"bottom-right",duration:4e3,dismissible:!0})}function e(s){o.success(s,{position:"bottom-right",duration:4e3,dismissible:!0})}export{r as a,e as s};

@@ -27,7 +27,7 @@ async function submitProject() {
     <div class="container">
         <div class="row">
             <div class="col-md-6">
-                <h3>Create Project</h3>
+                <h3>{{ projectStore.edit ? 'Update Project' : 'Create Project' }}</h3>
                 <br />
                 <form @submit.prevent="submitProject">
                     <div class="form-group">

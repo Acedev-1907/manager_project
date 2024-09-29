@@ -22,7 +22,7 @@ const emit = defineEmits<{
 const query = ref("");
 const search = myDebounce(async function () {
     await emit("getProject", 1, query.value,);
-}, 200);
+}, 100);
 </script>
 
 <template>

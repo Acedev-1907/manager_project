@@ -48,8 +48,8 @@ const router = createRouter({
                     component: () => import('../pages/admin/project/ProjectPage.vue'),
                 },
                 {
-                    path: '/create-projects',
-                    name: "create-projects",
+                    path: '/create-project',
+                    name: "create-project",
                     component: () => import('../pages/admin/project/components/CreateProject.vue'),
                 },
             ]

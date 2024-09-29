@@ -1,0 +1,1 @@
+import{_ as o,r as t,o as c,c as r,a as n}from"./app-CIMN4Q9B.js";const s={},a={class:"container"};function _(i,d){const e=t("router-view");return c(),r("div",a,[n(e)])}const l=o(s,[["render",_]]);export{l as default};

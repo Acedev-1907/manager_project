@@ -11,6 +11,15 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/register', 'register');
     Route::post('/login', 'login');
 });
+Route::controller(ProjectController::class)->group(function () {
+    Route::post('/projects', 'store')->name('createProject');
+    Route::put('/projects', 'update')->name('update');
+    Route::get('/projects', 'index')->name('indexProject');
+    Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
+    Route::get('projects/{slug}', 'getProject')->name('getProject');
+    Route::get('/count/projects', 'countProject')->name('countProject');
+    Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
+});
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
 
@@ -18,14 +27,15 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('/logout', 'logoutUser');
     });
 
-    Route::controller(ProjectController::class)->group(function () {
-        Route::post('/projects', 'store')->name('createProject');
-        Route::put('/projects', 'update')->name('update');
-        Route::get('/projects', 'index')->name('indexProject');
-        Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
-        Route::get('projects/{slug}', 'getProject')->name('getProject');
-        Route::get('/count/projects', 'countProject')->name('countProject');
-    });
+    // Route::controller(ProjectController::class)->group(function () {
+    //     Route::post('/projects', 'store')->name('createProject');
+    //     Route::put('/projects', 'update')->name('update');
+    //     Route::get('/projects', 'index')->name('indexProject');
+    //     Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
+    //     Route::get('projects/{slug}', 'getProject')->name('getProject');
+    //     Route::get('/count/projects', 'countProject')->name('countProject');
+    //     Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
+    // });
 
     Route::controller(MemberContrller::class)->group(function () {
         Route::post('/members', 'store')->name('createMember');

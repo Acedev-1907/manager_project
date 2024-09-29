@@ -5,6 +5,7 @@ import { showErrorResponse } from "../../../../helper/utils";
 import { projectStore } from "../store/projectStore";
 
 export type ProjectInputType = {
+    id: number,
     name: string
     startDate: string
     endDate: string
@@ -27,6 +28,7 @@ export function useCreateOrUpdateProject() {
             projectStore.projectInput = {} as ProjectInputType
 
             successMsg(data.message)
+
         } catch (error) {
             loading.value = false
             showErrorResponse(error);
@@ -44,5 +46,7 @@ async function updateProject() {
     const data = await makeHttpReq<ProjectInputType, ProjectResponseType>
         ('projects', 'PUT', projectStore.projectInput)
     projectStore.edit = false
+    console.log('data', data);
+
     return data;
 }

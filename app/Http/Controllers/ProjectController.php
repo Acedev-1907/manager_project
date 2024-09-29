@@ -71,42 +71,65 @@ class ProjectController extends Controller
         $errs = Validator::make($fields, [
             'id' => 'required',
             'name' => 'required',
-            'email' => 'required',
+            // 'email' => 'required',
         ]);
 
         if ($errs->fails()) return response($errs->errors()->all(), 422);
 
-        Member::where('id', $fields['id'])->update([
+        Project::where('id', $fields['id'])->update([
             'name' => $fields['name'],
-            'email' => $fields['email'],
+            'startDate' => $fields['startDate'],
+            'endDate' => $fields['endDate']
+            // 'email' => $fields['email'],
         ]);
 
-        return response(['message' => 'member updated'], 200);
+        return response(['message' => 'Project updated'], 200);
     }
 
     public function pinnendProject(Request $req)
     {
-        $fields = $req->all();
+        return DB::transaction(function () use ($req) {
+            $fields = $req->all();
 
-        $errs = Validator::make($fields, [
-            'projectId' => 'required',
-        ]);
-
-        if ($errs->fails()) {
-            return response($errs->errors()->all(), 422);
-        }
-
-        TaskProgress::where('projectId', $fields['projectId'])
-            ->update([
-                'pinned_on_dashboard' => TaskProgress::PINNED_ON_DASHBOARD
+            $errs = Validator::make($fields, [
+                'projectId' => 'required',
             ]);
 
-        return response(['message' => 'project pinned on dashboard']);
+            if ($errs->fails()) {
+                return response($errs->errors()->all(), 422);
+            }
+            TaskProgress::where('pinned_on_dashboard', TaskProgress::PINNED_ON_DASHBOARD)
+                ->update([
+                    'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD
+                ]);
+
+            TaskProgress::where('projectId', $fields['projectId'])
+                ->update([
+                    'pinned_on_dashboard' => TaskProgress::PINNED_ON_DASHBOARD
+                ]);
+
+            return response(['message' => 'project pinned on dashboard']);
+        });
     }
 
     public function countProject()
     {
         $count = Project::count();
         return response(['count' => $count]);
+    }
+
+    public function getPinnnedProject()
+    {
+        $project = DB::table('task_progress')
+            ->join('projects', 'task_progress.projectId', '=', 'projects.id')
+            ->select('projects.id', 'projects.name')
+            ->where('task_progress.pinned_on_dashboard', TaskProgress::PINNED_ON_DASHBOARD)
+            ->first();
+
+        if (!is_null($project)) {
+            return response(['data' => $project]);
+        }
+
+        return response(['data' => null]);
     }
 }

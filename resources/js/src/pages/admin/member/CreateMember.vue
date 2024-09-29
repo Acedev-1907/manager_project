@@ -26,7 +26,7 @@ async function submitMember() {
     <div class="container">
         <div class="row">
             <div class="col-md-6">
-                <h3>Create Member</h3>
+                <h3>{{ memberStore.edit ? 'Update Member' : 'Create Member' }}</h3>
                 <br />
                 <form @submit.prevent="submitMember">
                     <div class="form-group">
