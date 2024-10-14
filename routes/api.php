@@ -19,6 +19,7 @@ Route::controller(ProjectController::class)->group(function () {
     Route::get('projects/{slug}', 'getProject')->name('getProject');
     Route::get('/count/projects', 'countProject')->name('countProject');
     Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
+    Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
 });
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
@@ -35,6 +36,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //     Route::get('projects/{slug}', 'getProject')->name('getProject');
     //     Route::get('/count/projects', 'countProject')->name('countProject');
     //     Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
+    //     Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
     // });
 
     Route::controller(MemberContrller::class)->group(function () {

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\NewProjectCreated;
 use App\Models\Member;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\TaskProgress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -11,9 +13,9 @@ use Illuminate\Support\Facades\Validator;
 
 class ProjectController extends Controller
 {
-    public function getProject(Request $rep, $slug)
+    public function getProject($slug)
     {
-        $project = Project::with(['task.task_members.member'])
+        $project = Project::with(['task.task_members.member', 'task_progress'])
             ->where('projects.slug', $slug)
             ->first();
         return response(['data' => $project]);
@@ -60,6 +62,10 @@ class ProjectController extends Controller
                 'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
                 'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
             ]);
+
+            $count = Project::count();
+            NewProjectCreated::dispatch($count);
+
             return response(['message' => 'Project created'], 200);
         });
     }
@@ -131,5 +137,31 @@ class ProjectController extends Controller
         }
 
         return response(['data' => null]);
+    }
+
+    public  function getProjectChartData(Request $req)
+    {
+        $projectId = $req->projectId;
+        $task = Task::where('projectId', $projectId)->get();
+
+        $taskProjess = TaskProgress::where('projectId', $projectId)->select('progress')->first();
+
+        $pending = 0;
+        $completed = 0;
+        foreach ($task as $row) {
+            if (intval($row->status) === Task::PENDING) {
+                $pending++;
+            }
+
+            if (intval($row->status) === Task::COMPLETED) {
+                $completed++;
+            }
+        }
+        return response(
+            [
+                'task' => [$pending, $completed],
+                'progress' => intval($taskProjess->progress)
+            ]
+        );
     }
 }

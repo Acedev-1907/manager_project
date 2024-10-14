@@ -3,13 +3,17 @@ import { onMounted } from 'vue';
 import { useGetPinnedProject } from './actions/GetPinnedProject';
 import ApexDonut from './components/ApexDonut.vue';
 import ApexRadialBar from './components/ApexRadialBar.vue';
-import { useGetCountProject } from './actions/GetCountProject';
+import { useGetTotalProject } from './actions/countProject';
+import { useGetChartData } from './actions/getChartData';
 
 const { project, getPinnedProject } = useGetPinnedProject()
-const { countProject, getCountProject } = useGetCountProject()
+const { countProject, getTotalProject } = useGetTotalProject()
+const { chartData, getChartData } = useGetChartData();
+
 onMounted(async () => {
-    await getPinnedProject(), getCountProject()
-    console.log(getPinnedProject);
+    await getPinnedProject();
+    getTotalProject();
+    getChartData(project.value.id);
 })
 </script>
 <template>
@@ -35,7 +39,6 @@ onMounted(async () => {
                     <div class="card-body">
                         <br />
                         <br />
-
                         <h2 align="center">{{ countProject?.count }}</h2>
                         <br />
                         <br />
@@ -46,7 +49,12 @@ onMounted(async () => {
                 <div class="card">
                     <div class="card-header"><b>Tasks</b></div>
                     <div class="card-body">
-                        <ApexDonut :task="[40, 60]" />
+                        <div v-if="chartData.tasks">
+                            <ApexDonut :task="chartData.tasks" />
+                        </div>
+                        <div v-else>
+                            <ApexDonut :task="[100, 0]" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -57,15 +65,13 @@ onMounted(async () => {
                     </div>
 
                     <div class="card-body">
-                        <ApexRadialBar :percent=70 />
-
-                        <!-- <div v-if="chartData.progress > 0">
+                        <div v-if="chartData.progress > 0">
                             <ApexRadialBar :percent="chartData.progress" />
                         </div>
                         <div v-else>
-                            <ApexRadialBar :percent="chartData.progress" />
+                            <ApexRadialBar :percent="0" />
                         </div>
-                        <br /> -->
+                        <br />
                     </div>
                 </div>
             </div>
