@@ -8,40 +8,60 @@ import ProjectProgress from './components/ProjectProgress.vue';
 import NotStartedColumn from './components/NotStartedColumn.vue';
 import PendingColumn from './components/PendingColumn.vue';
 import CompletedColumn from './components/CompletedColumn.vue';
+import AddTaskModal from './components/AddTaskModal.vue';
+import { closeModal, openModal } from '../../../helper/utils';
+import { useGetMembers } from '../member/actions/getMember';
+import { taskStore } from './store/kabanStore';
 const route = useRoute();
 
 const { ProjectData, getProjectDetail } = useGetProjectDetail();
 
+const { getMembers, loading, memberData } = useGetMembers();
+
+
 const query = route.query?.query as string
 
 onMounted(async () => {
-    await getProjectDetail(query)
+    await getProjectDetail(query);
+    getMembers(1, '');
 })
 
+function openTaskModal() {
+    openModal('taskModal').then(() => {
+        console.log('modal open ...');
+        taskStore.taskInput.projectId = ProjectData.value?.data.id;
+        taskStore.taskInput.memberIds = [];
+    })
+}
+
+function closeTaskModal() {
+    closeModal('taskModal')
+}
 </script>
 <template>
     <div class="row">
+        <AddTaskModal :members="memberData" @closeModal="closeTaskModal" />
         <BreadCrumb />
         <ProjectDetail :ProjectData="ProjectData" />
         <ProjectProgress :ProjectData="ProjectData" />
-
     </div>
     <br />
 
     <div class="card">
         <div class="card-body">
             <div class="row" style="height: 500px;">
-                <NotStartedColumn />
+                <NotStartedColumn @openTaskModal="openTaskModal" />
                 <PendingColumn />
                 <CompletedColumn />
             </div>
         </div>
     </div>
 </template>
+<!-- <style scoped> -->
 <style>
 .assignees button {
     border-radius: 50px;
-    width: 40px;
+    width: 13%;
     border: 1px solid grey;
 }
 

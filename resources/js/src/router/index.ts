@@ -55,7 +55,7 @@ const router = createRouter({
                 {
                     path: '/kaban',
                     name: "kaban",
-                    component: () => import('../pages/admin/kabanborad/Kabanborad.vue'),
+                    component: () => import('../pages/admin/kabanborad/KabanBorad.vue'),
                 },
             ]
         }
