@@ -13,7 +13,6 @@ const { getMembers, memberData, loading } = useGetMembers()
 async function showListOfMembers() {
     await getMembers()
 }
-console.log('Pagination Data:', memberData.value);
 
 function editMember(member: MemberType) {
     memberStore.memberInput = member

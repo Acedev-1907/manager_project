@@ -5,7 +5,7 @@ import { ref } from "vue";
 import { taskStore } from "../store/kabanStore";
 import { GetMemberType } from "../../member/actions/getMember";
 import { useSelectMember } from "../actions/selectMember";
-import { openModal } from "../../../../helper/utils";
+import { myDebounce, openModal } from "../../../../helper/utils";
 import { useCreateTask } from "../actions/CreateTask";
 import { showError } from "../../../../helper/toast-notificaltion";
 
@@ -33,7 +33,6 @@ async function submitTask() {
     const result = await v$.value.$validate();
 
     if (!result) return;
-    console.log(taskStore.taskInput.memberIds.length);
 
     if (taskStore.taskInput.memberIds.length > 0) {
         await createTask();
@@ -44,6 +43,10 @@ async function submitTask() {
         showError('please select a member');
     }
 }
+
+const searchMember = myDebounce(async function () {
+    emit('getMembers', 1, query.value);
+}, 200);
 
 </script>
 <template>
@@ -69,9 +72,9 @@ async function submitTask() {
                         </div>
 
                         <div class="row">
-                            <div class="row">
-                                {{ taskStore.taskInput }}
-                                <div class="col-md-9">
+                            <!-- {{ taskStore.taskInput }} -->
+                            <div class="form-group row">
+                                <div class="col-md-9 task-input-name">
                                     <Error :errors="v$.name.$errors">
                                         <BaseInput placeholder="Task name" v-model="taskStore.taskInput.name" />
                                     </Error>
@@ -87,7 +90,8 @@ async function submitTask() {
 
                             <div class="form-group">
                                 <!-- @keyup="searchMember" -->
-                                <BaseInput type="text" placeholder="Search a member..." />
+                                <BaseInput type="text" v-model="query" @keydown="searchMember"
+                                    placeholder="Search a member..." />
                             </div>
 
                             <br />
@@ -123,14 +127,25 @@ async function submitTask() {
 </template>
 <style scoped>
 .select-members span {
+    display: inline-table;
     padding: 5px;
     border-radius: 4px;
     border: 1px solid gray;
     cursor: pointer;
     margin: 2px;
+    justify-content: space-between;
 }
 
 .select-members span b {
     color: red;
 }
+
+.task-input-name {
+    display: flex;
+    flex-direction: column;
+}
+
+/* .task-input-name {
+    margin-bottom: 10px;
+} */
 </style>

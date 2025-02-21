@@ -32,7 +32,7 @@ async function submitRegister() {
                             Register
                         </h2>
                         <br />
-                        {{ registerInput }}
+                        <!-- {{ registerInput }} -->
                         <form @submit.prevent="submitRegister">
                             <div class="form-group">
                                 <Error label="Email" :errors="v$.email.$errors">

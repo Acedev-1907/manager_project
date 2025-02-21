@@ -72,9 +72,9 @@ export function getChar(str: string) {
         const index = 1
         if (index >= 0 && index < str.length) {
             return str.charAt(index).toLocaleUpperCase();
-        } else {
+        }
+        else {
             return '';
         }
     }
-
 }

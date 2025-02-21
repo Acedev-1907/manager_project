@@ -46,7 +46,6 @@ async function updateProject() {
     const data = await makeHttpReq<ProjectInputType, ProjectResponseType>
         ('projects', 'PUT', projectStore.projectInput)
     projectStore.edit = false
-    console.log('data', data);
 
     return data;
 }

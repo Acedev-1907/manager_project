@@ -37,7 +37,6 @@ defineProps<{
 <template>
     <nav id="sidebarMenu" style="background-color: white" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
         <div class="position-sticky pt-3">
-
             <div align="center">
                 <img :src="`${APP.baseURL}/others/logo.png`" style="height: 55px" alt="">
                 <h4>TaskMgr</h4>

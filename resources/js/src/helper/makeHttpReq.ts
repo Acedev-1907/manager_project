@@ -11,7 +11,7 @@ export function makeHttpReq<TInput, TResponse>(
     return new Promise<TResponse>(async (resole, reject) => {
         try {
             const userData = getUserData()
-            console.log('userData', userData);
+
             const authHeader = "Bearer " + userData?.token;
             const res = await fetch(`${APP.apiBaseURL}/${endpoint}`, {
                 method: verb,

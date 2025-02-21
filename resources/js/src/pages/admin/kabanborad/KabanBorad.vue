@@ -5,13 +5,13 @@ import BreadCrumb from './components/BreadCrumb.vue';
 import { useGetProjectDetail } from './actions/getProjectDetail';
 import ProjectDetail from './components/ProjectData.vue';
 import ProjectProgress from './components/ProjectProgress.vue';
-import NotStartedColumn from './components/NotStartedColumn.vue';
 import PendingColumn from './components/PendingColumn.vue';
 import CompletedColumn from './components/CompletedColumn.vue';
 import AddTaskModal from './components/AddTaskModal.vue';
 import { closeModal, openModal } from '../../../helper/utils';
 import { useGetMembers } from '../member/actions/getMember';
 import { taskStore } from './store/kabanStore';
+import NotStartedColumn from './components/NotStartedColumn.vue';
 const route = useRoute();
 
 const { ProjectData, getProjectDetail } = useGetProjectDetail();
@@ -40,7 +40,7 @@ function closeTaskModal() {
 </script>
 <template>
     <div class="row">
-        <AddTaskModal :members="memberData" @closeModal="closeTaskModal" />
+        <AddTaskModal @getMembers="getMembers" :members="memberData" @closeModal="closeTaskModal" />
         <BreadCrumb />
         <ProjectDetail :ProjectData="ProjectData" />
         <ProjectProgress :ProjectData="ProjectData" />
@@ -50,7 +50,7 @@ function closeTaskModal() {
     <div class="card">
         <div class="card-body">
             <div class="row" style="height: 500px;">
-                <NotStartedColumn @openTaskModal="openTaskModal" />
+                <NotStartedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
                 <PendingColumn />
                 <CompletedColumn />
             </div>
