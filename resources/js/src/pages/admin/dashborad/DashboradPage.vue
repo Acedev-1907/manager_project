@@ -49,11 +49,12 @@ onMounted(async () => {
                 <div class="card">
                     <div class="card-header"><b>Tasks</b></div>
                     <div class="card-body">
+                        <!-- {{ chartData.tasks }} -->
                         <div v-if="chartData.tasks">
                             <ApexDonut :task="chartData.tasks" />
                         </div>
                         <div v-else>
-                            <ApexDonut :task="[100, 0]" />
+                            <ApexDonut :task="[0, 0]" />
                         </div>
                     </div>
                 </div>

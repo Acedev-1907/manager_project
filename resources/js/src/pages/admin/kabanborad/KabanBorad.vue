@@ -12,6 +12,7 @@ import { closeModal, openModal } from '../../../helper/utils';
 import { useGetMembers } from '../member/actions/getMember';
 import { taskStore } from './store/kabanStore';
 import NotStartedColumn from './components/NotStartedColumn.vue';
+import { useDragTask } from './actions/dragTask';
 const route = useRoute();
 
 const { ProjectData, getProjectDetail } = useGetProjectDetail();
@@ -19,14 +20,14 @@ const { ProjectData, getProjectDetail } = useGetProjectDetail();
 const { getMembers, loading, memberData } = useGetMembers();
 
 
-const query = route.query?.query as string
+const slug = route.query?.query as string;
 
 onMounted(async () => {
-    await getProjectDetail(query);
+    await getProjectDetail(slug);
     getMembers(1, '');
 })
 
-function openTaskModal() {
+async function openTaskModal() {
     openModal('taskModal').then(() => {
         console.log('modal open ...');
         taskStore.taskInput.projectId = ProjectData.value?.data.id;
@@ -37,6 +38,8 @@ function openTaskModal() {
 function closeTaskModal() {
     closeModal('taskModal')
 }
+
+const { fromNotStartedToPending, fromPendingToCompleted, fromCompletedToPending } = useDragTask(getProjectDetail, slug);
 </script>
 <template>
     <div class="row">
@@ -50,9 +53,12 @@ function closeTaskModal() {
     <div class="card">
         <div class="card-body">
             <div class="row" style="height: 500px;">
-                <NotStartedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
-                <PendingColumn />
-                <CompletedColumn />
+                <NotStartedColumn @fromNotStartedToPending="fromNotStartedToPending" :projectData="ProjectData"
+                    @openTaskModal="openTaskModal" />
+                <PendingColumn @fromPendingToCompleted="fromPendingToCompleted" :projectData="ProjectData"
+                    @openTaskModal="openTaskModal" />
+                <CompletedColumn @fromCompletedToPending="fromCompletedToPending" :projectData="ProjectData"
+                    @openTaskModal="openTaskModal" />
             </div>
         </div>
     </div>
@@ -61,16 +67,17 @@ function closeTaskModal() {
 <style>
 .assignees button {
     border-radius: 50px;
-    width: 13%;
+    width: 40px;
     border: 1px solid grey;
+    height: 40px;
 }
 
-.assignees .member_2 {
+.assignees .member_1 {
     position: relative;
     left: -10px;
 }
 
-.assignees .member_3 {
+.assignees .member_2 {
     position: relative;
     left: -20px;
 }

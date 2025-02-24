@@ -7,7 +7,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script src="https://kit.fontawesome.com/d615c16483.js" crossorigin="anonymous"></script>
-    <title>Document</title>
+    <title>App Task</title>
 </head>
 <script>
     const randomizeColour = () => {
@@ -57,22 +57,35 @@
     }
 </script>
 <style>
-    html,
-    body {
-        overflow: hidden;
-        height: 100%;
-        width: 100%;
-        margin: 0;
-        padding: 0;
+    .hovered {
+        background-color: rgba(30, 233, 81, 0.317);
+        border: 2px dashed #3cff00;
+        transition: background-color 0.3s ease, border 0.3s ease;
     }
 
-    /* Chỉ áp dụng cho các màn hình PC và Laptop */
+    .pending-column {
+        transition: transform 0.3s ease;
+    }
+
+    .pending-column.hovered {
+        transform: scale(1.05);
+    }
+
+    .card-direct {
+        max-height: 340px;
+        overflow-y: auto;
+    }
+
     @media screen and (min-width: 1024px) {
+        body {
+            overflow: hidden;
+        }
+
         .star {
             position: absolute;
             pointer-events: none;
             margin: 10px;
-            z-index: 0;
+            z-index: -2;
             animation: fall 5s forwards;
             /* Animation hoạt động lâu trên màn hình lớn */
         }
@@ -81,8 +94,8 @@
             box-shadow: 0px 0px 16px 7px #a78bfa;
             height: 1px;
             width: 1px;
+            z-index: -1;
             position: absolute;
-            z-index: 0;
         }
 
         /* Animations */

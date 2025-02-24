@@ -47,7 +47,8 @@ class TaskController extends Controller
     public function TaskToNotStartedToPending(Request $req)
     {
         Task::changeTaskStatus($req->taskId, Task::PENDING);
-        return response(['message' => 'task move to peding'], 200);
+        Task::handleProjectProgress($req->projectId);
+        return response(['message' => 'task move to peding'], 200); 
     }
 
     public function TaskToNotStartedToCompleted(Request $req)
@@ -59,6 +60,7 @@ class TaskController extends Controller
     public function TaskToPendingToCompleted(Request $req)
     {
         Task::changeTaskStatus($req->taskId, Task::COMPLETED);
+        Task::handleProjectProgress($req->projectId);
         return response(['message' => 'task move to completed'], 200);
     }
 
@@ -71,6 +73,7 @@ class TaskController extends Controller
     public function TaskToCompletedToPending(Request $req)
     {
         Task::changeTaskStatus($req->taskId, Task::PENDING);
+        Task::handleProjectProgress($req->projectId);
         return response(['message' => 'task move to peding'], 200);
     }
 

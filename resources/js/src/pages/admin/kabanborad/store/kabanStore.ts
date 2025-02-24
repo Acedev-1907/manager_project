@@ -4,7 +4,8 @@ import { CreateTaskInput } from '../actions/CreateTask';
 const useTaskStore = defineStore('task', {
     state: () => ({
         taskInput: {} as CreateTaskInput,
-        edit: false
+        edit: false,
+        currentTaskId: 0 as number,
     })
 })
 

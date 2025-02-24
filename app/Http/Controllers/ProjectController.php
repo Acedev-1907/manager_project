@@ -15,24 +15,24 @@ class ProjectController extends Controller
 {
     public function getProject($slug)
     {
-        $project = Project::with(['task.task_members.member', 'task_progress'])
+        $project = Project::with(['tasks.task_members.members','task_progress'])
             ->where('projects.slug', $slug)
             ->first();
-        return response(['data' => $project]);
+
+            return response(['data' => $project]);
     }
 
-    public function index(Request $req)
+    public function index(Request $request)
     {
-        $query = $req->get('query');
+        $query = $request->get('query');
         $projects = Project::with(['task_progress']);
 
-        if (!is_null($query) && $query !== '') {
+        if (!is_null($query)  && $query !== '') {
             $projects->where('name', 'like', '%' . $query . '%')
                 ->orderBy('id', 'desc');
 
             return response(['data' => $projects->paginate(10)], 200);
         }
-
         return response(['data' => $projects->paginate(10)], 200);
     }
 
@@ -157,9 +157,10 @@ class ProjectController extends Controller
                 $completed++;
             }
         }
+
         return response(
             [
-                'task' => [$pending, $completed],
+                'tasks' => [$pending, $completed],
                 'progress' => intval($taskProjess->progress)
             ]
         );

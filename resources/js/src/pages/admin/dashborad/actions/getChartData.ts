@@ -14,6 +14,8 @@ export function useGetChartData() {
             const data = await makeHttpReq<undefined, chartDataType>(`chart-data/projects?projectId=${projectsId}`, 'GET')
             chartData.value = data
             // updateData()
+            console.log(chartData.value);
+
         } catch (error) {
             showErrorResponse(error)
         }
