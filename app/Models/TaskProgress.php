@@ -14,6 +14,6 @@ class TaskProgress extends Model
     const PINNED_ON_DASHBOARD = 1;
 
     const INITIAL_PROJECT_PERCENCT = 0;
-    
-    protected $guarded=[];
+
+    protected $guarded = [];
 }

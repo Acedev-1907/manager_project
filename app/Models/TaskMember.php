@@ -11,7 +11,8 @@ class TaskMember extends Model
 
     protected $guarded=[];
 
-    public function member(){
-        return $this->hasOne(Member::class,'id');
-      }
+     public function members()
+    {
+        return $this->belongsTo(Member::class, 'memberId');
+    }
 }

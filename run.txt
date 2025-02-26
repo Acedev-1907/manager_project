@@ -1,0 +1,2 @@
+maildev --web 1081 --smtp 2525
+php artisan queue:work
