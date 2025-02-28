@@ -50,7 +50,7 @@ const { fromNotStartedToPending, fromPendingToCompleted, fromCompletedToPending 
     </div>
     <br />
 
-    <div class="card">
+    <div class="card card-task">
         <div class="card-body">
             <div class="row" style="height: 500px;">
                 <NotStartedColumn @fromNotStartedToPending="fromNotStartedToPending" :projectData="ProjectData"
@@ -89,9 +89,11 @@ const { fromNotStartedToPending, fromPendingToCompleted, fromCompletedToPending 
 
 .not_started_task {
     background-color: aliceblue;
+    height: 384px;
 }
 
 .pending_task {
-    background-color: rgba(214, 214, 214, 0.276);
+    background-color: rgba(231, 251, 83, 0.33);
+    height: 384px;
 }
 </style>

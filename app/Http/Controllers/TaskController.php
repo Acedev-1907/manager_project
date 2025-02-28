@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskStatusUpdated;
 use App\Models\Task;
 use App\Models\TaskMember;
+use App\Services\TaskService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
 {
+    public function __construct(private TaskService $taskService)
+    {}
+    
     public function createTask(Request $req)
     {
         return DB::transaction(function () use ($req) {
@@ -46,40 +51,54 @@ class TaskController extends Controller
 
     public function TaskToNotStartedToPending(Request $req)
     {
-        Task::changeTaskStatus($req->taskId, Task::PENDING);
-        Task::handleProjectProgress($req->projectId);
-        return response(['message' => 'task move to peding'], 200); 
+        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::PENDING);
+        if($checkUpdate){
+            return response(['message' => 'task move to peding'], 200);
+        }
     }
 
     public function TaskToNotStartedToCompleted(Request $req)
     {
-        Task::changeTaskStatus($req->taskId, Task::COMPLETED);
-        return response(['message' => 'task move to completed'], 200);
+        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::COMPLETED);
+
+        if($checkUpdate){
+            return response(['message' => 'task move to completed'], 200);
+        }
     }
 
     public function TaskToPendingToCompleted(Request $req)
     {
-        Task::changeTaskStatus($req->taskId, Task::COMPLETED);
-        Task::handleProjectProgress($req->projectId);
-        return response(['message' => 'task move to completed'], 200);
+        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::COMPLETED);
+
+        if($checkUpdate){
+            return response(['message' => 'task move to completed'], 200);
+        }
     }
 
     public function TaskToPendingToNotStarted(Request $req)
     {
-        Task::changeTaskStatus($req->taskId, Task::NOT_STARTED);
-        return response(['message' => 'task move to started'], 200);
+        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::NOT_STARTED);
+
+        if($checkUpdate){
+            return response(['message' => 'task move to started'], 200);
+        }
     }
 
     public function TaskToCompletedToPending(Request $req)
     {
-        Task::changeTaskStatus($req->taskId, Task::PENDING);
-        Task::handleProjectProgress($req->projectId);
-        return response(['message' => 'task move to peding'], 200);
+        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::PENDING);
+
+        if($checkUpdate){
+            return response(['message' => 'task move to pending'], 200);
+        }
     }
 
     public function TaskToCompletedToNotStarted(Request $req)
     {
-        Task::changeTaskStatus($req->taskId, Task::NOT_STARTED);
-        return response(['message' => 'task move to not started'], 200);
+        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::NOT_STARTED);
+
+        if($checkUpdate){
+            return response(['message' => 'task move to not started'], 200);
+        }
     }
 }

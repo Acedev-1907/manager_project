@@ -9,3 +9,7 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 Broadcast::channel('countProject', function () {
     return true;
 });
+
+Broadcast::channel('channel-task', function () {
+    return true;
+});

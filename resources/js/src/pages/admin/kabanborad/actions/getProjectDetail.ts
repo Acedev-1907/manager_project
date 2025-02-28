@@ -20,5 +20,5 @@ export function useGetProjectDetail() {
         }
     }
 
-    return { getProjectDetail, ProjectData, loading }
+    return { getProjectDetail , ProjectData, loading }
 }

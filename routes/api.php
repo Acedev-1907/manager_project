@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\MemberContrller;
+use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Http\Request;
@@ -39,7 +39,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     //     Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
     // });
 
-    Route::controller(MemberContrller::class)->group(function () {
+    Route::controller(MemberController::class)->group(function () {
         Route::post('/members', 'store')->name('createMember');
         Route::put('/members', 'update')->name('update');
         Route::get('/members', 'index')->name('indexMember');

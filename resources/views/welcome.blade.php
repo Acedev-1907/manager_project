@@ -81,13 +81,16 @@
             overflow: hidden;
         }
 
+        .card.card-task {
+            height: 420px;
+        }
+
         .star {
             position: absolute;
             pointer-events: none;
             margin: 10px;
             z-index: -2;
             animation: fall 5s forwards;
-            /* Animation hoạt động lâu trên màn hình lớn */
         }
 
         .glow {
