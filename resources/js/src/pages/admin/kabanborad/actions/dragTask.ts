@@ -1,12 +1,10 @@
-import { useRoute } from "vue-router";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { successMsg } from "../../../../helper/toast-notificaltion";
 import { taskStore } from "../store/kabanStore";
-import { useGetProjectDetail } from "./getProjectDetail";
 
 export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
 
-    function addDragAndDropListeners(sourceColumn: HTMLElement, targetColumn: HTMLElement, taskElement: HTMLElement, taskId: number, projectId: number, endpoint: string) {
+    function addDragAndDropListeners(targetColumn: HTMLElement, taskId: number, projectId: number, endpoint: string) {
         let isDragged = false;
 
         targetColumn.addEventListener("dragover", function (event) {
@@ -44,24 +42,24 @@ export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
     }
 
     async function fromNotStartedToPending(taskId: number, projectId: number) {
-        const notStartedTask = document.querySelector(`.notStartedTask_${taskId}`) as HTMLElement;
+        // const notStartedTask = document.querySelector(`.notStartedTask_${taskId}`) as HTMLElement;
         const pendingColumn = document.querySelector(".pending_task") as HTMLElement;
 
-        addDragAndDropListeners(pendingColumn, pendingColumn, notStartedTask, taskId, projectId, 'task/not_started_to_pending');
+        addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/not_started_to_pending');
     }
 
     async function fromPendingToCompleted(taskId: number, projectId: number) {
-        const pendingTask = document.querySelector(`.pendingTask_${taskId}`) as HTMLElement;
+        // const pendingTask = document.querySelector(`.pendingTask_${taskId}`) as HTMLElement;
         const completedColumn = document.querySelector(".completed_task") as HTMLElement;
 
-        addDragAndDropListeners(completedColumn, completedColumn, pendingTask, taskId, projectId, 'task/pending_to_completed');
+        addDragAndDropListeners(completedColumn, taskId, projectId, 'task/pending_to_completed');
     }
 
     function fromCompletedToPending(taskId: number, projectId: number) {
-        const completedTask = document.querySelector(`.completedTask_${taskId}`) as HTMLElement;
+        // const completedTask = document.querySelector(`.completedTask_${taskId}`) as HTMLElement;
         const pendingColumn = document.querySelector(".pending_task") as HTMLElement;
 
-        addDragAndDropListeners(pendingColumn, pendingColumn, completedTask, taskId, projectId, 'task/completed_to_pending');
+        addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/completed_to_pending');
     }
 
     return {

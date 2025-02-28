@@ -1,4 +1,3 @@
-
 export enum TaskStatus {
     NOT_STARTED = 0,
     PENDING = 1,
@@ -47,7 +46,7 @@ export type SingleProjectResponseType = {
             id: number;
             projectId: number
             progress: string
-            pinned_on_dashbaord: number
+            pinned_on_dashboard: number
             created_at: string
             updated_at: string
         };

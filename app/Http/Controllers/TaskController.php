@@ -44,8 +44,7 @@ class TaskController extends Controller
                     'memberId' => $members[$i]
                 ]);
             }
-
-            return response(['message' => 'user created'], 200);
+            return response(['message' => 'task created'], 200);
         });
     }
 
