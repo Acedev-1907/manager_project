@@ -39,7 +39,7 @@ function closeTaskModal() {
     closeModal('taskModal')
 }
 
-const { fromNotStartedToPending, fromPendingToCompleted, fromCompletedToPending } = useDragTask(getProjectDetail, slug);
+const { fromNotStartedToPending, fromNotStartedToCompleted, fromPendingToCompleted, fromPendingToNotStarted, fromCompletedToPending, fromCompletedToNotStarted } = useDragTask(getProjectDetail, slug);
 </script>
 <template>
     <div class="row">
@@ -53,11 +53,11 @@ const { fromNotStartedToPending, fromPendingToCompleted, fromCompletedToPending 
     <div class="card card-task">
         <div class="card-body">
             <div class="row" style="height: 500px;">
-                <NotStartedColumn @fromNotStartedToPending="fromNotStartedToPending" :projectData="ProjectData"
+                <NotStartedColumn @fromNotStartedToPending="fromNotStartedToPending" @fromNotStartedToCompleted="fromNotStartedToCompleted" :projectData="ProjectData"
                     @openTaskModal="openTaskModal" />
-                <PendingColumn @fromPendingToCompleted="fromPendingToCompleted" :projectData="ProjectData"
+                <PendingColumn @fromPendingToCompleted="fromPendingToCompleted"  @fromPendingToNotStarted="fromPendingToNotStarted" :projectData="ProjectData"
                     @openTaskModal="openTaskModal" />
-                <CompletedColumn @fromCompletedToPending="fromCompletedToPending" :projectData="ProjectData"
+                <CompletedColumn @fromCompletedToPending="fromCompletedToPending"  @fromCompletedToNotStarted="fromCompletedToNotStarted" :projectData="ProjectData"
                     @openTaskModal="openTaskModal" />
             </div>
         </div>
@@ -94,6 +94,11 @@ const { fromNotStartedToPending, fromPendingToCompleted, fromCompletedToPending 
 
 .pending_task {
     background-color: rgba(231, 251, 83, 0.33);
+    height: 384px;
+}
+
+.completed_task {
+    background-color: rgba(183, 235, 181, 0.658);
     height: 384px;
 }
 </style>

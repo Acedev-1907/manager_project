@@ -5,12 +5,13 @@ import { SingleProjectResponseType, TaskStatus } from '../actions/getProjectDeta
 defineProps<{
     projectData: SingleProjectResponseType
 }>()
+
 const emit = defineEmits<{
     (e: 'openTaskModal'): Promise<void>
     (e: 'fromNotStartedToPending', taskId: number, projectId: number): Promise<void>
-
-
+    (e: 'fromNotStartedToCompleted', taskId: number, projectId: number): Promise<void>
 }>()
+
 </script>
 <template>
     <div class="col-md-4 not_started_task">
@@ -20,8 +21,8 @@ const emit = defineEmits<{
         <div class="card-direct">
             <div v-for="task in projectData?.data?.tasks" :key="task.id"
                 v-show="task.status === TaskStatus.NOT_STARTED ? true : false"
-                @drag="emit('fromNotStartedToPending', task.id, projectData?.data?.id)" draggable="true"
-                :class="'card card-body card-direct  task_card notStartedTask_' + task.id">
+                @drag="emit('fromNotStartedToPending', task.id, projectData?.data?.id), emit('fromNotStartedToCompleted', task.id, projectData?.data?.id)"
+                draggable="true" :class="'card card-body card-direct  task_card notStartedTask_' + task.id">
                 <p>{{ task.name }}</p>
                 <div class="assignees">
                     <button v-for="(member, index) in task.task_members" :key="member.id"

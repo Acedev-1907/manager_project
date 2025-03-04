@@ -22,7 +22,7 @@ export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
 
         targetColumn.addEventListener("drop", async function (event) {
             event.preventDefault();
-            
+
             targetColumn.classList.remove("hovered");
             isDragged = false;
 
@@ -48,6 +48,20 @@ export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
         addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/not_started_to_pending');
     }
 
+    function fromNotStartedToCompleted(taskId: number, projectId: number) {
+        // const completedTask = document.querySelector(`.completedTask_${taskId}`) as HTMLElement;
+        const completedColumn = document.querySelector(".completed_task") as HTMLElement;
+
+        addDragAndDropListeners(completedColumn, taskId, projectId, 'task/not_started_to_completed');
+    }
+
+    async function fromPendingToNotStarted(taskId: number, projectId: number) {
+        // const pendingTask = document.querySelector(`.pendingTask_${taskId}`) as HTMLElement;
+        const notStartedColumn = document.querySelector(".not_started_task") as HTMLElement;
+
+        addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/pending_to_completed');
+    }
+
     async function fromPendingToCompleted(taskId: number, projectId: number) {
         // const pendingTask = document.querySelector(`.pendingTask_${taskId}`) as HTMLElement;
         const completedColumn = document.querySelector(".completed_task") as HTMLElement;
@@ -62,10 +76,21 @@ export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
         addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/completed_to_pending');
     }
 
+    function fromCompletedToNotStarted(taskId: number, projectId: number) {
+        // const completedTask = document.querySelector(`.completedTask_${taskId}`) as HTMLElement;
+        const notStartedColumn = document.querySelector(".not_started_task") as HTMLElement;
+
+        addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/completed_to_not_started');
+    }
+
+
     return {
         fromNotStartedToPending,
+        fromNotStartedToCompleted,
         fromPendingToCompleted,
-        fromCompletedToPending
+        fromPendingToNotStarted,
+        fromCompletedToPending,
+        fromCompletedToNotStarted,
     };
 }
 

@@ -8,6 +8,7 @@ defineProps<{
 
 const emit = defineEmits<{
     (e: "fromCompletedToPending", taskId: number, projectId: number): Promise<void>;
+    (e: "fromCompletedToNotStarted", taskId: number, projectId: number): Promise<void>;
 }>();
 </script>
 <template>
@@ -18,7 +19,7 @@ const emit = defineEmits<{
         <div class="card-direct">
             <div v-for="task in projectData?.data?.tasks" :key="task.id"
                 v-show="task.status === TaskStatus.COMPLETED ? true : false" draggable="true"
-                @drag="emit('fromCompletedToPending', task.id, projectData?.data?.id)"
+                @drag="emit('fromCompletedToPending', task.id, projectData?.data?.id), emit('fromCompletedToNotStarted', task.id, projectData?.data?.id)"
                 :class="'card card-body task_card completedTask_' + task.id">
                 <p>{{ task.name }}</p>
                 <div class="assignees">
