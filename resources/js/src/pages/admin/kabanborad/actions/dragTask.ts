@@ -59,7 +59,7 @@ export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
         // const pendingTask = document.querySelector(`.pendingTask_${taskId}`) as HTMLElement;
         const notStartedColumn = document.querySelector(".not_started_task") as HTMLElement;
 
-        addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/pending_to_completed');
+        addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/pending_to_not_started');
     }
 
     async function fromPendingToCompleted(taskId: number, projectId: number) {
