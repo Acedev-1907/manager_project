@@ -8,8 +8,7 @@ Route::get('/', function () {
 });
 
 Route::get('/app/{any}', function () {
-    return view('welcome');
+    return view('index');
 });
-
 
 Route::get('/check_email/{token}', [AuthController::class, 'validEmail'])->name('validEmail');

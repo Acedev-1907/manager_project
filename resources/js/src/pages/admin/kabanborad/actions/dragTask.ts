@@ -42,42 +42,36 @@ export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
     }
 
     async function fromNotStartedToPending(taskId: number, projectId: number) {
-        // const notStartedTask = document.querySelector(`.notStartedTask_${taskId}`) as HTMLElement;
         const pendingColumn = document.querySelector(".pending_task") as HTMLElement;
 
         addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/not_started_to_pending');
     }
 
     function fromNotStartedToCompleted(taskId: number, projectId: number) {
-        // const completedTask = document.querySelector(`.completedTask_${taskId}`) as HTMLElement;
         const completedColumn = document.querySelector(".completed_task") as HTMLElement;
 
         addDragAndDropListeners(completedColumn, taskId, projectId, 'task/not_started_to_completed');
     }
 
     async function fromPendingToNotStarted(taskId: number, projectId: number) {
-        // const pendingTask = document.querySelector(`.pendingTask_${taskId}`) as HTMLElement;
         const notStartedColumn = document.querySelector(".not_started_task") as HTMLElement;
 
         addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/pending_to_not_started');
     }
 
     async function fromPendingToCompleted(taskId: number, projectId: number) {
-        // const pendingTask = document.querySelector(`.pendingTask_${taskId}`) as HTMLElement;
         const completedColumn = document.querySelector(".completed_task") as HTMLElement;
 
         addDragAndDropListeners(completedColumn, taskId, projectId, 'task/pending_to_completed');
     }
 
     function fromCompletedToPending(taskId: number, projectId: number) {
-        // const completedTask = document.querySelector(`.completedTask_${taskId}`) as HTMLElement;
         const pendingColumn = document.querySelector(".pending_task") as HTMLElement;
 
         addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/completed_to_pending');
     }
 
     function fromCompletedToNotStarted(taskId: number, projectId: number) {
-        // const completedTask = document.querySelector(`.completedTask_${taskId}`) as HTMLElement;
         const notStartedColumn = document.querySelector(".not_started_task") as HTMLElement;
 
         addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/completed_to_not_started');

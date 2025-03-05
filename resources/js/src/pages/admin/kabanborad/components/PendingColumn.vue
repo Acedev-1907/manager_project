@@ -24,11 +24,13 @@ const emit = defineEmits<{
                 :class="'card card-body task_card pendingTask_' + task.id">
                 <p>{{ task.name }}</p>
                 <div class="assignees">
-                    <button v-for="(member, index) in task.task_members" :key="member.id"
-                        :class="'btn btn-primary member_' + index">
-                        {{ getChar(member?.members?.name) }}
-                    </button>
-                    {{ task?.task_members.length }} assignees
+                    <template v-for="(member, index) in task.task_members.slice(0, 3)" :key="member.id">
+                        <button :class="'btn btn-primary member_' + index">
+                            {{ getChar(member?.members?.name) }}
+                        </button>
+                    </template>
+                    <span v-if="task.task_members.length > 3">...</span>
+                    {{ task.task_members.length }} assignees
                 </div>
             </div>
         </div>

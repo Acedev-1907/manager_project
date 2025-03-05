@@ -72,7 +72,7 @@
     }
 
     .card-direct {
-        max-height: 340px;
+        max-height: 82%;
         overflow-y: auto;
     }
 
