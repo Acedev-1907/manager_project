@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use App\Events\TrackProjectProgress;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-// use  App\Events\TrackCompletedAndPendingTask;
+use  App\Events\TrackCompletedAndPending;
 
 class Task extends Model
 {
@@ -19,11 +20,6 @@ class Task extends Model
   public function task_members()
   {
     return $this->hasMany(TaskMember::class, 'taskId');
-  }
-
-  public static function changeTaskStatus($taskId, $status)
-  {
-    Task::where('id', $taskId)->update(['status' => $status]);
   }
 
   public static function countCompletedTask($projectId)
@@ -77,8 +73,8 @@ class Task extends Model
 
           $tasks = Task::countCompletedAndPendingTask($projectId);
 
-          // TrackCompletedAndPendingTask::dispatch($tasks);
-          // TrackProjectProgress::dispatch($progress);
+          TrackCompletedAndPending::dispatch($tasks);
+          TrackProjectProgress::dispatch($progress);
 
           return $progress;
       }

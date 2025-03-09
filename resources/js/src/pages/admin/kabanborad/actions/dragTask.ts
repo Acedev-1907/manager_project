@@ -4,178 +4,99 @@ import { taskStore } from "../store/kabanStore";
 
 export function useDragTask(fn: (slug: string) => Promise<void>, slug: string) {
 
-    async function fromNotStartedToPending(taskId: number, projectId: number) {
-        const notStartedTask = document.querySelector(
-            ".notStartedTask_" + taskId
-        ) as HTMLElement;
-        const pendingColumn = document.querySelector(
-            ".pending_task"
-        ) as HTMLElement;
+    function addDragAndDropListeners(targetColumn: HTMLElement, taskId: number, projectId: number, endpoint: string) {
         let isDragged = false;
 
-
-        pendingColumn.addEventListener("dragstart", function () {
-            console.log("dragstart");
-        });
-        //drag over event : this event fire many actions
-        pendingColumn.addEventListener("dragover", function (event) {
+        targetColumn.addEventListener("dragover", function (event) {
             if (!isDragged) {
                 event.preventDefault();
-                pendingColumn.className += " hovered";
+                targetColumn.classList.add("hovered");
                 isDragged = true;
             }
         });
 
-        pendingColumn.addEventListener("dragleave", function () {
-            console.log("dragstart");
+        targetColumn.addEventListener("dragleave", function () {
             isDragged = false;
-            pendingColumn.classList.remove("hovered");
+            targetColumn.classList.remove("hovered");
         });
 
-        // attention drop events fire many actions within console
-        pendingColumn.addEventListener("drop", async function (event) {
+        targetColumn.addEventListener("drop", async function (event) {
             event.preventDefault();
-            pendingColumn.append(notStartedTask);
-            pendingColumn.classList.remove("hovered");
+
+            targetColumn.classList.remove("hovered");
             isDragged = false;
 
-            // console.log('make httpp...',taskId) sending many actions
-            taskStore.currentTaskId = taskId
-            if (!pendingColumn.getAttribute("data-listeners-added")) {
-                pendingColumn.setAttribute("data-listeners-added", "true");
+            taskStore.currentTaskId = taskId;
+            if (!targetColumn.getAttribute("data-listeners-added")) {
+                targetColumn.setAttribute("data-listeners-added", "true");
 
                 setTimeout(async () => {
-
                     await Promise.all([
-                        changeTaskStatus(taskStore.currentTaskId, projectId, 'task/not_started_to_pending'),
+                        changeTaskStatus(taskStore.currentTaskId, projectId, endpoint),
                         fn(slug)
-                    ])
-                    pendingColumn.removeAttribute("data-listeners-added");
+                    ]);
+                    targetColumn.removeAttribute("data-listeners-added");
                 }, 200);
-
             }
         });
     }
 
+    async function fromNotStartedToPending(taskId: number, projectId: number) {
+        const pendingColumn = document.querySelector(".pending_task") as HTMLElement;
+
+        addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/not_started_to_pending');
+    }
+
+    function fromNotStartedToCompleted(taskId: number, projectId: number) {
+        const completedColumn = document.querySelector(".completed_task") as HTMLElement;
+
+        addDragAndDropListeners(completedColumn, taskId, projectId, 'task/not_started_to_completed');
+    }
+
+    async function fromPendingToNotStarted(taskId: number, projectId: number) {
+        const notStartedColumn = document.querySelector(".not_started_task") as HTMLElement;
+
+        addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/pending_to_not_started');
+    }
 
     async function fromPendingToCompleted(taskId: number, projectId: number) {
-        const pendingTask = document.querySelector(
-            ".pendingTask_" + taskId
-        ) as HTMLElement;
-        const completedColumn = document.querySelector(
-            ".completed_task"
-        ) as HTMLElement;
-        let isDragged = false;
+        const completedColumn = document.querySelector(".completed_task") as HTMLElement;
 
-        completedColumn.addEventListener("dragstart", function () {
-            console.log("dragstart");
-        });
-        //drag over event : this event fire many actions
-        completedColumn.addEventListener("dragover", function (event) {
-            if (!isDragged) {
-                event.preventDefault();
-                completedColumn.className += " hovered";
-                isDragged = true;
-            }
-        });
-
-        completedColumn.addEventListener("dragleave", function () {
-            console.log("dragstart");
-            isDragged = false;
-            completedColumn.classList.remove("hovered");
-        });
-
-        completedColumn.addEventListener("drop", function (event) {
-            event.preventDefault();
-            completedColumn.append(pendingTask);
-            completedColumn.classList.remove("hovered");
-            isDragged = false;
-            taskStore.currentTaskId = taskId
-            if (!completedColumn.getAttribute("data-listeners-added")) {
-                completedColumn.setAttribute("data-listeners-added", "true");
-
-                setTimeout(async () => {
-
-                    await Promise.all([
-                        changeTaskStatus(taskStore.currentTaskId, projectId, 'task/pending_to_completed'),
-                        fn(slug)
-                    ])
-                    completedColumn.removeAttribute("data-listeners-added");
-                }, 200);
-
-            }
-        });
-
+        addDragAndDropListeners(completedColumn, taskId, projectId, 'task/pending_to_completed');
     }
 
     function fromCompletedToPending(taskId: number, projectId: number) {
-        const completedTask = document.querySelector(
-            ".completedTask_" + taskId
-        ) as HTMLElement;
-        const pendingColumn = document.querySelector(
-            ".pending_task"
-        ) as HTMLElement;
-        let isDragged = false;
+        const pendingColumn = document.querySelector(".pending_task") as HTMLElement;
 
-        pendingColumn.addEventListener("dragstart", function () {
-            console.log("dragstart");
-        });
-        //drag over event : this event fire many actions
-        pendingColumn.addEventListener("dragover", function (event) {
-            if (!isDragged) {
-                event.preventDefault();
-                pendingColumn.className += " hovered";
-                isDragged = true;
-            }
-        });
-
-        pendingColumn.addEventListener("dragleave", function () {
-            console.log("dragstart");
-            isDragged = false;
-            pendingColumn.classList.remove("hovered");
-        });
-
-        pendingColumn.addEventListener("drop", function (event) {
-            event.preventDefault();
-            pendingColumn.append(completedTask);
-            pendingColumn.classList.remove("hovered");
-            isDragged = false;
-
-
-            taskStore.currentTaskId = taskId
-            if (!pendingColumn.getAttribute("data-listeners-added")) {
-                pendingColumn.setAttribute("data-listeners-added", "true");
-
-                setTimeout(async () => {
-
-                    await Promise.all([
-                        changeTaskStatus(taskStore.currentTaskId, projectId, 'task/completed_to_pending'),
-                        fn(slug)
-                    ])
-                    pendingColumn.removeAttribute("data-listeners-added");
-                }, 200);
-
-            }
-        });
+        addDragAndDropListeners(pendingColumn, taskId, projectId, 'task/completed_to_pending');
     }
+
+    function fromCompletedToNotStarted(taskId: number, projectId: number) {
+        const notStartedColumn = document.querySelector(".not_started_task") as HTMLElement;
+
+        addDragAndDropListeners(notStartedColumn, taskId, projectId, 'task/completed_to_not_started');
+    }
+
 
     return {
         fromNotStartedToPending,
+        fromNotStartedToCompleted,
         fromPendingToCompleted,
-        fromCompletedToPending
+        fromPendingToNotStarted,
+        fromCompletedToPending,
+        fromCompletedToNotStarted,
     };
 }
 
-
 export type changeTaskInput = {
     taskId: number;
-    projectId: number
+    projectId: number;
 }
 
 export async function changeTaskStatus(
     taskId: number,
     projectId: number,
-    endPoint: string
+    endPoint: string,
 ) {
     try {
         const data = await makeHttpReq<changeTaskInput, { message: string }>(endPoint, "POST", {
@@ -184,5 +105,7 @@ export async function changeTaskStatus(
         });
 
         successMsg(data.message);
-    } catch (error) { }
+    } catch (error) {
+        console.error("Error changing task status:", error);
+    }
 }

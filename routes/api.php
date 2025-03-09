@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\MemberContrller;
+use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Http\Request;
@@ -11,16 +11,6 @@ Route::controller(AuthController::class)->group(function () {
     Route::post('/register', 'register');
     Route::post('/login', 'login');
 });
-Route::controller(ProjectController::class)->group(function () {
-    Route::post('/projects', 'store')->name('createProject');
-    Route::put('/projects', 'update')->name('update');
-    Route::get('/projects', 'index')->name('indexProject');
-    Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
-    Route::get('/projects/{slug}', 'getProject')->name('getProject');
-    Route::get('/count/projects', 'countProject')->name('countProject');
-    Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
-    Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
-});
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
 
@@ -28,18 +18,18 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('/logout', 'logoutUser');
     });
 
-    // Route::controller(ProjectController::class)->group(function () {
-    //     Route::post('/projects', 'store')->name('createProject');
-    //     Route::put('/projects', 'update')->name('update');
-    //     Route::get('/projects', 'index')->name('indexProject');
-    //     Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
-    //     Route::get('projects/{slug}', 'getProject')->name('getProject');
-    //     Route::get('/count/projects', 'countProject')->name('countProject');
-    //     Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
-    //     Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
-    // });
+    Route::controller(ProjectController::class)->group(function () {
+        Route::post('/projects', 'store')->name('createProject');
+        Route::put('/projects', 'update')->name('update');
+        Route::get('/projects', 'index')->name('indexProject');
+        Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
+        Route::get('projects/{slug}', 'getProject')->name('getProject');
+        Route::get('/count/projects', 'countProject')->name('countProject');
+        Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
+        Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
+    });
 
-    Route::controller(MemberContrller::class)->group(function () {
+    Route::controller(MemberController::class)->group(function () {
         Route::post('/members', 'store')->name('createMember');
         Route::put('/members', 'update')->name('update');
         Route::get('/members', 'index')->name('indexMember');
@@ -48,12 +38,12 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::controller(TaskController::class)->group(function () {
         Route::post('/tasks', 'createTask')->name('createTask');
         Route::post('task/not_started_to_pending', 'TaskToNotStartedToPending')->name('TaskToNotStartedToPending');//work
-        Route::post('task/not_started_to_completed', 'TaskToNotStartedToCompleted')->name('TaskToNotStartedToCompleted');
+        Route::post('task/not_started_to_completed', 'TaskToNotStartedToCompleted')->name('TaskToNotStartedToCompleted');//work
         Route::post('task/pending_to_completed', 'TaskToPendingToCompleted')->name('TaskToPendingToCompleted');//work
 
         Route::post('task/pending_to_not_started', 'TaskToPendingToNotStarted')->name('TaskToPendingToNotStarted');
         Route::post('task/completed_to_pending', 'TaskToCompletedToPending')->name('TaskToCompletedToPending');//work
-        Route::post('task/complete_to_not_started', 'TaskToCompletedToNotStarted')->name('TaskToCompletedToNotStarted');
+        Route::post('task/completed_to_not_started', 'TaskToCompletedToNotStarted')->name('TaskToCompletedToNotStarted');//work
     });
 });
 

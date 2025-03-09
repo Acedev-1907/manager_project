@@ -3,11 +3,11 @@ import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { taskStore } from "../store/kabanStore";
 import { successMsg } from "../../../../helper/toast-notificaltion";
 import { showErrorResponse } from "../../../../helper/utils";
+import { eventBus } from "../../../../helper/eventBus";
 
 export type CreateTaskInput = {
     name: string
     memberIds: Array<number>,
-
     projectId: number,
 }
 
@@ -21,7 +21,8 @@ export function useCreateTask() {
 
             const data = await makeHttpReq<CreateTaskInput, { message: string }>('tasks', 'POST', taskStore.taskInput)
             loading.value = false
-            successMsg(data.message)
+            successMsg(data.message);
+            eventBus.emit("taskCreated");
         } catch (error) {
             loading.value = false
             showErrorResponse(error);
