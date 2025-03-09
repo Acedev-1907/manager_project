@@ -3,7 +3,8 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vue-tsc --noEmit && vite build"
+        "build": "vue-tsc --noEmit && vite build",
+        "lint": "eslint --ext .js,.vue resources/js"
     },
     "devDependencies": {
         "axios": "^1.6.4",
