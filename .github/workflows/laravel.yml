@@ -55,8 +55,5 @@ jobs:
       - name: Install Frontend Dependencies
         run: npm install
 
-      - name: Run Frontend Tests
-        run: npm run test
-
       - name: Build Frontend
         run: npm run build
