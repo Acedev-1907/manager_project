@@ -2,9 +2,9 @@ name: Laravel & Vue CI Push
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "production" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "production" ]
 
 jobs:
   laravel-tests:
