@@ -4,8 +4,8 @@ const router = createRouter({
     history: createWebHistory('/app'),
     routes: [
         {
-            path: '/register',
-            name: "register",
+            path: '/auth',
+            name: "auth",
             component: () => import('../pages/auth/AuthPage.vue'),
 
             children: [
@@ -28,9 +28,9 @@ const router = createRouter({
             meta: { requiresAuth: true },
             children: [
                 {
-                    path: '/admin',
-                    name: "admin",
-                    component: () => import('../pages/admin/dashborad/DashboradPage.vue'),
+                    path: '',
+                    name: "dashboard",
+                    component: () => import('../pages/admin/dashboard/DashboardPage.vue')
                 },
                 {
                     path: '/members',

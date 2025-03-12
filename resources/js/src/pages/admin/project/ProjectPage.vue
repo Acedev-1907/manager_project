@@ -29,7 +29,7 @@ function editProject(project: ProjectType) {
 
 const { pinnendProject } = usepinnendProject()
 
-async function pinnedProjectOnDashborad(projectId: number) {
+async function pinnedProjectOnDashboard(projectId: number) {
     await pinnendProject(projectId)
     router.push('/admin')
 }
@@ -52,7 +52,7 @@ onMounted(async () => {
                     </div>
                     <div class="card-body">
                         <ProjectTable @getProject="getProjects" :loading="loading" @editProject="editProject"
-                            :projects="projectData" @pinnedProject="pinnedProjectOnDashborad">
+                            :projects="projectData" @pinnedProject="pinnedProjectOnDashboard">
                             <template #pagination>
                                 <Bootstrap5Pagination v-if="projectData?.data" :data="projectData.data"
                                     @pagination-change-page="getProjects" />
