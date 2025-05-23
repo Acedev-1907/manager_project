@@ -12,9 +12,8 @@ use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
 {
-    public function __construct(private TaskService $taskService)
-    {}
-    
+    public function __construct(private TaskService $taskService) {}
+
     public function createTask(Request $req)
     {
         return DB::transaction(function () use ($req) {
@@ -48,56 +47,102 @@ class TaskController extends Controller
         });
     }
 
-    public function TaskToNotStartedToPending(Request $req)
+    // public function TaskToNotStartedToPending(Request $req)
+    // {
+    //     $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::PENDING);
+    //     if($checkUpdate){
+    //         return response(['message' => 'task move to peding'], 200);
+    //     }
+    // }
+
+    // public function TaskToNotStartedToCompleted(Request $req)
+    // {
+    //     $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::COMPLETED);
+
+    //     if($checkUpdate){
+    //         return response(['message' => 'task move to completed'], 200);
+    //     }
+    // }
+
+    // public function TaskToPendingToCompleted(Request $req)
+    // {
+    //     $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::COMPLETED);
+
+    //     if($checkUpdate){
+    //         return response(['message' => 'task move to completed'], 200);
+    //     }
+    // }
+
+    // public function TaskToPendingToNotStarted(Request $req)
+    // {
+    //     $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::NOT_STARTED);
+
+    //     if($checkUpdate){
+    //         return response(['message' => 'task move to started'], 200);
+    //     }
+    // }
+
+    // public function TaskToCompletedToPending(Request $req)
+    // {
+    //     $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::PENDING);
+
+    //     if($checkUpdate){
+    //         return response(['message' => 'task move to pending'], 200);
+    //     }
+    // }
+
+    // public function TaskToCompletedToNotStarted(Request $req)
+    // {
+    //     $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::NOT_STARTED);
+
+    //     if($checkUpdate){
+    //         return response(['message' => 'task move to not started'], 200);
+    //     }
+    // }
+
+    //Optimizing code about task status
+    public function transition(Request $req, string $transition)
     {
-        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::PENDING);
-        if($checkUpdate){
-            return response(['message' => 'task move to peding'], 200);
+        switch ($transition) {
+            case 'not_started_to_pending':
+                $newStatus = Task::PENDING;
+                $nameStatus = 'Pending';
+                break;
+
+            case 'not_started_to_completed':
+                $newStatus = Task::COMPLETED;
+                $nameStatus = 'Completed';
+                break;
+
+            case 'pending_to_completed':
+                $newStatus = Task::COMPLETED;
+                $nameStatus = 'Completed';
+                break;
+
+            case 'pending_to_not_started':
+                $newStatus = Task::NOT_STARTED;
+                $nameStatus = 'Not Started';
+                break;
+
+            case 'completed_to_pending':
+                $newStatus = Task::PENDING;
+                $nameStatus = 'Pending';
+                break;
+
+            case 'completed_to_not_started':
+                $newStatus = Task::NOT_STARTED;
+                break;
+
+            default:
+                return response(['error' => 'Unknown transition: ' . $transition], 404);
         }
-    }
 
-    public function TaskToNotStartedToCompleted(Request $req)
-    {
-        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::COMPLETED);
+        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), $newStatus);
 
-        if($checkUpdate){
-            return response(['message' => 'task move to completed'], 200);
+        if ($checkUpdate) {
+            return response(['message' => "Task status updated to {$nameStatus}"], 200);
         }
-    }
 
-    public function TaskToPendingToCompleted(Request $req)
-    {
-        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::COMPLETED);
-
-        if($checkUpdate){
-            return response(['message' => 'task move to completed'], 200);
-        }
-    }
-
-    public function TaskToPendingToNotStarted(Request $req)
-    {
-        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::NOT_STARTED);
-
-        if($checkUpdate){
-            return response(['message' => 'task move to started'], 200);
-        }
-    }
-
-    public function TaskToCompletedToPending(Request $req)
-    {
-        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::PENDING);
-
-        if($checkUpdate){
-            return response(['message' => 'task move to pending'], 200);
-        }
-    }
-
-    public function TaskToCompletedToNotStarted(Request $req)
-    {
-        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), Task::NOT_STARTED);
-
-        if($checkUpdate){
-            return response(['message' => 'task move to not started'], 200);
-        }
+        return response(['error' => 'Failed to update task status'], 500);
     }
 }
