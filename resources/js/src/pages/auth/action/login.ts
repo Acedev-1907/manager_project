@@ -28,7 +28,6 @@ export function useLoginUser() {
         "POST",
         loginInput.value
       );
-      console.log(data);
 
       loading.value = false;
       loginInput.value = {} as LoginUserType;

@@ -75,7 +75,7 @@ router.beforeEach((to, from, next) => {
   // console.log('isAuthenticated:', isAuthenticated); // Kiểm tra xem đã đăng nhập chưa
 
   if (to.meta.requiresAuth && !isAuthenticated) {
-    console.log("Redirecting to login because user is not authenticated");
+    // console.log("Redirecting to login because user is not authenticated");
     next({ path: "/login" });
   } else {
     next();

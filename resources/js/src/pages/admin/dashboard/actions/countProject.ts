@@ -19,7 +19,6 @@ export function useGetTotalProject() {
     function updateData() {
         window.Echo.channel('countProject').listen('NewProjectCreated',
             (e: { countProject: number }) => {
-                // console.log(e);
                 countProject.value = { count: e.countProject }
             }
         );

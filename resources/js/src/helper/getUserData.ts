@@ -11,6 +11,6 @@ export function getUserData(): LoginResponseType | undefined {
             return connectedUser
         }
     } catch (err) {
-        console.log((err as Error).message);
+        // console.log((err as Error).message);
     }
 }

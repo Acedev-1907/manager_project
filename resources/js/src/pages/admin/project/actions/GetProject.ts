@@ -31,7 +31,6 @@ export function useGetProject() {
             const data = await makeHttpReq<undefined, GetProjectType>(`projects?query=${query}&page=${page}`, 'GET')
             loading.value = false
             projectData.value = data
-            // console.log(data);
 
         } catch (error) {
             loading.value = false
