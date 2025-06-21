@@ -8,6 +8,7 @@ import { useSelectMember } from "../actions/selectMember";
 import { myDebounce, openModal } from "../../../../helper/utils";
 import { useCreateTask } from "../actions/CreateTask";
 import { showError } from "../../../../helper/toast-notificaltion";
+import BaseInput from "../../../../components/BaseInput.vue";
 
 defineProps<{
     members: GetMemberType;
@@ -30,10 +31,18 @@ const { selectMember, selectedMembers, unSelectedMember } = useSelectMember()
 const { loading, createTask } = useCreateTask();
 
 async function submitTask() {
+    // Ensure memberIds is always an array before validate
+    if (!Array.isArray(taskStore.taskInput.memberIds)) {
+        taskStore.taskInput.memberIds = [];
+    }
     const result = await v$.value.$validate();
 
     if (!result) return;
 
+    // Ensure memberIds is always an array before checking length
+    if (!Array.isArray(taskStore.taskInput.memberIds)) {
+        taskStore.taskInput.memberIds = [];
+    }
     if (taskStore.taskInput.memberIds.length > 0) {
         await createTask();
         taskStore.taskInput.memberIds = []

@@ -13,7 +13,9 @@ const { chartData, getChartData } = useGetChartData();
 onMounted(async () => {
     await getPinnedProject();
     getTotalProject();
-    getChartData(project.value.id);
+    if (project.value && project.value.id) {
+        getChartData(project.value.id);
+    }
 })
 </script>
 <template>

@@ -11,6 +11,8 @@ export default defineConfig({
         vue(),
     ],
     build: {
+        // outDir: '../public/build',
+        outDir: 'public/build',
         chunkSizeWarningLimit: 1600,
     },
 });

@@ -1,4 +1,6 @@
 export const APP = {
-    baseURL: 'http://127.0.0.1:8000',
-    apiBaseURL: 'http://127.0.0.1:8000/api'
-}
+  // baseURL: import.meta.env.VITE_APP_URL,
+  // apiBaseURL: import.meta.env.VITE_APP_URL + "/api",
+  baseURL: "https://project-management-vi.onrender.com",
+  apiBaseURL: "https://project-management-vi.onrender.com/api",
+};

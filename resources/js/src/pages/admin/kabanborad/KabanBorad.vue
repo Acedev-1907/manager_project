@@ -28,11 +28,19 @@ onMounted(async () => {
 })
 
 async function openTaskModal() {
-    openModal('taskModal').then(() => {
-        console.log('modal open ...');
-        taskStore.taskInput.projectId = ProjectData.value?.data.id;
+    // Ensure memberIds is always an array before open modal
+    if (!Array.isArray(taskStore.taskInput.memberIds)) {
         taskStore.taskInput.memberIds = [];
-    })
+    }
+    // Kiểm tra projectId trước khi gán
+    const projectId = ProjectData.value?.data?.id;
+    if (!projectId) {
+        alert('Project chưa sẵn sàng, vui lòng thử lại sau!');
+        return;
+    }
+    taskStore.taskInput.projectId = projectId;
+    taskStore.taskInput.memberIds = [];
+    openModal('taskModal');
 }
 
 function closeTaskModal() {
@@ -53,11 +61,14 @@ const { fromNotStartedToPending, fromNotStartedToCompleted, fromPendingToComplet
     <div class="card card-task">
         <div class="card-body">
             <div class="row" style="height: 500px;">
-                <NotStartedColumn @fromNotStartedToPending="fromNotStartedToPending" @fromNotStartedToCompleted="fromNotStartedToCompleted" :projectData="ProjectData"
+                <NotStartedColumn @fromNotStartedToPending="fromNotStartedToPending"
+                    @fromNotStartedToCompleted="fromNotStartedToCompleted" :projectData="ProjectData"
                     @openTaskModal="openTaskModal" />
-                <PendingColumn @fromPendingToCompleted="fromPendingToCompleted"  @fromPendingToNotStarted="fromPendingToNotStarted" :projectData="ProjectData"
+                <PendingColumn @fromPendingToCompleted="fromPendingToCompleted"
+                    @fromPendingToNotStarted="fromPendingToNotStarted" :projectData="ProjectData"
                     @openTaskModal="openTaskModal" />
-                <CompletedColumn @fromCompletedToPending="fromCompletedToPending"  @fromCompletedToNotStarted="fromCompletedToNotStarted" :projectData="ProjectData"
+                <CompletedColumn @fromCompletedToPending="fromCompletedToPending"
+                    @fromCompletedToNotStarted="fromCompletedToNotStarted" :projectData="ProjectData"
                     @openTaskModal="openTaskModal" />
             </div>
         </div>

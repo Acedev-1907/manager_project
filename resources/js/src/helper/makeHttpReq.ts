@@ -1,35 +1,40 @@
 import { APP } from "../App/APP";
 import { getUserData } from "./getUserData";
 
-type HttpVerbType = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type HttpVerbType = "GET" | "POST" | "PUT" | "DELETE";
 
 export function makeHttpReq<TInput, TResponse>(
-    endpoint: string,
-    verb: HttpVerbType,
-    input?: TInput
+  endpoint: string,
+  verb: HttpVerbType,
+  input?: TInput
 ) {
-    return new Promise<TResponse>(async (resole, reject) => {
-        try {
-            const userData = getUserData()
+  return new Promise<TResponse>(async (resolve, reject) => {
+    try {
+      const userData = getUserData();
+      const authHeader = "Bearer " + userData?.token;
 
-            const authHeader = "Bearer " + userData?.token;
-            const res = await fetch(`${APP.apiBaseURL}/${endpoint}`, {
-                method: verb,
-                headers: {
-                    "content-type": "application/json",
-                    Authorization: "Bearer " + userData?.token
-                },
-                body: JSON.stringify(input)
-            });
+      const fetchOptions: RequestInit = {
+        method: verb,
+        headers: {
+          "content-type": "application/json",
+          Authorization: authHeader,
+        },
+      };
 
-            const data: TResponse = await res.json();
+      // Chỉ thêm body nếu không phải GET
+      if (verb !== "GET" && input !== undefined) {
+        fetchOptions.body = JSON.stringify(input);
+      }
 
-            if (!res.ok) {
-                reject(data)
-            }
-            resole(data);
-        } catch (error) {
-            reject(error)
-        }
-    })
+      const res = await fetch(`${APP.apiBaseURL}/${endpoint}`, fetchOptions);
+      const data: TResponse = await res.json();
+
+      if (!res.ok) {
+        return reject(data);
+      }
+      resolve(data);
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
