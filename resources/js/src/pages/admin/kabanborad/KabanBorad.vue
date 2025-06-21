@@ -32,10 +32,10 @@ async function openTaskModal() {
     if (!Array.isArray(taskStore.taskInput.memberIds)) {
         taskStore.taskInput.memberIds = [];
     }
-    // Kiểm tra projectId trước khi gán
+
     const projectId = ProjectData.value?.data?.id;
     if (!projectId) {
-        alert('Project chưa sẵn sàng, vui lòng thử lại sau!');
+        alert('Loading Project!');
         return;
     }
     taskStore.taskInput.projectId = projectId;

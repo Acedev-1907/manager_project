@@ -7,7 +7,7 @@ const props = defineProps<{
 }>();
 </script>
 <template>
-    <label for="">{{ props.label }}</label>
+    <label :for="'base-input-' + props.label">{{ props.label }}</label>
     <div :class="{ error: props.errors.length }">
         <slot></slot>
         <div class="input-errors" v-for="error of props.errors" :key="error.$uid">

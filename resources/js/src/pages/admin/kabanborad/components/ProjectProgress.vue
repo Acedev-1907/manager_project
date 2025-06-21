@@ -12,7 +12,8 @@ defineProps<{
                 aria-valuemax="100">
                 <div class="progress-bar bg-success"
                     :style="{ width: ProjectData?.data?.task_progress?.progress + '%' }">
-                    {{ ProjectData?.data?.task_progress?.progress + '%' }}</div>
+                    {{ ProjectData?.data?.task_progress?.progress ? ProjectData.data.task_progress.progress + '%' : '' }}
+                </div>
             </div>
         </div>
     </div>

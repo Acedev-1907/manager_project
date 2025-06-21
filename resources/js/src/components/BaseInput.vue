@@ -16,6 +16,6 @@ function updateValue(event: any) {
 }
 </script>
 <template>
-    <input :value="modelValue" :type="typeof type === 'undefined' ? 'text' : type" class="form-control"
+    <input :id="'base-input-' + type" :name="'base-input-' + type" :value="modelValue" :type="typeof type === 'undefined' ? 'text' : type" class="form-control"
         @input="updateValue" placeholder="" />
 </template>
