@@ -46,7 +46,13 @@ async function submitLogin() {
                         <div class="form-group mt-3">
                             <BaseBtn label="login" :loading="loading"></BaseBtn>
                         </div>
+                        <div class="form-group mt-2 text-center">
+                            <small class="text-muted">
+                                Demo: admin.yi@gmail.com / Admin@123
+                            </small>
+                        </div>
                     </form>
+
                 </div>
             </div>
         </div>

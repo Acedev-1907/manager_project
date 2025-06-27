@@ -37,14 +37,6 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 
     Route::controller(TaskController::class)->group(function () {
         Route::post('/tasks', 'createTask')->name('createTask');
-        // Route::post('task/not_started_to_pending', 'TaskToNotStartedToPending')->name('TaskToNotStartedToPending');//work
-        // Route::post('task/not_started_to_completed', 'TaskToNotStartedToCompleted')->name('TaskToNotStartedToCompleted');//work
-        // Route::post('task/pending_to_completed', 'TaskToPendingToCompleted')->name('TaskToPendingToCompleted');//work
-
-        // Route::post('task/pending_to_not_started', 'TaskToPendingToNotStarted')->name('TaskToPendingToNotStarted');
-        // Route::post('task/completed_to_pending', 'TaskToCompletedToPending')->name('TaskToCompletedToPending');//work
-        // Route::post('task/completed_to_not_started', 'TaskToCompletedToNotStarted')->name('TaskToCompletedToNotStarted');//work
-
         Route::post('/task/{transition}', 'transition')->name('transition');
     });
 });

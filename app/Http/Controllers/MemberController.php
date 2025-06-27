@@ -21,9 +21,9 @@ class MemberController extends Controller
             $members->where('name', 'like', '%' . $query . '%')
                 ->orderBy('id', 'desc');
 
-            return response(['data' => $members->paginate(3)], 200);
+            return response(['data' => $members->paginate(6)], 200);
         }
-        return response(['data' => $members->paginate(3)], 200);
+        return response(['data' => $members->paginate(6)], 200);
     }
 
     public function store(Request $req)

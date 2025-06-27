@@ -24,8 +24,9 @@ const search = myDebounce(async function () {
     <div class="row">
         <div class="row">
             <div class="col-md-4">
-                <input id="member-search" name="member-search" type="text" @keydown="search" v-model="query" placeholder="search..." class="form-control" />
-                <span style="color: blue" v-show="loading === true ? true : false"><b>Searching....</b></span>
+                <input id="member-search" name="member-search" type="text" @keydown="search" v-model="query"
+                    placeholder="search..." class="form-control" />
+                <span style="color: blue" v-show="loading === true ? true : false"><b>Loading ...</b></span>
             </div>
         </div>
         <br />

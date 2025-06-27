@@ -25,6 +25,7 @@ const slug = route.query?.query as string;
 onMounted(async () => {
     await getProjectDetail(slug);
     getMembers(1, '');
+    setupAllDropListeners();
 })
 
 async function openTaskModal() {
@@ -47,7 +48,7 @@ function closeTaskModal() {
     closeModal('taskModal')
 }
 
-const { fromNotStartedToPending, fromNotStartedToCompleted, fromPendingToCompleted, fromPendingToNotStarted, fromCompletedToPending, fromCompletedToNotStarted } = useDragTask(getProjectDetail, slug);
+const { setupAllDropListeners } = useDragTask(getProjectDetail, slug, ProjectData);
 </script>
 <template>
     <div class="row">
@@ -61,15 +62,9 @@ const { fromNotStartedToPending, fromNotStartedToCompleted, fromPendingToComplet
     <div class="card card-task">
         <div class="card-body">
             <div class="row" style="height: 500px;">
-                <NotStartedColumn @fromNotStartedToPending="fromNotStartedToPending"
-                    @fromNotStartedToCompleted="fromNotStartedToCompleted" :projectData="ProjectData"
-                    @openTaskModal="openTaskModal" />
-                <PendingColumn @fromPendingToCompleted="fromPendingToCompleted"
-                    @fromPendingToNotStarted="fromPendingToNotStarted" :projectData="ProjectData"
-                    @openTaskModal="openTaskModal" />
-                <CompletedColumn @fromCompletedToPending="fromCompletedToPending"
-                    @fromCompletedToNotStarted="fromCompletedToNotStarted" :projectData="ProjectData"
-                    @openTaskModal="openTaskModal" />
+                <NotStartedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
+                <PendingColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
+                <CompletedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
             </div>
         </div>
     </div>

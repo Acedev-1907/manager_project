@@ -30,7 +30,7 @@ const search = myDebounce(async function () {
         <div class="row">
             <div class="col-md-4 p-2">
                 <BaseInput @keydown="search" v-model="query" placeholder="search..." />
-                <span style="color: blue" v-show="loading === true ? true : false"><b>Searching....</b></span>
+                <span style="color: blue" v-show="loading === true ? true : false"><b>Loading ...</b></span>
             </div>
         </div>
         <div class="table-scroll">
