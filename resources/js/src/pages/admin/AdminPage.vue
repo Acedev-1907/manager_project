@@ -26,24 +26,17 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="container">
-        <div class="container-fluid">
-            <div class="row">
-
-                <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" />
-                <main class="col-md-9 ms-sm-auto col-lg-10  bg-pages">
-                    <br /><br />
-                    <router-view v-slot="{ Component, route }">
-                        <transition name="fade" mode="out-in">
-                            <div :key="route.name">
-                                <component :is="Component"></component>
-                            </div>
-                        </transition>
-                    </router-view>
-                </main>
-            </div>
+    <div class="admin-layout">
+        <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" />
+        <div class="admin-content">
+            <router-view v-slot="{ Component, route }">
+                <transition name="fade" mode="out-in">
+                    <div :key="route.name">
+                        <component :is="Component"></component>
+                    </div>
+                </transition>
+            </router-view>
         </div>
-
     </div>
 </template>
 
@@ -58,6 +51,39 @@ onMounted(async () => {
 .fade-enter,
 .fade-leave-active {
     opacity: 0;
+}
+
+.admin-layout {
+    display: flex;
+    min-height: 100vh;
+    /* background: #f8fafd; */
+}
+
+.admin-layout>.sidebar {
+    flex-shrink: 0;
+}
+
+.admin-content {
+    flex: 1;
+    padding: 2rem 1.5rem 1.5rem 1.5rem;
+    min-width: 0;
+}
+
+@media (min-width: 768px) {
+    .admin-content {
+        margin-left: 260px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .admin-layout {
+        display: block;
+    }
+
+    .admin-content {
+        padding: 1rem 0.5rem;
+        margin-left: 0;
+    }
 }
 
 /* input errors  */

@@ -1,10 +1,9 @@
 <script lang="ts" setup>
-import { onMounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { ref, onMounted, onUnmounted } from "vue";
+import { RouterLink, useRouter, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
 
 const navigation = ref([
-
     {
         name: "Dashboard",
         link: "/admin",
@@ -20,23 +19,91 @@ const navigation = ref([
         link: "/members",
         icon: "bi bi-file-ppt",
     },
-
-
 ]);
 
 const emit = defineEmits<{
     (e: 'logout'): Promise<void>,
 }>()
 
-
 defineProps<{
     loggedInUserEmail: string | undefined
 }>()
 
+const sidebarOpen = ref(false)
+function toggleSidebar() {
+    sidebarOpen.value = !sidebarOpen.value
+}
+function closeSidebar() {
+    sidebarOpen.value = false
+}
+
+// Đóng sidebar sau khi chuyển route (chỉ ở mobile)
+const router = useRouter()
+const route = useRoute()
+let removeAfterEach: any = null
+onMounted(() => {
+    removeAfterEach = router.afterEach(() => {
+        sidebarOpen.value = false
+    })
+})
+onUnmounted(() => {
+    if (removeAfterEach) removeAfterEach()
+})
+
+function isActive(link: string) {
+    // Dashboard chỉ active khi đúng /admin hoặc /admin/
+    if (link === "/admin") {
+        return route.path === "/admin" || route.path === "/admin/"
+    }
+    // Các menu khác active khi path bắt đầu đúng link
+    return route.path.startsWith(link)
+}
 </script>
 <template>
-    <nav id="sidebarMenu" style="background-color: white" class="col-md-3 col-lg-2 d-md-block sidebar collapse">
-        <div class="position-sticky pt-3">
+    <!-- Mobile Top Navbar -->
+    <nav class="mobile-navbar d-md-none">
+        <button class="hamburger" @click="toggleSidebar">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <div class="mobile-title">
+            <img :src="`${APP.baseURL}/others/logo.png`" style="height: 32px" alt="">
+            <span>TaskMgr</span>
+        </div>
+    </nav>
+    <!-- Sidebar: hiện đại, bo góc, shadow, icon lớn, avatar, nút đóng -->
+    <nav :class="['sidebar', { 'sidebar-open': sidebarOpen, 'sidebar-mobile-modern': true }]" id="sidebarMenu">
+        <div class="sidebar-mobile-header d-md-none">
+            <div class="sidebar-mobile-avatar">
+                <img :src="`${APP.baseURL}/others/logo.png`" alt="avatar" />
+            </div>
+            <div class="sidebar-mobile-info">
+                <span class="sidebar-mobile-app">TaskMgr</span>
+                <span class="sidebar-mobile-email">{{ loggedInUserEmail }}</span>
+            </div>
+            <button class="sidebar-mobile-close" @click="closeSidebar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="sidebar-mobile-menu d-md-none">
+            <ul>
+                <li v-for="nav in navigation" :key="nav.name">
+                    <RouterLink class="sidebar-mobile-link" :class="{ active: isActive(nav.link) }" :to="nav.link">
+                        <i :class="nav.icon + ' sidebar-mobile-icon'"></i>
+                        <span>{{ nav.name }}</span>
+                    </RouterLink>
+                </li>
+                <li>
+                    <a class="sidebar-mobile-link logout" @click="emit('logout'); closeSidebar()">
+                        <i class="bi bi-box-arrow-right sidebar-mobile-icon"></i>
+                        <span>Logout</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <!-- Desktop giữ nguyên -->
+        <div class="position-sticky pt-3 d-none d-md-block">
             <div align="center">
                 <img :src="`${APP.baseURL}/others/logo.png`" style="height: 55px" alt="">
                 <h4>TaskMgr</h4>
@@ -51,24 +118,246 @@ defineProps<{
             </h6>
             <ul class="nav flex-column">
                 <li class="nav-item" v-for="nav in navigation" :key="nav.name">
-                    <RouterLink class="nav-link" :to="nav.link" exact>
+                    <RouterLink class="nav-link" :to="nav.link" :class="{ active: isActive(nav.link) }">
                         <i :class="nav.icon"></i>
                         {{ nav.name }}
                     </RouterLink>
                 </li>
-
-                <li class="nav-item" style="cursor: pointer" @click="emit('logout')">
+                <li class="nav-item" style="cursor: pointer" @click="emit('logout'); closeSidebar()">
                     <a class="nav-link">
                         <i class="bi bi-box-arrow-right"></i>
                         Logout
                     </a>
                 </li>
-
             </ul>
         </div>
     </nav>
+    <!-- Overlay for mobile (đặt SAU sidebar để không che sidebar) -->
+    <div v-if="sidebarOpen" class="sidebar-overlay d-md-none" @click="closeSidebar"></div>
 </template>
 <style>
+/* Mobile Top Navbar */
+.mobile-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    padding: 0.5rem 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+}
+
+.mobile-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.hamburger {
+    background: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    justify-content: center;
+}
+
+.hamburger span {
+    display: block;
+    height: 3px;
+    width: 24px;
+    background: #333;
+    border-radius: 2px;
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 1049;
+}
+
+/* Sidebar responsive hiện đại cho mobile */
+.sidebar.sidebar-mobile-modern {
+    background: #fff;
+    border-top-right-radius: 24px;
+    border-bottom-right-radius: 24px;
+    box-shadow: 4px 0 24px 0 rgba(0, 0, 0, 0.10);
+    transition: transform 0.3s cubic-bezier(.4, 2, .6, 1), box-shadow 0.2s;
+    width: 85vw;
+    max-width: 340px;
+    min-width: 220px;
+    z-index: 1052;
+    padding: 0;
+    overflow-y: auto;
+    margin-left: 0 !important;
+    left: 0 !important;
+}
+
+@media (max-width: 767.98px) {
+    .sidebar.sidebar-mobile-modern {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        transform: translateX(-100%);
+        display: block !important;
+    }
+
+    .sidebar.sidebar-open.sidebar-mobile-modern {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px 0 rgba(0, 0, 0, 0.18);
+    }
+
+    .sidebar-mobile-header {
+        display: flex;
+        align-items: center;
+        padding: 1.2rem 1.2rem 0.5rem 1.2rem;
+        border-bottom: 1px solid #f0f0f0;
+        position: relative;
+        background: #f8fafd;
+        border-top-right-radius: 24px;
+    }
+
+    .sidebar-mobile-avatar img {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #e0e7ef;
+        background: #fff;
+    }
+
+    .sidebar-mobile-info {
+        flex: 1;
+        margin-left: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .sidebar-mobile-app {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #2470dc;
+    }
+
+    .sidebar-mobile-email {
+        font-size: 0.95rem;
+        color: #888;
+    }
+
+    .sidebar-mobile-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #888;
+        cursor: pointer;
+        position: absolute;
+        right: 1.2rem;
+        top: 1.2rem;
+        z-index: 2;
+    }
+
+    .sidebar-mobile-menu {
+        padding: 1.2rem 0.5rem 1.2rem 0.5rem;
+    }
+
+    .sidebar-mobile-menu ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .sidebar-mobile-menu li {
+        margin-bottom: 0.7rem;
+    }
+
+    .sidebar-mobile-link {
+        display: flex;
+        align-items: center;
+        gap: 1.1rem;
+        font-size: 1.15rem;
+        font-weight: 500;
+        color: #222;
+        background: #f5f8ff;
+        border-radius: 12px;
+        padding: 0.85rem 1.2rem;
+        text-decoration: none;
+        transition: background 0.18s, color 0.18s;
+    }
+
+    .sidebar-mobile-link:hover,
+    .sidebar-mobile-link.router-link-active {
+        background: #2470dc;
+        color: #fff;
+    }
+
+    .sidebar-mobile-icon {
+        font-size: 1.5rem;
+        min-width: 1.5rem;
+        color: #2470dc;
+        transition: color 0.18s;
+    }
+
+    .sidebar-mobile-link:hover .sidebar-mobile-icon,
+    .sidebar-mobile-link.router-link-active .sidebar-mobile-icon {
+        color: #fff;
+    }
+
+    .sidebar-mobile-link.logout {
+        background: #ffeaea;
+        color: #d32f2f;
+    }
+
+    .sidebar-mobile-link.logout:hover {
+        background: #d32f2f;
+        color: #fff;
+    }
+
+    .sidebar-mobile-link.logout .sidebar-mobile-icon {
+        color: #d32f2f;
+    }
+
+    .sidebar-mobile-link.logout:hover .sidebar-mobile-icon {
+        color: #fff;
+    }
+}
+
+@media (min-width: 768px) {
+    .sidebar.sidebar-mobile-modern {
+        border-radius: 0;
+        box-shadow: none;
+        width: 260px;
+        min-width: 200px;
+        max-width: 320px;
+        position: fixed;
+        left: 0;
+        top: 0;
+        height: 100vh;
+        margin-left: 0 !important;
+        z-index: 1052;
+    }
+
+    .sidebar-mobile-header,
+    .sidebar-mobile-menu {
+        display: none;
+    }
+}
+
+/* Desktop giữ nguyên */
 a.router-link-active.router-link-exact-active.nav-link {
     color: white;
 }
@@ -78,5 +367,30 @@ a.router-link-active.router-link-exact-active.nav-link {
     box-shadow: 1px 1px 5px 1px #69757d;
     background: #2470dc;
     color: #fff;
+}
+
+.sidebar-mobile-link.active {
+    background: #2470dc !important;
+    color: #fff !important;
+}
+
+.sidebar-mobile-link.router-link-active {
+    background: #f5f8ff;
+    color: #222;
+}
+
+.sidebar-mobile-link.active .sidebar-mobile-icon {
+    color: #fff !important;
+}
+
+.nav-link.active {
+    background: #2470dc !important;
+    color: #fff !important;
+    margin: 14px;
+}
+
+.nav-link.router-link-active {
+    background: #f5f8ff;
+    color: #222;
 }
 </style>
