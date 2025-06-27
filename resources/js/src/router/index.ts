@@ -70,9 +70,11 @@ router.beforeEach((to, from, next) => {
   const isAuthenticated = !!token; // Chuyển token thành boolean
 
   // console.log(token);
-
-  // console.log('Navigating to:', to.fullPath); // Kiểm tra đường dẫn
-  // console.log('isAuthenticated:', isAuthenticated); // Kiểm tra xem đã đăng nhập chưa
+  // Nếu đã đăng nhập mà vào trang login hoặc register thì chuyển sang /admin
+  if (isAuthenticated && (to.path === "/login" || to.path === "/register")) {
+    next({ path: "/admin" });
+    return;
+  }
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     // console.log("Redirecting to login because user is not authenticated");
