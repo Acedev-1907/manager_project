@@ -61,15 +61,14 @@ const { setupAllDropListeners } = useDragTask(getProjectDetail, slug, ProjectDat
 
     <div class="card card-task">
         <div class="card-body">
-            <div class="row" style="height: 500px;">
-                <NotStartedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
-                <PendingColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
-                <CompletedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" />
+            <div class="kanban-row">
+                <NotStartedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" class="not_started_task" />
+                <PendingColumn :projectData="ProjectData" @openTaskModal="openTaskModal" class="pending_task" />
+                <CompletedColumn :projectData="ProjectData" @openTaskModal="openTaskModal" class="completed_task" />
             </div>
         </div>
     </div>
 </template>
-<!-- <style scoped> -->
 <style>
 .assignees button {
     border-radius: 50px;
@@ -106,5 +105,68 @@ const { setupAllDropListeners } = useDragTask(getProjectDetail, slug, ProjectDat
 .completed_task {
     background-color: rgba(183, 235, 181, 0.658);
     height: 384px;
+}
+
+.card-body {
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
+}
+
+.kanban-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 10px;
+    height: 500px;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .card-body {
+        overflow-x: auto;
+    }
+
+    .kanban-row {
+        width: 210vw;
+    }
+
+    .not_started_task,
+    .pending_task,
+    .completed_task {
+        min-width: 70vw;
+        max-width: 70vw;
+        height: 494px;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+
+    .task_card {
+        padding: 6px;
+        margin-top: 4px;
+        font-size: 14px;
+    }
+}
+
+@media (min-width: 769px) {
+    .card-body {
+        overflow-x: unset;
+    }
+
+    .kanban-row {
+        width: 100%;
+        min-width: 0;
+        overflow-x: unset;
+    }
+
+    .not_started_task,
+    .pending_task,
+    .completed_task {
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: none;
+        height: 384px;
+        margin-right: 0;
+    }
 }
 </style>
