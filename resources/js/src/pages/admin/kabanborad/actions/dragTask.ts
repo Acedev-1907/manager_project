@@ -16,6 +16,14 @@ export function useDragTask(
       const [task] = tasks.splice(idx, 1);
       task.status = newStatus;
       tasks.unshift(task);
+
+      // Tính lại progress (giả sử progress là % task hoàn thành)
+      const total = tasks.length;
+      const completed = tasks.filter((t: any) => t.status === 2).length; // 2 = COMPLETED
+      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+      if (ProjectData.value.data.task_progress) {
+        ProjectData.value.data.task_progress.progress = progress;
+      }
     }
   }
 

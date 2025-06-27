@@ -14,7 +14,7 @@ function handleDragStart(taskId: number, projectId: number) {
 </script>
 <template>
     <div class="col-md-4 pending_task">
-        <div class="card card-header">
+        <div class="card card-header noselect">
             <b>Pending</b>
         </div>
         <div class="card-direct">
@@ -36,3 +36,12 @@ function handleDragStart(taskId: number, projectId: number) {
         </div>
     </div>
 </template>
+
+<style>
+.noselect {
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+}
+</style>
