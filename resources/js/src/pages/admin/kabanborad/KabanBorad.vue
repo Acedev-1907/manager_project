@@ -146,6 +146,15 @@ const { setupAllDropListeners } = useDragTask(getProjectDetail, slug, ProjectDat
         margin-top: 4px;
         font-size: 14px;
     }
+
+    .ghost-task {
+        border-radius: 6px;
+        font-size: 15px;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        pointer-events: none;
+        user-select: none;
+    }
 }
 
 @media (min-width: 769px) {

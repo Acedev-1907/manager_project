@@ -61,8 +61,10 @@ function handleTouchStart(taskId: number, projectId: number, event: TouchEvent) 
     const target = event.target as HTMLElement;
     touchMoveElem = target.closest('.task_card') as HTMLElement;
     if (touchMoveElem) {
-        // Tạo bóng task
-        ghostElem = touchMoveElem.cloneNode(true) as HTMLElement;
+        // Tạo bóng task đơn giản chỉ chứa tên task
+        const taskName = touchMoveElem.querySelector('p')?.textContent || '';
+        ghostElem = document.createElement('div');
+        ghostElem.className = 'ghost-task';
         ghostElem.style.position = 'fixed';
         ghostElem.style.left = event.touches[0].clientX - 100 + 'px';
         ghostElem.style.top = event.touches[0].clientY - 30 + 'px';
@@ -70,6 +72,11 @@ function handleTouchStart(taskId: number, projectId: number, event: TouchEvent) 
         ghostElem.style.pointerEvents = 'none';
         ghostElem.style.opacity = '0.8';
         ghostElem.style.zIndex = '9999';
+        ghostElem.style.background = '#fff';
+        ghostElem.style.border = '1px solid #ccc';
+        ghostElem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        ghostElem.style.padding = '8px';
+        ghostElem.innerHTML = `<p style='margin:0;'>${taskName}</p>`;
         document.body.appendChild(ghostElem);
         // Ẩn task gốc
         touchMoveElem.style.opacity = '0';
@@ -77,6 +84,7 @@ function handleTouchStart(taskId: number, projectId: number, event: TouchEvent) 
 }
 
 function handleTouchMove(event: TouchEvent) {
+    event.preventDefault(); // Ngăn cuộn trang khi kéo task trên mobile
     if (ghostElem) {
         ghostElem.style.left = event.touches[0].clientX - 100 + 'px';
         ghostElem.style.top = event.touches[0].clientY - 30 + 'px';
