@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { Bootstrap5Pagination } from 'laravel-vue-pagination';
 import { ProjectType, useGetProject } from './actions/GetProject';
 import ProjectTable from './components/ProjectTable.vue';
@@ -7,9 +7,12 @@ import { useRouter } from 'vue-router';
 import { projectStore } from './store/projectStore';
 import { ProjectInputType } from './actions/createtProject';
 import { usepinnendProject } from './actions/pinnendProject';
+import LoadingPage from '../../../components/LoadingPage.vue';
 
 
 const { getProjects, projectData, loading } = useGetProject()
+
+const isLoading = ref(true);
 
 async function showListOfMembers() {
     await getProjects()
@@ -35,14 +38,17 @@ async function pinnedProjectOnDashboard(projectId: number) {
 }
 
 onMounted(async () => {
-    showListOfMembers()
-    projectStore.edit = false
-    projectStore.projectInput = {} as ProjectInputType
+    isLoading.value = true;
+    await showListOfMembers();
+    projectStore.edit = false;
+    projectStore.projectInput = {} as ProjectInputType;
+    isLoading.value = false;
 })
 
 </script>
 <template>
     <div class="container">
+        <LoadingPage v-if="isLoading" />
         <div class="row">
             <div class="col-md-12">
                 <div class="card">

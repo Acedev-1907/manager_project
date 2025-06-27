@@ -11,12 +11,12 @@ defineProps<{
 
 const emit = defineEmits<{
     (e: "editMember", member: MemberType): void;
-    (e: "getMember", page: number, query: string,): Promise<void>;
+    (e: "getMember", page: number, query: string, showGlobalLoading: boolean): Promise<void>;
 }>();
 
 const query = ref("");
 const search = myDebounce(async function () {
-    await emit("getMember", 1, query.value,);
+    await emit("getMember", 1, query.value, false);
 }, 200);
 
 </script>

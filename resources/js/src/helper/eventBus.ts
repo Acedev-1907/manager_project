@@ -1,7 +1,7 @@
 import mitt from "mitt";
 
 type Events = {
-    "taskCreated": void;
+  taskCreated: void;
 };
 
-export const eventBus = mitt<Events>();
+export const eventBus = mitt();

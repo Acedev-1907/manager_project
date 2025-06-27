@@ -2,22 +2,23 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { RouterLink, useRouter, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
+import { eventBus } from '../../../helper/eventBus';
 
 const navigation = ref([
     {
         name: "Dashboard",
         link: "/admin",
-        icon: "bi bi-wrench-adjustable",
+        icon: "bi bi-speedometer2",
     },
     {
         name: "Projects",
         link: "/projects",
-        icon: "bi bi-file-ppt",
+        icon: "bi bi-kanban",
     },
     {
         name: "Members",
         link: "/members",
-        icon: "bi bi-file-ppt",
+        icon: "bi bi-people",
     },
 ]);
 
@@ -42,8 +43,13 @@ const router = useRouter()
 const route = useRoute()
 let removeAfterEach: any = null
 onMounted(() => {
-    removeAfterEach = router.afterEach(() => {
-        sidebarOpen.value = false
+    removeAfterEach = router.beforeEach((to, from, next) => {
+        eventBus.emit('show-loading');
+        next();
+    });
+    router.afterEach(() => {
+        sidebarOpen.value = false;
+        eventBus.emit('hide-loading');
     })
 })
 onUnmounted(() => {
@@ -105,13 +111,14 @@ function isActive(link: string) {
         <!-- Desktop giữ nguyên -->
         <div class="position-sticky pt-3 d-none d-md-block">
             <div align="center">
-                <img :src="`${APP.baseURL}/others/logo.png`" style="height: 55px" alt="">
+                <img :src="`${APP.baseURL}/others/logo.png`" alt="">
                 <h4>TaskMgr</h4>
                 {{ loggedInUserEmail }}
             </div>
             <br />
-            <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
-                <span style="color: red">Menu</span>
+            <h6
+                class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted menu-title">
+                <span><i class="bi bi-list-task"></i> MENU</span>
                 <a class="link-secondary" href="#" aria-label="Add a new report">
                     <span data-feather="plus-circle"></span>
                 </a>
@@ -386,11 +393,176 @@ a.router-link-active.router-link-exact-active.nav-link {
 .nav-link.active {
     background: #2470dc !important;
     color: #fff !important;
-    margin: 14px;
+    border-radius: 8px;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+    box-shadow: 1px 1px 8px 1px #b3c6e0;
 }
 
 .nav-link.router-link-active {
     background: #f5f8ff;
     color: #222;
+    border-radius: 8px;
+    transition: background 0.18s, color 0.18s;
+}
+
+.nav-link {
+    border-radius: 8px;
+    padding: 0.7rem 1.2rem;
+    font-size: 1.08rem;
+    font-weight: 500;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+
+.nav-link:hover {
+    background: #e3edfa;
+    color: #2470dc;
+}
+
+.sidebar-mobile-link,
+.nav-link {
+    border-radius: 12px;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+
+.sidebar-mobile-link.active {
+    background: #2470dc !important;
+    color: #fff !important;
+    border-radius: 12px;
+    box-shadow: 1px 1px 8px 1px #b3c6e0;
+}
+
+.sidebar-mobile-link.router-link-active {
+    background: #f5f8ff;
+    color: #222;
+    border-radius: 12px;
+}
+
+.sidebar-mobile-link:hover {
+    background: #e3edfa;
+    color: #2470dc;
+}
+
+.sidebar-mobile-link {
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+
+.sidebar-mobile-icon,
+.nav-link i {
+    font-size: 1.5rem;
+    min-width: 1.5rem;
+    color: #2470dc;
+    transition: color 0.18s;
+}
+
+.sidebar-mobile-link.active .sidebar-mobile-icon,
+.nav-link.active i {
+    color: #fff !important;
+}
+
+.sidebar-mobile-link.logout {
+    background: #ffeaea;
+    color: #d32f2f;
+    border-radius: 12px;
+}
+
+.sidebar-mobile-link.logout:hover {
+    background: #d32f2f;
+    color: #fff;
+}
+
+.sidebar-mobile-link.logout .sidebar-mobile-icon {
+    color: #d32f2f;
+}
+
+.sidebar-mobile-link.logout:hover .sidebar-mobile-icon {
+    color: #fff;
+}
+
+/* Avatar/logo/email tối ưu */
+.sidebar-mobile-avatar img,
+.sidebar .sidebar-mobile-avatar img,
+.sidebar img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #e0e7ef;
+    background: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-mobile-info,
+.sidebar .sidebar-mobile-info {
+    flex: 1;
+    margin-left: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sidebar-mobile-app,
+.sidebar .sidebar-mobile-app {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #2470dc;
+}
+
+.sidebar-mobile-email,
+.sidebar .sidebar-mobile-email {
+    font-size: 0.97rem;
+    color: #888;
+    word-break: break-all;
+}
+
+@media (max-width: 767.98px) {
+    .sidebar.sidebar-mobile-modern {
+        border-top-right-radius: 24px;
+        border-bottom-right-radius: 24px;
+        box-shadow: 4px 0 24px 0 rgba(0, 0, 0, 0.10);
+        width: 85vw;
+        max-width: 340px;
+        min-width: 220px;
+        left: 0 !important;
+        background: #f8fafd;
+    }
+
+    .sidebar-mobile-header {
+        background: #f8fafd;
+        border-top-right-radius: 24px;
+    }
+}
+
+@media (min-width: 768px) {
+    .sidebar.sidebar-mobile-modern {
+        border-radius: 0 16px 16px 0;
+        box-shadow: 2px 0 16px 0 rgba(0, 0, 0, 0.08);
+        width: 260px;
+        min-width: 200px;
+        max-width: 320px;
+        background: #f8fafd;
+    }
+}
+
+.menu-title span {
+    font-weight: 800;
+    font-size: 1.08rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #2470dc;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    position: relative;
+}
+
+.menu-title span::after {
+    content: "";
+    display: block;
+    height: 3px;
+    width: 36px;
+    background: linear-gradient(90deg, #2470dc 60%, #6bc1ff 100%);
+    border-radius: 2px;
+    margin-left: 0.5em;
+    margin-top: 2px;
 }
 </style>

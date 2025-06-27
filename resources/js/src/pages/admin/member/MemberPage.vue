@@ -1,14 +1,16 @@
 <script lang="ts" setup>
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import MemberTable from './components/MemberTable.vue';
 import { MemberType, useGetMembers } from './actions/getMember';
 import { Bootstrap5Pagination } from 'laravel-vue-pagination';
 import { memberStore } from './store/MemberStore';
 import router from '../../../router';
 import { MemberInputType } from './actions/createMember';
+import LoadingPage from '../../../components/LoadingPage.vue';
 
 
 const { getMembers, memberData, loading } = useGetMembers()
+const isLoading = ref(true);
 
 async function showListOfMembers() {
     await getMembers()
@@ -20,14 +22,17 @@ function editMember(member: MemberType) {
     router.push('/create-members')
 }
 onMounted(async () => {
-    showListOfMembers()
+    isLoading.value = true;
+    await showListOfMembers()
     memberStore.edit = false
     memberStore.memberInput = {} as MemberInputType
+    isLoading.value = false;
 })
 
 </script>
 <template>
     <div class="container">
+        <LoadingPage v-if="isLoading" />
         <div class="row">
             <div class="col-md-8">
                 <div class="card">

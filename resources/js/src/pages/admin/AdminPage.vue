@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import NarBar from './components/NarBar.vue';
 import { useLogOutUser } from './actions/Logout';
 import { getUserData } from '../../helper/getUserData';
+import LoadingPage from '../../components/LoadingPage.vue';
+import { eventBus } from '../../helper/eventBus';
 
 const { logout } = useLogOutUser()
 
 const userData = getUserData()
+const isLoading = ref(true);
+
 async function logoutUser() {
     const userId = userData?.user?.id
     if (typeof userId !== 'undefined') {
@@ -20,18 +24,29 @@ async function tryLogoutUser() {
     await logout(undefined)
 }
 
-onMounted(async () => {
-    await tryLogoutUser()
-})
+const showLoading = () => { isLoading.value = true; };
+const hideLoading = () => { isLoading.value = false; };
+
+onMounted(() => {
+    eventBus.on('show-loading', showLoading);
+    eventBus.on('hide-loading', hideLoading);
+    tryLogoutUser().finally(() => isLoading.value = false);
+});
+
+onUnmounted(() => {
+    eventBus.off('show-loading', showLoading);
+    eventBus.off('hide-loading', hideLoading);
+});
 </script>
 
 <template>
     <div class="admin-layout">
         <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" />
-        <div class="admin-content">
+        <div class="admin-content" style="position:relative;">
+            <LoadingPage v-if="isLoading" class="loading-overlay" />
             <router-view v-slot="{ Component, route }">
                 <transition name="fade" mode="out-in">
-                    <div :key="route.name">
+                    <div :key="route.fullPath">
                         <component :is="Component"></component>
                     </div>
                 </transition>
@@ -67,6 +82,8 @@ onMounted(async () => {
     flex: 1;
     padding: 2rem 1.5rem 1.5rem 1.5rem;
     min-width: 0;
+    position: relative;
+    margin-left: 260px;
 }
 
 @media (min-width: 768px) {
@@ -209,5 +226,15 @@ body {
 .form-control-dark:focus {
     border-color: transparent;
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+
+.loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

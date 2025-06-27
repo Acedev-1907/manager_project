@@ -14,14 +14,14 @@ const emit = defineEmits<{
     (e: 'pinnedProject', projectId: number): void
     (e: 'editProject', project: ProjectType): void
     (e: 'viewProjectDetail', projectId: number): void
-    (e: 'getProject', page: number, query: string): Promise<void>
+    (e: 'getProject', page: number, query: string, showGlobalLoading: boolean): Promise<void>
 
 
 }>()
 
 const query = ref("");
 const search = myDebounce(async function () {
-    await emit("getProject", 1, query.value,);
+    await emit("getProject", 1, query.value, false);
 }, 100);
 </script>
 
