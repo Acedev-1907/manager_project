@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package + env
 COPY package*.json ./
-# COPY .env.production .env
+COPY .env.production .env
 
 RUN npm install
 
@@ -32,7 +32,7 @@ COPY . /var/www/html
 WORKDIR /var/www/html
 
 # Copy file .env.production thành .env cho Laravel backend
-# COPY .env.production /var/www/html/.env
+COPY .env.production /var/www/html/.env
 
 # Cài đặt PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
