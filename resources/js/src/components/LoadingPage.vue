@@ -1,5 +1,5 @@
 <template>
-    <div v-if="visible" class="loading-overlay">
+    <div v-if="props.visible" class="loading-overlay">
         <div class="loader">
             <svg class="spinner" viewBox="0 0 50 50">
                 <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5" />
@@ -9,18 +9,12 @@
     </div>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { eventBus } from '../helper/eventBus';
-const visible = ref(false);
-function show() { visible.value = true; }
-function hide() { visible.value = false; }
-onMounted(() => {
-    eventBus.on('show-loading', show);
-    eventBus.on('hide-loading', hide);
-});
-onUnmounted(() => {
-    eventBus.off('show-loading', show);
-    eventBus.off('hide-loading', hide);
+import { defineProps } from 'vue';
+const props = defineProps({
+    visible: {
+        type: Boolean,
+        default: true
+    }
 });
 </script>
 <style scoped>
@@ -33,6 +27,7 @@ onUnmounted(() => {
     align-items: center;
     justify-content: center;
     transition: opacity 0.3s;
+    min-height: 100%;
 }
 
 .loader {
@@ -40,29 +35,8 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 100vw;
+    width: 100%;
     min-height: 100vh;
-}
-
-@media (max-width: 767.98px) {
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100vw;
-        height: 100vh;
-        min-height: 100vh;
-    }
-
-    .loader {
-        width: 100vw;
-        min-height: 100vh;
-        align-items: center;
-        justify-content: center;
-        display: flex;
-    }
 }
 
 .spinner {
@@ -107,5 +81,21 @@ onUnmounted(() => {
     color: #2470dc;
     letter-spacing: 0.08em;
     text-shadow: 0 2px 8px #b3c6e0;
+}
+
+@media (max-width: 768px) {
+    .loading-overlay {
+        min-height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0 !important;
+    }
+
+    .loader {
+        min-height: 100vh;
+    }
 }
 </style>

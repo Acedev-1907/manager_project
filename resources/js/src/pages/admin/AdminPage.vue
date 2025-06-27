@@ -3,7 +3,6 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import NarBar from './components/NarBar.vue';
 import { useLogOutUser } from './actions/Logout';
 import { getUserData } from '../../helper/getUserData';
-import LoadingPage from '../../components/LoadingPage.vue';
 import { eventBus } from '../../helper/eventBus';
 
 const { logout } = useLogOutUser()
@@ -43,7 +42,6 @@ onUnmounted(() => {
     <div class="admin-layout">
         <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" />
         <div class="admin-content" style="position:relative;">
-            <LoadingPage v-if="isLoading" class="loading-overlay" />
             <router-view v-slot="{ Component, route }">
                 <transition name="fade" mode="out-in">
                     <div :key="route.fullPath">

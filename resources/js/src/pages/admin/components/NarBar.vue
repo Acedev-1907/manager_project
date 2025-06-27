@@ -67,15 +67,15 @@ function isActive(link: string) {
 </script>
 <template>
     <!-- Mobile Top Navbar -->
-    <nav class="mobile-navbar d-md-none">
-        <button class="hamburger" @click="toggleSidebar">
+    <nav class="mobile-navbar d-md-none beautiful-mobile-navbar">
+        <button class="hamburger modern-hamburger" @click="toggleSidebar">
             <span></span>
             <span></span>
             <span></span>
         </button>
-        <div class="mobile-title">
-            <img :src="`${APP.baseURL}/others/logo.png`" style="height: 32px" alt="">
-            <span>TaskMgr</span>
+        <div class="mobile-title beautiful-mobile-title">
+            <img :src="`${APP.baseURL}/others/logo.png`" class="mobile-logo" alt="TaskMgr Logo">
+            <span class="mobile-app-name">TaskMgr</span>
         </div>
     </nav>
     <!-- Sidebar: hiện đại, bo góc, shadow, icon lớn, avatar, nút đóng -->
@@ -313,10 +313,10 @@ function isActive(link: string) {
     }
 
     .sidebar-mobile-icon {
-        font-size: 1.5rem;
-        min-width: 1.5rem;
-        color: #2470dc;
-        transition: color 0.18s;
+        font-size: 1.5rem !important;
+        min-width: 1.5rem !important;
+        color: #2470dc !important;
+        transition: color 0.18s !important;
     }
 
     .sidebar-mobile-link:hover .sidebar-mobile-icon,
@@ -564,5 +564,103 @@ a.router-link-active.router-link-exact-active.nav-link {
     border-radius: 2px;
     margin-left: 0.5em;
     margin-top: 2px;
+}
+
+.beautiful-mobile-navbar {
+    background: #fff;
+    border-radius: 0 0 1.2rem 1.2rem;
+    box-shadow: 0 4px 18px rgba(34, 34, 59, 0.10);
+    min-height: 62px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+}
+
+.beautiful-mobile-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    flex: 1 1 auto;
+}
+
+.mobile-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
+    background: #fff;
+    border: 2px solid #e0e7ef;
+}
+
+.mobile-app-name {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #2563eb;
+    letter-spacing: 0.04em;
+    text-shadow: 0 2px 8px #e0e7ef;
+}
+
+.modern-hamburger {
+    background: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    cursor: pointer;
+    padding: 0;
+    width: 38px;
+    height: 38px;
+    justify-content: center;
+    align-items: center;
+    margin-right: 0.5rem;
+    margin-left: 0;
+    transition: background 0.18s;
+    border-radius: 50%;
+}
+
+.modern-hamburger:hover {
+    background: #f3f7fa;
+}
+
+.modern-hamburger span {
+    display: block;
+    height: 3.5px;
+    width: 22px;
+    background: #2563eb;
+    border-radius: 2px;
+    transition: background 0.18s, width 0.18s;
+}
+
+@media (max-width: 767.98px) {
+    .beautiful-mobile-navbar {
+        border-radius: 0 0 1.2rem 1.2rem;
+        min-height: 62px;
+        height: 62px;
+        padding: 0 0.7rem;
+    }
+
+    .modern-hamburger {
+        margin-right: 0.5rem;
+    }
+
+    .beautiful-mobile-title {
+        gap: 0.7rem;
+    }
+
+    .mobile-logo {
+        width: 38px;
+        height: 38px;
+    }
+
+    .mobile-app-name {
+        font-size: 1.18rem;
+    }
 }
 </style>
