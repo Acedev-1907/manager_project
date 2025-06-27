@@ -4,6 +4,8 @@ import { SingleProjectResponseType, TaskStatus } from '../actions/getProjectDeta
 import { taskStore } from '../store/kabanStore';
 import { onMounted } from 'vue';
 
+const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
 defineProps<{
     projectData: SingleProjectResponseType;
 }>();
@@ -135,9 +137,9 @@ onMounted(() => {
         </div>
         <div class="card-direct">
             <div v-for="task in projectData?.data?.tasks.filter(t => t.status === TaskStatus.COMPLETED)" :key="task.id"
-                draggable="true" @dragstart="handleDragStart(task.id, projectData?.data?.id)"
-                @touchstart="handleTouchStart(task.id, projectData?.data?.id, $event)"
-                @touchmove="handleTouchMove($event)" @touchend="handleTouchEnd($event)"
+                :draggable="!isMobile" @dragstart="!isMobile && handleDragStart(task.id, projectData?.data?.id)"
+                @touchstart="isMobile && handleTouchStart(task.id, projectData?.data?.id, $event)"
+                @touchmove="isMobile && handleTouchMove($event)" @touchend="isMobile && handleTouchEnd($event)"
                 :class="'card card-body task_card completedTask_' + task.id">
                 <p>{{ task.name }}</p>
                 <div class="assignees">
