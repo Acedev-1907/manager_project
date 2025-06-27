@@ -20,13 +20,6 @@ RUN npm run build
 # Stage 2: Laravel + Nginx + PHP-FPM
 FROM richarvey/nginx-php-fpm:3.1.6
 
-# Copy frontend build (xóa build cũ trước nếu có)
-RUN rm -rf /var/www/html/public/build
-COPY --from=frontend /app/public/build /var/www/html/public/build
-
-# Debug sau khi copy
-RUN echo "[DEBUG] Đã copy frontend build:" && ls -al /var/www/html/public/build
-
 # Copy toàn bộ source code
 COPY . /var/www/html
 WORKDIR /var/www/html
@@ -63,6 +56,9 @@ ENV LOG_CHANNEL=stderr
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
 COPY supervisord.conf /etc/supervisord.conf
+
+# ĐẢM BẢO build mới luôn được copy vào cuối cùng
+COPY --from=frontend /app/public/build /var/www/html/public/build
 
 EXPOSE 80
 
