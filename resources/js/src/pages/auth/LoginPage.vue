@@ -64,7 +64,6 @@ async function submitLogin() {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: #fff;
 }
 
 .login-card {
