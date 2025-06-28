@@ -27,17 +27,13 @@ async function logoutUser() {
     }
 }
 
-async function tryLogoutUser() {
-    await logout(undefined)
-}
-
 const showLoading = () => { isLoading.value = true; };
 const hideLoading = () => { isLoading.value = false; };
 
 onMounted(() => {
     eventBus.on('show-loading', showLoading);
     eventBus.on('hide-loading', hideLoading);
-    tryLogoutUser().finally(() => isLoading.value = false);
+    isLoading.value = false;
 });
 
 onUnmounted(() => {

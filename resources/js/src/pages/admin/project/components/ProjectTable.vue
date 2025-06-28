@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-// import { myDebounce } from '../../../../helper/util';
 import { GetProjectType, ProjectType } from '../actions/GetProject';
-import { myDebounce } from '../../../../helper/utils';
+import SearchInput from '../../../../components/SearchInput.vue';
 
 defineProps<{
     projects: GetProjectType;
@@ -19,28 +18,16 @@ const emit = defineEmits<{
 }>()
 
 const query = ref("");
-const search = myDebounce(async function () {
-    await emit("getProject", 1, query.value, false);
-}, 100);
+
+const handleSearch = async (searchQuery: string) => {
+    query.value = searchQuery;
+    await emit("getProject", 1, searchQuery, false);
+};
 </script>
 
 <template>
     <div class="project-table-container" style="position:relative;">
-        <div class="search-bar-card">
-            <div class="search-input-wrapper">
-                <span class="search-icon">
-                    <i class="bi bi-search"></i>
-                </span>
-                <BaseInput @keydown="search" v-model="query" placeholder="Search project..."
-                    class="search-input-beauty" />
-                <span v-if="query" class="clear-icon" @click="query = ''">
-                    <i class="bi bi-x-circle"></i>
-                </span>
-                <span v-show="loading" class="loading-spinner">
-                    <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
-                </span>
-            </div>
-        </div>
+        <SearchInput v-model="query" placeholder="Search project..." :loading="loading" @search="handleSearch" />
         <div class="table-responsive table-card d-none d-md-block">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-header">
@@ -131,86 +118,14 @@ const search = myDebounce(async function () {
 .project-table-container {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 1.5rem 0.5rem;
-}
-
-.search-bar-card {
-    background: #fff;
-    border-radius: 1rem;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
-    padding: 1rem 1.5rem 1rem 1rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-}
-
-.search-input-wrapper {
-    position: relative;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    background: #f8fafc;
-    border-radius: 2.5rem;
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
-    padding: 0.05rem 0.7rem 0.05rem 0.5rem;
-    transition: box-shadow 0.2s, border 0.2s;
-}
-
-.search-input-beauty {
-    flex: 1;
-    border: none;
-    background: transparent;
-    outline: none;
-    font-size: 0.98rem;
-    padding: 0.45rem 0.5rem 0.45rem 1.7rem;
-    border-radius: 2.5rem;
-    color: #22223b;
-    transition: box-shadow 0.2s, border 0.2s;
-}
-
-.search-input-beauty:focus {
-    box-shadow: 0 0 0 2px #a5b4fc;
-    background: #fff;
-}
-
-.search-icon {
-    position: absolute;
-    left: 0.5rem;
-    color: #94a3b8;
-    font-size: 1.05rem;
-    z-index: 2;
-    pointer-events: none;
-}
-
-.clear-icon {
-    position: absolute;
-    right: 1.7rem;
-    color: #cbd5e1;
-    font-size: 1.05rem;
-    cursor: pointer;
-    z-index: 2;
-    transition: color 0.2s;
-}
-
-.clear-icon:hover {
-    color: #ef4444;
-}
-
-.loading-spinner {
-    position: absolute;
-    right: 0.5rem;
-    display: flex;
-    align-items: center;
-    top: 50%;
-    transform: translateY(-50%);
+    padding: 1rem 0.5rem;
 }
 
 .table-card {
     background: #fff;
-    border-radius: 1rem;
+    border-radius: 0.875rem;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
-    padding: 1rem;
+    padding: 0.75rem;
     overflow-x: auto;
 }
 
@@ -218,9 +133,11 @@ const search = myDebounce(async function () {
     background: linear-gradient(90deg, #f8fafc 0%, #e3e9f7 100%);
     color: #333;
     font-weight: bold;
-    border-top-left-radius: 0.75rem;
-    border-top-right-radius: 0.75rem;
+    border-top-left-radius: 0.625rem;
+    border-top-right-radius: 0.625rem;
     border-bottom: 2px solid #e0e0e0;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
 }
 
 .table-row {
@@ -231,14 +148,19 @@ const search = myDebounce(async function () {
     background: #f3f7fa;
 }
 
+.table-row td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.9rem;
+}
+
 .action-btn {
     border-radius: 50%;
-    width: 2.2rem;
-    height: 2.2rem;
+    width: 2rem;
+    height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
+    font-size: 1rem;
     transition: background 0.2s, color 0.2s;
 }
 
@@ -248,9 +170,9 @@ const search = myDebounce(async function () {
 }
 
 .custom-progress {
-    border-radius: 1rem;
+    border-radius: 0.875rem;
     background: #f1f3f6;
-    height: 1.2rem;
+    height: 1.1rem;
     overflow: hidden;
 }
 
@@ -258,11 +180,11 @@ const search = myDebounce(async function () {
     background: linear-gradient(90deg, #4ade80 0%, #22d3ee 100%);
     color: #fff;
     font-weight: 500;
-    border-radius: 1rem;
+    border-radius: 0.875rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     transition: width 0.4s cubic-bezier(.4, 2.3, .3, 1);
 }
 
@@ -271,7 +193,6 @@ const search = myDebounce(async function () {
         padding: 0.5rem 0.1rem;
     }
 
-    .search-bar-card,
     .table-card {
         padding: 0.7rem;
     }
@@ -340,29 +261,6 @@ const search = myDebounce(async function () {
     .action-btn-mobile:hover {
         background: #f0f6ff;
         color: #007bff;
-    }
-
-    .search-bar-card {
-        padding: 0.7rem;
-    }
-
-    .search-input-beauty {
-        font-size: 0.93rem;
-        padding: 0.38rem 0.4rem 0.38rem 1.3rem;
-    }
-
-    .search-input-wrapper {
-        padding: 0.01rem 0.3rem 0.01rem 0.2rem;
-    }
-
-    .search-icon {
-        left: 0.3rem;
-        font-size: 0.95rem;
-    }
-
-    .clear-icon {
-        right: 1.1rem;
-        font-size: 0.95rem;
     }
 }
 </style>

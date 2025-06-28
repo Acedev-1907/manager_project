@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
 import { GetMemberType, MemberType } from '../actions/getMember';
-import { myDebounce } from '../../../../helper/utils';
-
+import SearchInput from '../../../../components/SearchInput.vue';
 
 defineProps<{
     members: GetMemberType;
@@ -15,28 +14,15 @@ const emit = defineEmits<{
 }>();
 
 const query = ref("");
-const search = myDebounce(async function () {
-    await emit("getMember", 1, query.value, false);
-}, 200);
 
+const handleSearch = async (searchQuery: string) => {
+    query.value = searchQuery;
+    await emit("getMember", 1, searchQuery, false);
+};
 </script>
 <template>
     <div class="member-table-container" style="position:relative;">
-        <div class="search-bar-card">
-            <div class="search-input-wrapper">
-                <span class="search-icon">
-                    <i class="bi bi-search"></i>
-                </span>
-                <BaseInput @keydown="search" v-model="query" placeholder="Search member..."
-                    class="search-input-beauty" />
-                <span v-if="query" class="clear-icon" @click="query = ''">
-                    <i class="bi bi-x-circle"></i>
-                </span>
-                <span v-show="loading" class="loading-spinner">
-                    <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
-                </span>
-            </div>
-        </div>
+        <SearchInput v-model="query" placeholder="Search member..." :loading="loading" @search="handleSearch" />
         <div class="table-responsive table-card d-none d-md-block">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-header">
@@ -131,78 +117,6 @@ const search = myDebounce(async function () {
     padding: 1.5rem 0.5rem;
 }
 
-.search-bar-card {
-    background: #fff;
-    border-radius: 1rem;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
-    padding: 1rem 1.5rem 1rem 1rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-}
-
-.search-input-wrapper {
-    position: relative;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    background: #f8fafc;
-    border-radius: 2.5rem;
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
-    padding: 0.05rem 0.7rem 0.05rem 0.5rem;
-    transition: box-shadow 0.2s, border 0.2s;
-}
-
-.search-input-beauty {
-    flex: 1;
-    border: none;
-    background: transparent;
-    outline: none;
-    font-size: 0.98rem;
-    padding: 0.45rem 0.5rem 0.45rem 1.7rem;
-    border-radius: 2.5rem;
-    color: #22223b;
-    transition: box-shadow 0.2s, border 0.2s;
-}
-
-.search-input-beauty:focus {
-    box-shadow: 0 0 0 2px #a5b4fc;
-    background: #fff;
-}
-
-.search-icon {
-    position: absolute;
-    left: 0.5rem;
-    color: #94a3b8;
-    font-size: 1.05rem;
-    z-index: 2;
-    pointer-events: none;
-}
-
-.clear-icon {
-    position: absolute;
-    right: 1.7rem;
-    color: #cbd5e1;
-    font-size: 1.05rem;
-    cursor: pointer;
-    z-index: 2;
-    transition: color 0.2s;
-}
-
-.clear-icon:hover {
-    color: #ef4444;
-}
-
-.loading-spinner {
-    position: absolute;
-    right: 0.5rem;
-    display: flex;
-    align-items: center;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
 .table-card {
     background: #fff;
     border-radius: 1rem;
@@ -249,7 +163,6 @@ const search = myDebounce(async function () {
         padding: 0.5rem 0.1rem;
     }
 
-    .search-bar-card,
     .table-card {
         padding: 0.7rem;
     }
@@ -314,29 +227,6 @@ const search = myDebounce(async function () {
     .action-btn-mobile:hover {
         background: #f0f6ff;
         color: #007bff;
-    }
-
-    .search-bar-card {
-        padding: 0.7rem;
-    }
-
-    .search-input-beauty {
-        font-size: 0.93rem;
-        padding: 0.38rem 0.4rem 0.38rem 1.3rem;
-    }
-
-    .search-input-wrapper {
-        padding: 0.01rem 0.3rem 0.01rem 0.2rem;
-    }
-
-    .search-icon {
-        left: 0.3rem;
-        font-size: 0.95rem;
-    }
-
-    .clear-icon {
-        right: 1.1rem;
-        font-size: 0.95rem;
     }
 }
 </style>
