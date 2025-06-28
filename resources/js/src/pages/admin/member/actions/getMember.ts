@@ -26,7 +26,7 @@ export function useGetMembers() {
         `members?query=${query}&page=${page}`,
         "GET",
         undefined,
-        showGlobalLoading
+        { showGlobalLoading }
       );
       loading.value = false;
       memberData.value = data;
