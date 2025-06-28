@@ -27,7 +27,8 @@ const search = myDebounce(async function () {
                 <span class="search-icon">
                     <i class="bi bi-search"></i>
                 </span>
-                <input @keydown="search" v-model="query" placeholder="Search member..." class="search-input-beauty" />
+                <BaseInput @keydown="search" v-model="query" placeholder="Search member..."
+                    class="search-input-beauty" />
                 <span v-if="query" class="clear-icon" @click="query = ''">
                     <i class="bi bi-x-circle"></i>
                 </span>
@@ -41,14 +42,15 @@ const search = myDebounce(async function () {
                 <thead class="table-header">
                     <tr>
                         <th width="10%">ID</th>
-                        <th width="40%">Name</th>
-                        <th width="40%">Email</th>
+                        <th width="35%">Name</th>
+                        <th width="35%">Email</th>
                         <th width="10%">Edit</th>
+                        <th width="10%">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="!members?.data?.data || members?.data?.data.length === 0">
-                        <td colspan="4" class="text-center text-muted">No data</td>
+                        <td colspan="5" class="text-center text-muted">No data</td>
                     </tr>
                     <tr v-for="member in members?.data?.data" :key="member.id" class="table-row">
                         <td>{{ member.id }}</td>
@@ -59,6 +61,25 @@ const search = myDebounce(async function () {
                                 class="btn btn-outline-primary action-btn">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
+                        </td>
+                        <td>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary action-btn" type="button"
+                                    data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" @click="emit('editMember', member)">
+                                            <i class="bi bi-pencil-square me-2"></i>Edit
+                                        </a></li>
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li><a class="dropdown-item text-danger" href="#">
+                                            <i class="bi bi-trash me-2"></i>Delete
+                                        </a></li>
+                                </ul>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -71,6 +92,22 @@ const search = myDebounce(async function () {
             <div v-for="member in members?.data?.data" :key="member.id" class="mobile-member-card">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="mobile-id">#{{ member.id }}</span>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" @click="emit('editMember', member)">
+                                    <i class="bi bi-pencil-square me-2"></i>Edit
+                                </a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item text-danger" href="#">
+                                    <i class="bi bi-trash me-2"></i>Delete
+                                </a></li>
+                        </ul>
+                    </div>
                 </div>
                 <div class="mobile-member-name mb-1">{{ member.name }}</div>
                 <div class="mobile-member-email mb-2">{{ member.email }}</div>

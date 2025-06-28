@@ -5,43 +5,51 @@ import { showErrorResponse } from "../../../../helper/utils";
 import { memberStore } from "../store/MemberStore";
 
 export type MemberInputType = {
-    name: string
-    email: string
-}
+  id?: number;
+  name: string;
+  email: string;
+};
 export type MemberResponseType = {
-    message: string
-}
+  message: string;
+};
 
 export function useCreateOrUpdateMember() {
+  const loading = ref(false);
 
-    const loading = ref(false)
+  async function createOrUpdate() {
+    try {
+      loading.value = true;
+      const data = memberStore.edit
+        ? await updateMember()
+        : await createMember();
+      loading.value = false;
+      memberStore.memberInput = {} as MemberInputType;
 
-    async function createOrUpdate() {
-        try {
-            loading.value = true
-            const data =
-                memberStore.edit ?
-                    await updateMember() : await createMember()
-            loading.value = false
-            memberStore.memberInput = {} as MemberInputType
-
-            successMsg(data.message)
-        } catch (error) {
-            loading.value = false
-            showErrorResponse(error);
-        }
+      successMsg(data.message);
+      return { success: true, data };
+    } catch (error) {
+      loading.value = false;
+      showErrorResponse(error);
+      return { success: false, error };
     }
-    return { createOrUpdate, loading }
+  }
+  return { createOrUpdate, loading };
 }
 
 async function createMember() {
-    const data = await makeHttpReq<MemberInputType, MemberResponseType>
-        ('members', 'POST', memberStore.memberInput)
-    return data;
+  const data = await makeHttpReq<MemberInputType, MemberResponseType>(
+    "members",
+    "POST",
+    memberStore.memberInput
+  );
+  return data;
 }
 async function updateMember() {
-    const data = await makeHttpReq<MemberInputType, MemberResponseType>
-        ('members', 'PUT', memberStore.memberInput)
-    memberStore.edit = false
-    return data;
+  const data = await makeHttpReq<MemberInputType, MemberResponseType>(
+    "members",
+    "PUT",
+    memberStore.memberInput
+  );
+  memberStore.edit = false;
+  return data;
 }

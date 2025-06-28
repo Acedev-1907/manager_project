@@ -100,6 +100,11 @@ function closeCalendar() {
 
 function selectDate(date: Date) {
     const isoDate = date.toISOString().split('T')[0];
+    console.log('DateInput: Selecting date:', isoDate);
+    console.log('DateInput: Min prop:', props.min);
+    console.log('DateInput: Max prop:', props.max);
+    console.log('DateInput: Is disabled:', isDisabled(date));
+
     displayValue.value = formatDateForDisplay(isoDate);
     emit('update:modelValue', isoDate);
     closeCalendar();
@@ -141,6 +146,19 @@ function nextMonth() {
     currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() + 1, 1);
 }
 
+// Allow navigation to far future months
+function goToFutureMonth() {
+    const futureDate = new Date();
+    futureDate.setFullYear(futureDate.getFullYear() + 5); // Go 5 years into future
+    currentMonth.value = futureDate;
+}
+
+function goToFarFutureMonth() {
+    const farFutureDate = new Date();
+    farFutureDate.setFullYear(farFutureDate.getFullYear() + 20); // Go 20 years into future
+    currentMonth.value = farFutureDate;
+}
+
 function isToday(date: Date): boolean {
     const today = new Date();
     return date.toDateString() === today.toDateString();
@@ -157,14 +175,33 @@ function isOtherMonth(date: Date): boolean {
 }
 
 function isDisabled(date: Date): boolean {
-    if (props.min) {
+    const dateString = date.toISOString().split('T')[0];
+    console.log('DateInput: Checking if date is disabled:', dateString);
+    console.log('DateInput: Min prop:', props.min);
+    console.log('DateInput: Max prop:', props.max);
+
+    // Only apply constraints if props are provided
+    if (props.min && props.min !== undefined && props.min !== '') {
         const minDate = new Date(props.min);
-        if (date < minDate) return true;
+        // Compare only date part (ignoring time)
+        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const minDateOnly = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
+        if (dateOnly < minDateOnly) {
+            console.log('DateInput: Date disabled - before min date');
+            return true;
+        }
     }
-    if (props.max) {
+    if (props.max && props.max !== undefined && props.max !== '') {
         const maxDate = new Date(props.max);
-        if (date > maxDate) return true;
+        // Compare only date part (ignoring time)
+        const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const maxDateOnly = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
+        if (dateOnly > maxDateOnly) {
+            console.log('DateInput: Date disabled - after max date');
+            return true;
+        }
     }
+    console.log('DateInput: Date is enabled');
     return false;
 }
 
@@ -206,6 +243,40 @@ onUnmounted(() => {
                 </button>
             </div>
 
+            <!-- Quick navigation buttons for testing -->
+            <div v-if="false" class="calendar-quick-nav">
+                <button type="button" class="btn btn-sm btn-outline-primary me-1" @click="goToFutureMonth">
+                    +5 Years
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" @click="goToFarFutureMonth">
+                    +20 Years
+                </button>
+            </div>
+
+            <!-- Date constraints info -->
+            <div v-if="props.min || props.max" class="calendar-constraints">
+                <small class="text-muted">
+                    <span v-if="props.min">From: {{ formatDateForDisplay(props.min) }}</span>
+                    <span v-if="props.min && props.max"> | </span>
+                    <span v-if="props.max">To: {{ formatDateForDisplay(props.max) }}</span>
+                    <span v-if="props.min && !props.max"> | No maximum limit</span>
+                </small>
+            </div>
+
+            <!-- Show when no constraints -->
+            <div v-if="!props.min && !props.max" class="calendar-constraints">
+                <small class="text-muted">
+                    <span>No date restrictions - free selection</span>
+                </small>
+            </div>
+
+            <!-- Debug info for troubleshooting -->
+            <div v-if="false" class="calendar-debug">
+                <small class="text-muted">
+                    <strong>Debug:</strong> Min={{ props.min || 'None' }}, Max={{ props.max || 'None' }}
+                </small>
+            </div>
+
             <div class="calendar-weekdays">
                 <div class="weekday">Sun</div>
                 <div class="weekday">Mon</div>
@@ -223,7 +294,8 @@ onUnmounted(() => {
                         'today': isToday(date),
                         'selected': isSelected(date),
                         'disabled': isDisabled(date)
-                    }" :disabled="isDisabled(date)" @click="selectDate(date)">
+                    }" :disabled="isDisabled(date)" @click="selectDate(date)"
+                    :title="isDisabled(date) ? 'Date not available' : ''">
                     {{ date.getDate() }}
                 </button>
             </div>
@@ -391,10 +463,29 @@ onUnmounted(() => {
 .calendar-day.disabled {
     color: #d1d5db;
     cursor: not-allowed;
+    background: #f9fafb;
+    opacity: 0.5;
+    text-decoration: line-through;
 }
 
 .calendar-day.disabled:hover {
-    background: none;
+    background: #f9fafb;
+    color: #d1d5db;
+}
+
+.calendar-constraints {
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.calendar-debug {
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+.calendar-quick-nav {
+    margin-bottom: 1rem;
+    text-align: center;
 }
 
 @media (max-width: 768px) {

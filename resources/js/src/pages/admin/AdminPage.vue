@@ -86,7 +86,6 @@ onUnmounted(() => {
 
 .admin-content {
     flex: 1;
-    padding: 2rem 1.5rem 1.5rem 1.5rem;
     min-width: 0;
     position: relative;
     margin-left: 260px;

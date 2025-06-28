@@ -4,12 +4,13 @@ import MemberTable from './components/MemberTable.vue';
 import { MemberType, useGetMembers } from './actions/getMember';
 import { Bootstrap5Pagination } from 'laravel-vue-pagination';
 import { memberStore } from './store/MemberStore';
-import router from '../../../router';
+import { useRouter } from 'vue-router';
 import { MemberInputType } from './actions/createMember';
 import LoadingPage from '../../../components/LoadingPage.vue';
 
 const { getMembers, memberData, loading: tableLoading } = useGetMembers();
 const isLoading = ref(true);
+const router = useRouter();
 
 async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
     if (showLoadingPage) {
@@ -23,8 +24,12 @@ async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
     }
 }
 
-function editMember(member: MemberType) {
-    memberStore.memberInput = member;
+function handleEditMember(member: MemberType) {
+    memberStore.memberInput = {
+        id: member.id,
+        name: member.name,
+        email: member.email
+    };
     memberStore.edit = true;
     router.push('/create-members');
 }
@@ -56,7 +61,7 @@ onMounted(async () => {
             </div>
             <div class="main-card-body position-relative">
                 <LoadingPage v-if="isLoading" />
-                <MemberTable @getMember="fetchMembers" :loading="tableLoading" @editMember="editMember"
+                <MemberTable @getMember="fetchMembers" :loading="tableLoading" @editMember="handleEditMember"
                     :members="memberData">
                     <template #pagination>
                         <div class="d-flex justify-content-center mt-3">

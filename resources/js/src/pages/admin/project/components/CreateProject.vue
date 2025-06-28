@@ -24,24 +24,51 @@ const today = computed(() => {
     return date.toISOString().split('T')[0];
 });
 
-const minEndDate = computed(() => {
-    return projectStore.projectInput.startDate || today.value;
+// Remove all date constraints - allow free selection
+const minStartDate = computed(() => {
+    return undefined; // No minimum limit for start date
 });
 
-// Watch for start date changes to auto-fill end date
-watch(() => projectStore.projectInput.startDate, (newStartDate) => {
-    if (newStartDate && !projectStore.projectInput.endDate) {
-        // Auto-set end date to 30 days after start date
-        const startDate = new Date(newStartDate);
-        const endDate = new Date(startDate);
-        endDate.setDate(startDate.getDate() + 30);
-        projectStore.projectInput.endDate = endDate.toISOString().split('T')[0];
+const minEndDate = computed(() => {
+    // Only constraint: end date must be >= start date
+    if (projectStore.projectInput.startDate) {
+        return projectStore.projectInput.startDate;
     }
+    return undefined; // No minimum limit if no start date
+});
+
+// Remove max date limitation completely - allow any future date
+const maxEndDate = computed(() => {
+    return undefined; // No max limit
+});
+
+const debugInfo = computed(() => {
+    return {
+        startDate: projectStore.projectInput.startDate,
+        endDate: projectStore.projectInput.endDate,
+        minStartDate: minStartDate.value || 'No limit',
+        minEndDate: minEndDate.value || 'No limit',
+        maxEndDate: maxEndDate.value || 'No limit',
+        today: today.value
+    };
+});
+
+// Watch for start date changes - only validate end date
+watch(() => projectStore.projectInput.startDate, (newStartDate) => {
+    console.log('Start date changed:', newStartDate);
+    console.log('Min end date:', minEndDate.value);
 
     // If end date is before start date, clear it
     if (newStartDate && projectStore.projectInput.endDate && projectStore.projectInput.endDate < newStartDate) {
+        console.log('Clearing end date because it\'s before start date');
         projectStore.projectInput.endDate = '';
     }
+});
+
+// Watch for end date changes to log validation
+watch(() => projectStore.projectInput.endDate, (newEndDate) => {
+    console.log('End date changed:', newEndDate);
+    console.log('Current min end date:', minEndDate.value);
 });
 
 async function submitProject() {
@@ -83,23 +110,35 @@ if (projectStore.edit && projectStore.projectInput.id) {
                     </div>
                     <div class="col-md-6 col-12">
                         <Error label="Start Date" :errors="v$.startDate.$errors" />
-                        <DateInput v-model="projectStore.projectInput.startDate" :min="today"
-                            placeholder="DD/MM/YYYY" />
+                        <DateInput v-model="projectStore.projectInput.startDate" placeholder="DD/MM/YYYY" />
                         <small class="text-muted mt-1 d-block">
                             <i class="bi bi-info-circle"></i>
-                            Project start date (cannot be in the past)
+                            Project start date (can be any date)
                         </small>
                     </div>
                     <div class="col-md-6 col-12">
                         <Error label="End Date" :errors="v$.endDate.$errors" />
-                        <DateInput v-model="projectStore.projectInput.endDate" :min="minEndDate"
-                            placeholder="DD/MM/YYYY" />
+                        <DateInput v-model="projectStore.projectInput.endDate" placeholder="DD/MM/YYYY" />
                         <small class="text-muted mt-1 d-block">
                             <i class="bi bi-info-circle"></i>
                             Project end date (must be after start date)
                         </small>
                     </div>
                 </div>
+
+                <!-- Debug information (remove in production) -->
+                <div v-if="false" class="mt-3 p-2 bg-light rounded">
+                    <small class="text-muted">
+                        <strong>Debug Info:</strong><br>
+                        Start Date: {{ debugInfo.startDate }}<br>
+                        End Date: {{ debugInfo.endDate }}<br>
+                        Min Start Date: {{ debugInfo.minStartDate }}<br>
+                        Min End Date: {{ debugInfo.minEndDate }}<br>
+                        Max End Date: {{ debugInfo.maxEndDate }}<br>
+                        Today: {{ debugInfo.today }}
+                    </small>
+                </div>
+
                 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mt-4">
                     <RouterLink to="/projects" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Back to Projects
