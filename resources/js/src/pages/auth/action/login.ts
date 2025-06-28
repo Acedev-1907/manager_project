@@ -14,13 +14,18 @@ export type LoginResponseType = {
   token: string;
 };
 
-export const loginInput = ref<LoginUserType>({} as LoginUserType);
+export const loginInput = ref<LoginUserType>({
+  email: "",
+  password: "",
+});
 
 export function useLoginUser() {
   const loading = ref(false);
 
   async function login() {
     try {
+      console.log("login function called");
+      console.log("loginInput.value:", loginInput.value);
       loading.value = true;
 
       const data = await makeHttpReq<LoginUserType, LoginResponseType>(
@@ -29,14 +34,18 @@ export function useLoginUser() {
         loginInput.value
       );
 
+      console.log("login response:", data);
       loading.value = false;
-      loginInput.value = {} as LoginUserType;
-      successMsg(data.message);
+      loginInput.value = {
+        email: "",
+        password: "",
+      };
       if (data.isLoggedIn) {
         localStorage.setItem("userData", JSON.stringify(data));
         window.location.href = "/app/admin";
       }
     } catch (error) {
+      console.error("login error:", error);
       showErrorResponse(error);
       loading.value = false;
       for (const message of error as string) {

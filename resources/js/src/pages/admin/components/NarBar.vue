@@ -27,7 +27,8 @@ const emit = defineEmits<{
 }>()
 
 defineProps<{
-    loggedInUserEmail: string | undefined
+    loggedInUserEmail: string | undefined,
+    logoutLoading?: boolean
 }>()
 
 const sidebarOpen = ref(false)
@@ -101,9 +102,11 @@ function isActive(link: string) {
                     </RouterLink>
                 </li>
                 <li>
-                    <a class="sidebar-mobile-link logout" @click="emit('logout'); closeSidebar()">
-                        <i class="bi bi-box-arrow-right sidebar-mobile-icon"></i>
-                        <span>Logout</span>
+                    <a class="sidebar-mobile-link logout" :class="{ 'loading': logoutLoading }"
+                        @click="!logoutLoading && emit('logout'); closeSidebar()">
+                        <i v-if="!logoutLoading" class="bi bi-box-arrow-right sidebar-mobile-icon"></i>
+                        <i v-else class="bi bi-arrow-clockwise sidebar-mobile-icon spinning"></i>
+                        <span>{{ logoutLoading ? 'Logging out...' : 'Logout' }}</span>
                     </a>
                 </li>
             </ul>
@@ -130,10 +133,11 @@ function isActive(link: string) {
                         {{ nav.name }}
                     </RouterLink>
                 </li>
-                <li class="nav-item" style="cursor: pointer" @click="emit('logout'); closeSidebar()">
-                    <a class="nav-link">
-                        <i class="bi bi-box-arrow-right"></i>
-                        Logout
+                <li class="nav-item" style="cursor: pointer" @click="!logoutLoading && emit('logout'); closeSidebar()">
+                    <a class="nav-link" :class="{ 'loading': logoutLoading }">
+                        <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
+                        <i v-else class="bi bi-arrow-clockwise spinning"></i>
+                        {{ logoutLoading ? 'Logging out...' : 'Logout' }}
                     </a>
                 </li>
             </ul>
@@ -662,5 +666,45 @@ a.router-link-active.router-link-exact-active.nav-link {
     .mobile-app-name {
         font-size: 1.18rem;
     }
+}
+
+/* Loading animation */
+.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Loading state styles */
+.sidebar-mobile-link.loading,
+.nav-link.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.sidebar-mobile-link.loading .sidebar-mobile-icon,
+.nav-link.loading i {
+    animation: spin 1s linear infinite;
+}
+
+/* Disable hover effects when loading */
+.sidebar-mobile-link.loading:hover,
+.nav-link.loading:hover {
+    background: inherit;
+    color: inherit;
+}
+
+.sidebar-mobile-link.loading:hover .sidebar-mobile-icon,
+.nav-link.loading:hover i {
+    color: inherit;
 }
 </style>

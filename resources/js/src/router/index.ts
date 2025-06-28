@@ -60,27 +60,57 @@ const router = createRouter({
         },
       ],
     },
+    // Catch all route - redirect to login
+    {
+      path: "/:pathMatch(.*)*",
+      redirect: "/login",
+    },
   ],
 });
 
 // Navigation Guard Check login
 router.beforeEach((to, from, next) => {
-  const userData = localStorage.getItem("userData"); // Lấy toàn bộ dữ liệu từ localStorage
-  const token = userData ? JSON.parse(userData).token : null; // Lấy token từ dữ liệu
-  const isAuthenticated = !!token; // Chuyển token thành boolean
+  try {
+    const userData = localStorage.getItem("userData");
+    let token = null;
+    let isAuthenticated = false;
 
-  // console.log(token);
-  // Nếu đã đăng nhập mà vào trang login hoặc register thì chuyển sang /admin
-  if (isAuthenticated && (to.path === "/login" || to.path === "/register")) {
-    next({ path: "/admin" });
-    return;
-  }
+    // Safely parse userData
+    if (userData) {
+      try {
+        const parsedData = JSON.parse(userData);
+        token = parsedData?.token;
+        isAuthenticated = !!token;
+      } catch (parseError) {
+        console.warn("Error parsing userData:", parseError);
+        // Clear invalid data
+        localStorage.removeItem("userData");
+        isAuthenticated = false;
+      }
+    }
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    // console.log("Redirecting to login because user is not authenticated");
-    next({ path: "/login" });
-  } else {
+    // Nếu đã đăng nhập mà vào trang login hoặc register thì chuyển sang /admin
+    if (
+      isAuthenticated &&
+      (to.path === "/login" || to.path === "/register" || to.path === "/auth")
+    ) {
+      next({ path: "/admin" });
+      return;
+    }
+
+    // Nếu cần auth mà chưa đăng nhập
+    if (to.meta.requiresAuth && !isAuthenticated) {
+      next({ path: "/login" });
+      return;
+    }
+
+    // Các trường hợp khác - cho phép
     next();
+  } catch (error) {
+    console.error("Router guard error:", error);
+    // Nếu có lỗi, clear localStorage và chuyển về login
+    localStorage.removeItem("userData");
+    next({ path: "/login" });
   }
 });
 

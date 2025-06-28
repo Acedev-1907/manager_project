@@ -5,7 +5,7 @@ import { useLogOutUser } from './actions/Logout';
 import { getUserData } from '../../helper/getUserData';
 import { eventBus } from '../../helper/eventBus';
 
-const { logout } = useLogOutUser()
+const { logout, loading } = useLogOutUser()
 
 const userData = getUserData()
 const isLoading = ref(true);
@@ -13,9 +13,17 @@ const isLoading = ref(true);
 async function logoutUser() {
     const userId = userData?.user?.id
     if (typeof userId !== 'undefined') {
-        await logout(userId)
+        try {
+            await logout(userId)
+            localStorage.clear()
+            window.location.href = "/app/login"
+        } catch (error) {
+            localStorage.clear()
+            window.location.href = "/app/login"
+        }
+    } else {
         localStorage.clear()
-        setTimeout(() => window.location.href = "/app/login", 1000)
+        window.location.href = "/app/login"
     }
 }
 
@@ -40,7 +48,7 @@ onUnmounted(() => {
 
 <template>
     <div class="admin-layout">
-        <NarBar :loggedInUserEmail="userData?.user.email" @logout="logoutUser" />
+        <NarBar :loggedInUserEmail="userData?.user.email" :logoutLoading="loading" @logout="logoutUser" />
         <div class="admin-content" style="position:relative;">
             <router-view v-slot="{ Component, route }">
                 <transition name="fade" mode="out-in">

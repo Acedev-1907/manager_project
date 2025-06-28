@@ -13,15 +13,21 @@ export function useLogOutUser() {
       await makeHttpReq<{ userId: number | undefined }, { message: string }>(
         "logout",
         "POST",
-        { userId: userId }
+        { userId: userId },
+        { timeout: 5000 }
       );
+
       loading.value = false;
+      return true;
     } catch (error) {
-      // showErrorResponse(error);
       loading.value = false;
+
       if ((error as Error).message == "Not authenticated") {
-        window.location.href = "/app/login";
+        return true;
       }
+
+      console.warn("Logout error:", error);
+      return false;
     }
   }
 
