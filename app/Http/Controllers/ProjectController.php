@@ -15,11 +15,11 @@ class ProjectController extends Controller
 {
     public function getProject($slug)
     {
-        $project = Project::with(['tasks.task_members.members','task_progress'])
+        $project = Project::with(['tasks.task_members.members', 'task_progress'])
             ->where('projects.slug', $slug)
             ->first();
 
-            return response(['data' => $project]);
+        return response(['data' => $project]);
     }
 
     public function index(Request $request)
@@ -31,9 +31,9 @@ class ProjectController extends Controller
             $projects->where('name', 'like', '%' . $query . '%')
                 ->orderBy('id', 'desc');
 
-            return response(['data' => $projects->paginate(10)], 200);
+            return response(['data' => $projects->paginate(6)], 200);
         }
-        return response(['data' => $projects->paginate(10)], 200);
+        return response(['data' => $projects->paginate(6)], 200);
     }
 
     public function store(Request $req)
