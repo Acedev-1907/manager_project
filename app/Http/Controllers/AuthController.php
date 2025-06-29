@@ -27,14 +27,14 @@ class AuthController extends Controller
             'email' => $fiels['email'],
             'password' => bcrypt($fiels['password']),
             'isValidEmail' => User::IS_INVALID_EMAIL,
-            'remember_token' => $this->generateRamdonCode()
+            'remember_token' => $this->generateRandomCode()
         ]);
 
         NewUserCreated::dispatch(($user));
         return response(['user' => $user, 'message' => 'user created'], 200);
     }
 
-    public function generateRamdonCode()
+    public function generateRandomCode()
     {
         $code = Str::random(10) . time();
         return $code;
@@ -62,7 +62,7 @@ class AuthController extends Controller
         $user = User::where('email', $fiels['email'])->first();
         if (!is_null($user)) {
             if (intval($user->isValidEmail) !== User::IS_VALID_EMAIL) {
-                NewUserCreated::dispatch(($user));
+                // NewUserCreated::dispatch(($user));
                 return response([
                     'message' => 'We send you an email verification!',
                     'isLoggedIn' => false

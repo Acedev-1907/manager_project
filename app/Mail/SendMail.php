@@ -20,7 +20,7 @@ class SendMail extends Mailable
      */
     public function __construct(User $user)
     {
-        $this->user=$user;
+        $this->user = $user;
     }
 
     /**
@@ -29,7 +29,7 @@ class SendMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: new Address('admin@gmail.com', 'Task app'),
+            from: new Address(config('mail.from.address'), config('mail.from.name', 'Task app')),
             subject: 'Send Mail',
         );
     }
@@ -41,7 +41,7 @@ class SendMail extends Mailable
     {
         return new Content(
             view: 'email.email-verification',
-            with:['user'=>$this->user]
+            with: ['user' => $this->user]
         );
     }
 
