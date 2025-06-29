@@ -1,12 +1,20 @@
 <script lang="ts" setup>
 import useVuelidate from '@vuelidate/core';
-import { required, email, sameAs } from '@vuelidate/validators';
+import { required, email, sameAs, helpers } from '@vuelidate/validators';
 import { registerInput, useRegisterUser } from './action/register';
+import { computed } from 'vue';
+
+const passwordValue = computed(() => registerInput.value.password);
+
+const sameAsPassword = helpers.withMessage(
+    'The value must be equal to the other value',
+    sameAs(passwordValue)
+);
 
 const rules = {
     email: { required, email },
     password: { required },
-    confirmPassword: { required, sameAsPassword: sameAs(() => registerInput.value.password) }
+    confirmPassword: { required, sameAsPassword }
 }
 
 const v$ = useVuelidate(rules, registerInput);

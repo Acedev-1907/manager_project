@@ -1,4 +1,5 @@
 import "./bootstrap";
+import "../css/drag-drop.css";
 
 import { createApp } from "vue";
 import App from "./src/App.vue";
