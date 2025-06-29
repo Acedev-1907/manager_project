@@ -1,0 +1,91 @@
+/* Improved Drag and Drop Styles */
+.ghost-task {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  background: white !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 12px 40px 8px rgba(59, 130, 246, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.18) !important;
+  max-width: 300px !important;
+  min-width: 250px !important;
+  opacity: 0.9 !important;
+  backdrop-filter: blur(10px) !important;
+  transform: rotate(-2deg) !important;
+  transition: none !important;
+  user-select: none !important;
+  font-family: inherit !important;
+  line-height: 1.4 !important;
+}
+
+.ghost-task .task-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  margin: 0 0 8px 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  display: block !important;
+}
+
+.ghost-task .task-members {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex-wrap: nowrap !important;
+  max-width: 100% !important;
+}
+
+.ghost-task .member-avatar {
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
+  background: #3b82f6 !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  flex-shrink: 0 !important;
+}
+
+.task-card.dragging {
+  opacity: 0.5 !important;
+  transform: rotate(5deg) !important;
+  z-index: 1000 !important;
+  transition: all 0.2s ease !important;
+}
+
+.kanban-column.hovered {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
+  border: 2px dashed #3b82f6 !important;
+  transform: scale(1.02) !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Prevent text selection during drag */
+.task-card {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* Ensure modal stays on top during drag */
+.modal {
+  z-index: 9999 !important;
+}
+
+.modal-backdrop {
+  z-index: 9998 !important;
+}
+
+/* Prevent ghost task from interfering with other elements */
+.ghost-task * {
+  pointer-events: none !important;
+}

@@ -36,17 +36,21 @@ defineProps<{
     background: #fff;
     border-radius: 0.875rem;
     box-shadow: 0 4px 32px rgba(0, 0, 0, 0.09);
-    padding: 1.25rem 0.875rem 0.875rem 0.875rem;
+    padding: 1rem 0.75rem 0.75rem 0.75rem;
     margin-bottom: 1rem;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .main-card-header {
     border-bottom: 1.5px solid #e0e0e0;
     background: transparent;
+    padding-bottom: 0.75rem;
 }
 
 .main-title {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #22223b;
     letter-spacing: 0.5px;
@@ -55,10 +59,10 @@ defineProps<{
 }
 
 .create-btn {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 500;
     border-radius: 1.25rem;
-    padding: 0.4rem 0.875rem;
+    padding: 0.35rem 0.75rem;
     display: flex;
     align-items: center;
     gap: 0.3rem;
@@ -78,13 +82,15 @@ defineProps<{
 
 @media (max-width: 768px) {
     .main-card {
-        padding: 0.7rem 0.2rem 0.5rem 0.2rem;
+        padding: 0.4rem 0.1rem 0.3rem 0.1rem;
         border-radius: 0.7rem;
         margin-bottom: 1rem;
+        margin-left: 0.3rem;
+        margin-right: 0.3rem;
     }
 
     .main-title {
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 600;
         letter-spacing: 0.2px;
     }
@@ -92,6 +98,7 @@ defineProps<{
     .main-card-header {
         background: transparent;
         border-bottom: none;
+        padding-bottom: 0.4rem;
     }
 
     .d-md-inline {
@@ -107,34 +114,34 @@ defineProps<{
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 0.7rem 0.5rem 0.7rem 0.5rem;
+        padding: 0.4rem 0.3rem 0.4rem 0.3rem;
         background: transparent;
         border-radius: 0;
         box-shadow: none;
-        min-height: 3.2rem;
+        min-height: 2.5rem;
     }
 
     .main-title-mobile-fab {
-        font-size: 1.35rem;
+        font-size: 1.1rem;
         color: #22223b;
         font-weight: 800;
         text-align: center;
         flex: 1 1 auto;
         letter-spacing: 0.1px;
-        margin: 0 0.5rem;
+        margin: 0 0.3rem;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.5rem;
+        gap: 0.3rem;
     }
 
     .icon-before-title {
-        font-size: 1.1rem;
+        font-size: 0.9rem;
         color: #2563eb;
-        margin-right: 0.3rem;
+        margin-right: 0.2rem;
         display: inline-block;
         vertical-align: middle;
     }
@@ -143,17 +150,17 @@ defineProps<{
         position: fixed;
         top: auto;
         left: auto;
-        right: 1.2rem;
-        bottom: 1.8rem;
+        right: 1rem;
+        bottom: 4.5rem;
         z-index: 1002;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 2.2rem;
+        font-size: 1.8rem;
         color: #fff;
         background: linear-gradient(135deg, #2563eb 60%, #60a5fa 100%);
-        width: 3.5rem;
-        height: 3.5rem;
+        width: 3.2rem;
+        height: 3.2rem;
         border-radius: 50%;
         box-shadow: 0 4px 18px rgba(34, 34, 59, 0.18);
         transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
@@ -183,7 +190,23 @@ defineProps<{
     .fab-add-project svg {
         display: block;
         margin: 0 auto;
-        margin-top: 14px;
+        margin-top: 12px;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+    .main-card {
+        max-width: 1000px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+@media (min-width: 1201px) {
+    .main-card {
+        max-width: 1100px;
+        margin-left: auto;
+        margin-right: auto;
     }
 }
 

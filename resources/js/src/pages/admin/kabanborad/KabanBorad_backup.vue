@@ -8,6 +8,7 @@ import ProjectProgress from './components/ProjectProgress.vue';
 import PendingColumn from './components/PendingColumn.vue';
 import CompletedColumn from './components/CompletedColumn.vue';
 import AddTaskModal from './components/AddTaskModal.vue';
+import { closeModal, openModal } from '../../../helper/utils';
 import { useGetMembers } from '../member/actions/getMember';
 import { taskStore } from './store/kabanStore';
 import NotStartedColumn from './components/NotStartedColumn.vue';
@@ -18,6 +19,7 @@ const route = useRoute();
 const router = useRouter();
 
 const { ProjectData, getProjectDetail, loading: projectLoading } = useGetProjectDetail();
+
 const { getMembers, loading, memberData } = useGetMembers();
 
 const slug = route.query?.query as string;
@@ -26,17 +28,24 @@ const modalVisible = ref(false);
 onMounted(async () => {
     await getProjectDetail(slug);
     getMembers(1, '');
+
+    // Setup drag and drop listeners after a short delay to ensure DOM is ready
     setTimeout(() => {
         setupAllDropListeners();
     }, 100);
-});
+})
 
 async function openTaskModal() {
+    // Ensure memberIds is always an array before open modal
     if (!Array.isArray(taskStore.taskInput.memberIds)) {
         taskStore.taskInput.memberIds = [];
     }
+
     const projectId = ProjectData.value?.data?.id;
-    if (!projectId) return;
+    if (!projectId) {
+        // Don't show alert, just return if project is still loading
+        return;
+    }
     taskStore.taskInput.projectId = projectId;
     taskStore.taskInput.memberIds = [];
     modalVisible.value = true;
@@ -62,6 +71,7 @@ function formatDate(dateString: string | undefined): string {
 
 const { setupAllDropListeners, setupTaskCardDragListeners } = useDragTask(getProjectDetail, slug, ProjectData);
 
+// Watch for project data changes to refresh drag listeners
 watch(() => ProjectData.value?.data?.tasks, () => {
     setTimeout(() => {
         setupTaskCardDragListeners();
@@ -88,7 +98,7 @@ watch(() => ProjectData.value?.data?.tasks, () => {
                         {{ ProjectData?.data?.name || 'Project Management' }}
                     </h1>
                 </div>
-                <div class="dates-section project-dates-desktop">
+                <div class="dates-section">
                     <div class="project-dates">
                         <div class="date-card">
                             <div class="date-icon">
@@ -118,29 +128,6 @@ watch(() => ProjectData.value?.data?.tasks, () => {
         <div class="kanban-content">
             <!-- Project Progress Section -->
             <div class="progress-section">
-                <div class="project-dates-mobile">
-                    <div class="project-dates">
-                        <div class="date-card">
-                            <div class="date-icon">
-                                <i class="fas fa-calendar-alt"></i>
-                            </div>
-                            <div class="date-content">
-                                <div class="date-label">Start Date</div>
-                                <div class="date-value">{{ formatDate(ProjectData?.data?.startDate) }}</div>
-                            </div>
-                        </div>
-                        <div class="date-divider"></div>
-                        <div class="date-card">
-                            <div class="date-icon">
-                                <i class="fas fa-calendar-check"></i>
-                            </div>
-                            <div class="date-content">
-                                <div class="date-label">End Date</div>
-                                <div class="date-value">{{ formatDate(ProjectData?.data?.endDate) }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <ProjectProgress :ProjectData="ProjectData" />
             </div>
 
@@ -185,22 +172,6 @@ watch(() => ProjectData.value?.data?.tasks, () => {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(4px);
     border-radius: 16px;
-}
-
-@media (max-width: 768px) {
-    :deep(.loading-overlay) {
-        position: fixed !important;
-        left: 0;
-        top: 62px;
-        width: 100vw;
-        height: calc(100vh - 62px);
-        min-height: unset;
-        border-radius: 0 !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 20000 !important;
-    }
 }
 
 :deep(.loader) {
@@ -454,38 +425,69 @@ watch(() => ProjectData.value?.data?.tasks, () => {
     --column-color-light: #34d399;
 }
 
+/* Mobile FAB */
+.fab-add-task {
+    position: fixed;
+    bottom: 12px;
+    bottom: 24px;
+    right: 24px;
+    width: auto;
+    min-width: 120px;
+    height: 48px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    border: none;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+    z-index: 1000;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 16px;
+}
+
+.fab-add-task:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
+}
+
+.fab-add-task i {
+    font-size: 16px;
+}
+
+.fab-text {
+    font-size: 14px;
+    font-weight: 600;
+}
+
 /* Drag and Drop Effects */
 .kanban-column.hovered {
     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     border: 2px dashed #3b82f6;
-    transform: scale(1.01);
-    transition: all 0.2s ease;
+    transform: scale(1.02);
 }
 
 .task-card.dragging {
-    opacity: 0.6;
-    transform: scale(1.01);
+    opacity: 0.5;
+    transform: rotate(5deg);
     z-index: 1000;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
-    position: relative;
-    top: auto;
-    left: auto;
 }
 
 .ghost-task {
-    background: #fbbf24 !important;
-    border: 2px solid #f59e0b !important;
-    opacity: 1 !important;
-    z-index: 99999 !important;
     position: fixed;
     pointer-events: none;
+    z-index: 9999;
+    background: white;
     border-radius: 12px;
     padding: 16px;
+    border: 1px solid #e2e8f0;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     max-width: 300px;
-    transition: none;
-    will-change: transform, left, top;
+    opacity: 0.8;
 }
 
 .ghost-task .task-title {
@@ -514,70 +516,6 @@ watch(() => ProjectData.value?.data?.tasks, () => {
     font-weight: 600;
 }
 
-/* ----------- PROJECT DATES MOBILE OPTIMIZED ----------- */
-@media (max-width: 768px) {
-    .kanban-columns {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        min-height: auto;
-        overflow: hidden;
-    }
-
-    .kanban-column {
-        min-height: 350px;
-        max-height: 400px;
-        margin-top: 10px;
-        margin-bottom: 10px;
-        padding-top: 16px;
-        padding-bottom: 16px;
-    }
-
-    .dates-section.project-dates-desktop {
-        display: none !important;
-    }
-
-    .project-dates-mobile {
-        display: block !important;
-        margin-bottom: 16px;
-        font-size: 1.15rem;
-    }
-
-    .project-dates-mobile .project-dates {
-        gap: 10px;
-        padding: 10px 0;
-    }
-
-    .project-dates-mobile .date-card {
-        padding: 10px 16px;
-        gap: 8px;
-        border-radius: 12px;
-        max-width: 140px;
-        min-width: 90px;
-    }
-
-    .project-dates-mobile .date-icon {
-        width: 24px;
-        height: 24px;
-        font-size: 14px;
-        border-radius: 8px;
-    }
-
-    .project-dates-mobile .date-label {
-        font-size: 12px;
-    }
-
-    .project-dates-mobile .date-value {
-        font-size: 15px;
-    }
-}
-
-@media (min-width: 769px) {
-    .project-dates-mobile {
-        display: none !important;
-    }
-}
-
 /* Responsive Design */
 @media (max-width: 1200px) {
     .kanban-columns {
@@ -587,6 +525,114 @@ watch(() => ProjectData.value?.data?.tasks, () => {
 
     .kanban-container {
         padding: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .kanban-container {
+        padding: 12px;
+        overflow-x: hidden;
+    }
+
+    .kanban-header {
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .header-content {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 12px;
+        overflow: hidden;
+    }
+
+    .back-btn {
+        padding: 10px;
+        min-width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        font-size: 12px;
+    }
+
+    .back-btn i {
+        font-size: 14px;
+    }
+
+    .project-title {
+        font-size: 18px;
+        gap: 8px;
+        text-align: center;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .project-title i {
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+
+    .project-dates {
+        gap: 6px;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        overflow: hidden;
+    }
+
+    .date-card {
+        padding: 6px 8px;
+        min-width: 0;
+        max-width: 100px;
+        gap: 4px;
+        border-radius: 8px;
+        flex-shrink: 0;
+    }
+
+    .date-icon {
+        width: 16px;
+        height: 16px;
+        font-size: 7px;
+        border-radius: 4px;
+    }
+
+    .date-label {
+        font-size: 7px;
+    }
+
+    .date-value {
+        font-size: 10px;
+    }
+
+    .date-divider {
+        display: none;
+    }
+
+    .progress-section {
+        padding: 0 0 16px 0;
+        overflow: hidden;
+    }
+
+    .kanban-columns {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        min-height: auto;
+        overflow: hidden;
+    }
+
+    .kanban-column {
+        min-height: 350px;
+        max-height: 400px;
+    }
+
+    .fab-add-task {
+        bottom: 12px;
+        right: 12px;
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
     }
 }
 
@@ -656,23 +702,13 @@ watch(() => ProjectData.value?.data?.tasks, () => {
     .date-value {
         font-size: 9px;
     }
-}
 
-.task-card {
-    background: white;
-    border-radius: 12px;
-    padding: 16px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-    cursor: grab;
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    /* Touch support for mobile */
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
+    .fab-add-task {
+        bottom: 8px;
+        right: 8px;
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+    }
 }
 </style>

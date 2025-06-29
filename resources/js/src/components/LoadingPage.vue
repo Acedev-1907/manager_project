@@ -85,17 +85,25 @@ const props = defineProps({
 
 @media (max-width: 768px) {
     .loading-overlay {
-        min-height: 100vh;
-        position: fixed;
+        position: fixed !important;
         left: 0;
-        top: 0;
+        top: 62px;
         width: 100vw;
-        height: 100vh;
+        height: calc(100vh - 62px);
+        min-height: unset;
         border-radius: 0 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 20000 !important;
     }
 
     .loader {
-        min-height: 100vh;
+        min-height: calc(100vh - 62px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100vw;
     }
 }
 </style>
