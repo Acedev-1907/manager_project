@@ -7,14 +7,15 @@ import { computed } from 'vue';
 const passwordValue = computed(() => registerInput.value.password);
 
 const sameAsPassword = helpers.withMessage(
-    'The value must be equal to the other value',
+    'The value must be equal to the password',
     sameAs(passwordValue)
 );
 
 const rules = {
+    name: { required },
     email: { required, email },
     password: { required },
-    confirmPassword: { required, sameAsPassword }
+    password_confirmation: { required, sameAsPassword }
 }
 
 const v$ = useVuelidate(rules, registerInput);
@@ -38,6 +39,13 @@ async function submitRegister() {
             </div>
             <form @submit.prevent="submitRegister">
                 <div class="form-group">
+                    <Error label="Name" :errors="v$.name.$errors" />
+                    <div class="input-icon-group">
+                        <i class="bi bi-person input-icon"></i>
+                        <BaseInput v-model="registerInput.name" placeholder="Full name" type="text" />
+                    </div>
+                </div>
+                <div class="form-group">
                     <Error label="Email" :errors="v$.email.$errors" />
                     <div class="input-icon-group">
                         <i class="bi bi-envelope input-icon"></i>
@@ -52,10 +60,10 @@ async function submitRegister() {
                     </div>
                 </div>
                 <div class="form-group">
-                    <Error label="Confirm Password" :errors="v$.confirmPassword.$errors" />
+                    <Error label="Confirm Password" :errors="v$.password_confirmation.$errors" />
                     <div class="input-icon-group">
                         <i class="bi bi-shield-check input-icon"></i>
-                        <BaseInput v-model="registerInput.confirmPassword" type="password"
+                        <BaseInput v-model="registerInput.password_confirmation" type="password"
                             placeholder="Confirm password" />
                     </div>
                 </div>

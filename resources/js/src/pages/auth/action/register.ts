@@ -1,11 +1,13 @@
 import { ref } from "vue";
+import { useRouter } from "vue-router";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
 import { showError, successMsg } from "../../../helper/toast-notificaltion";
 
 export type RegisterUserType = {
+  name: string;
   email: string;
   password: string;
-  confirmPassword: string;
+  password_confirmation: string;
 };
 export type RegisterResponseType = {
   user: { email: string };
@@ -13,13 +15,15 @@ export type RegisterResponseType = {
 };
 
 export const registerInput = ref<RegisterUserType>({
+  name: "",
   email: "",
   password: "",
-  confirmPassword: "",
+  password_confirmation: "",
 });
 
 export function useRegisterUser() {
   const loading = ref(false);
+  const router = useRouter();
 
   async function register() {
     try {
@@ -33,11 +37,13 @@ export function useRegisterUser() {
 
       loading.value = false;
       registerInput.value = {
+        name: "",
         email: "",
         password: "",
-        confirmPassword: "",
+        password_confirmation: "",
       };
       successMsg(data.message);
+      router.push("/login");
     } catch (error) {
       loading.value = false;
       for (const message of error as string) {

@@ -9,29 +9,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Services\AuthService;
 
 class AuthController extends Controller
 {
-    public function register(Request $req)
+    public function register(RegisterRequest $request, AuthService $authService)
     {
-        $fiels = $req->all();
-
-        $errs = Validator::make($fiels, [
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6|max:20'
-        ]);
-
-        if ($errs->fails()) return response($errs->errors()->all(), 422);
-
-        $user = User::create([
-            'email' => $fiels['email'],
-            'password' => bcrypt($fiels['password']),
-            'isValidEmail' => User::IS_INVALID_EMAIL,
-            'remember_token' => $this->generateRandomCode()
-        ]);
-
-        NewUserCreated::dispatch(($user));
-        return response(['user' => $user, 'message' => 'user created'], 200);
+        $user = $authService->register($request->validated());
+        return response()->json([
+            'user' => $user,
+            'message' => __('validationMessages.register_success')
+        ], 201);
     }
 
     public function generateRandomCode()
@@ -48,45 +38,14 @@ class AuthController extends Controller
         return redirect('/app/login');
     }
 
-    public function login(Request $req)
+    public function login(LoginRequest $request, AuthService $authService)
     {
-        $fiels = $req->all();
-
-        $errs = Validator::make($fiels, [
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
-
-        if ($errs->fails()) return response($errs->errors()->all(), 422);
-
-        $user = User::where('email', $fiels['email'])->first();
-        if (!is_null($user)) {
-            if (intval($user->isValidEmail) !== User::IS_VALID_EMAIL) {
-                // NewUserCreated::dispatch(($user));
-                return response([
-                    'message' => 'We send you an email verification!',
-                    'isLoggedIn' => false
-                ], 422);
-            }
+        $result = $authService->login($request->validated());
+        if (!$result) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
-
-        if (!$user || !Hash::check($fiels['password'], $user->password)) {
-            return response([
-                'user' => $user,
-                'message' => 'email or password invalid',
-                'isLoggedIn' => false
-            ], 422);
-        }
-
-        $token = $user->createToken('secrettoken')->plainTextToken;
-        return response([
-            'user' => $user,
-            'message' => 'loggedin',
-            'token' => $token,
-            'isLoggedIn' => true
-        ], 200);
+        return response()->json($result);
     }
-
 
     public function logoutUser(Request $req)
     {

@@ -40,9 +40,11 @@ export function useLoginUser() {
         email: "",
         password: "",
       };
-      if (data.isLoggedIn) {
+      if (data && data.token && data.user) {
         localStorage.setItem("userData", JSON.stringify(data));
         window.location.href = "/app/admin";
+      } else {
+        showError("Đăng nhập thất bại!");
       }
     } catch (error) {
       console.error("login error:", error);
