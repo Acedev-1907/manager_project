@@ -32,9 +32,6 @@ onMounted(async () => {
 });
 
 async function openTaskModal() {
-    if (!Array.isArray(taskStore.taskInput.memberIds)) {
-        taskStore.taskInput.memberIds = [];
-    }
     const projectId = ProjectData.value?.data?.id;
     if (!projectId) return;
     taskStore.taskInput.projectId = projectId;

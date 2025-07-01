@@ -392,22 +392,21 @@ export function useDragTask(
   }
 
   function createMobileGhost(x: number, y: number) {
-    console.log("[Ghost] Creating ghost at:", x, y);
     if (ghostElement) {
-      console.log("[Ghost] Removing existing ghost");
       ghostElement.remove();
     }
-
     ghostElement = document.createElement("div");
     ghostElement.classList.add("ghost-task");
     ghostElement.style.position = "fixed";
     ghostElement.style.zIndex = "99999";
     ghostElement.style.pointerEvents = "none";
-    ghostElement.style.opacity = "1 !important";
-    ghostElement.style.transition = "none";
+    ghostElement.style.opacity = "1";
+    ghostElement.style.transition =
+      "left 0.15s cubic-bezier(0.4,0,0.2,1), top 0.15s cubic-bezier(0.4,0,0.2,1)";
     ghostElement.style.willChange = "left, top";
-    ghostElement.style.background = "red !important";
-    ghostElement.style.color = "white !important";
+    ghostElement.style.background = "#e0f2fe";
+    ghostElement.style.border = "3px solid #3b82f6";
+    ghostElement.style.color = "#1e293b";
     ghostElement.style.fontWeight = "bold";
     ghostElement.style.fontSize = "18px";
     ghostElement.style.width = "220px";
@@ -416,7 +415,6 @@ export function useDragTask(
     ghostElement.style.flexDirection = "column";
     ghostElement.style.alignItems = "flex-start";
     ghostElement.style.justifyContent = "center";
-    ghostElement.style.border = "4px solid yellow !important";
     ghostElement.style.borderRadius = "16px";
     ghostElement.style.padding = "16px";
     ghostElement.style.boxSizing = "border-box";
@@ -458,27 +456,53 @@ export function useDragTask(
     ghostElement.style.transform = "";
 
     document.body.appendChild(ghostElement);
-    console.log("[Ghost] Ghost created:", ghostElement);
-    console.log("[Ghost] Ghost in DOM:", document.body.contains(ghostElement));
+  }
+
+  function updateGhostTaskColor(x: number, y: number) {
+    if (!ghostElement) return;
+    const columns = document.querySelectorAll(".kanban-column");
+    let found = false;
+    columns.forEach((column) => {
+      const rect = column.getBoundingClientRect();
+      if (
+        x >= rect.left &&
+        x <= rect.right &&
+        y >= rect.top &&
+        y <= rect.bottom
+      ) {
+        found = true;
+        if (column.classList.contains("not-started-column") && ghostElement) {
+          ghostElement.style.background = "#e0f2fe";
+          ghostElement.style.border = "3px solid #3b82f6";
+        } else if (
+          column.classList.contains("pending-column") &&
+          ghostElement
+        ) {
+          ghostElement.style.background = "#fef9c3";
+          ghostElement.style.border = "3px solid #f59e0b";
+        } else if (
+          column.classList.contains("completed-column") &&
+          ghostElement
+        ) {
+          ghostElement.style.background = "#dcfce7";
+          ghostElement.style.border = "3px solid #10b981";
+        }
+      }
+    });
+    if (!found && ghostElement) {
+      ghostElement.style.background = "#e0f2fe";
+      ghostElement.style.border = "3px solid #3b82f6";
+    }
   }
 
   function updateMobileGhost(x: number, y: number) {
-    if (!ghostElement) {
-      console.log("[Ghost] No ghost element to update");
-      return;
-    }
-
-    if (ghostAnimationFrame) {
-      cancelAnimationFrame(ghostAnimationFrame);
-    }
-
+    if (!ghostElement) return;
+    if (ghostAnimationFrame) cancelAnimationFrame(ghostAnimationFrame);
     ghostAnimationFrame = requestAnimationFrame(() => {
-      if (ghostElement) {
-        ghostElement.style.left = x + "px";
-        ghostElement.style.top = y + "px";
-        ghostElement.style.transform = "";
-        console.log("[Ghost] Ghost updated to:", x, y);
-      }
+      if (!ghostElement) return;
+      ghostElement.style.left = x + "px";
+      ghostElement.style.top = y + "px";
+      updateGhostTaskColor(x, y);
     });
   }
 
