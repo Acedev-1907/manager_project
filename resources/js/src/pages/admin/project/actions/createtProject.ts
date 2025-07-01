@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
-import { showError, successMsg } from "../../../../helper/toast-notificaltion";
+import { showError, showSuccess } from "../../../../helper/alert";
 import { showErrorResponse } from "../../../../helper/utils";
 import { projectStore } from "../store/projectStore";
 
@@ -26,7 +26,7 @@ export function useCreateOrUpdateProject() {
       loading.value = false;
       projectStore.projectInput = {} as ProjectInputType;
 
-      successMsg(data.message);
+      showSuccess(data.message);
       return { success: true, data };
     } catch (error) {
       loading.value = false;

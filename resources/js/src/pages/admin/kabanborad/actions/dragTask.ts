@@ -1,5 +1,5 @@
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
-import { successMsg } from "../../../../helper/toast-notificaltion";
+import { showSuccess } from "../../../../helper/alert";
 import { taskStore } from "../store/kabanStore";
 
 export function useDragTask(

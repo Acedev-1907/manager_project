@@ -1,7 +1,7 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { taskStore } from "../store/kabanStore";
-import { successMsg } from "../../../../helper/toast-notificaltion";
+import { showSuccess } from "../../../../helper/alert";
 import { showErrorResponse } from "../../../../helper/utils";
 import { eventBus } from "../../../../helper/eventBus";
 
@@ -24,7 +24,7 @@ export function useCreateTask() {
         taskStore.taskInput
       );
       loading.value = false;
-      successMsg(data.message);
+      showSuccess(data.message);
       eventBus.emit("taskCreated");
     } catch (error) {
       loading.value = false;

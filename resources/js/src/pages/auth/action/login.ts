@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
-import { showError, successMsg } from "../../../helper/toast-notificaltion";
+import { showError, showSuccess } from "../../../helper/alert";
 import { showErrorResponse } from "../../../helper/utils";
 
 export type LoginUserType = {

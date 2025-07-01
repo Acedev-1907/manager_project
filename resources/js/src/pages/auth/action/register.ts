@@ -1,7 +1,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
-import { showError, successMsg } from "../../../helper/toast-notificaltion";
+import { showError, showSuccess } from "../../../helper/alert";
 
 export type RegisterUserType = {
   name: string;
@@ -42,7 +42,7 @@ export function useRegisterUser() {
         password: "",
         password_confirmation: "",
       };
-      successMsg(data.message);
+      showSuccess(data.message);
       router.push("/login");
     } catch (error) {
       loading.value = false;

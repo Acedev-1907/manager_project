@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
-import { showError, successMsg } from "../../../../helper/toast-notificaltion";
+import { showError, showSuccess } from "../../../../helper/alert";
 import { showErrorResponse } from "../../../../helper/utils";
 import { memberStore } from "../store/MemberStore";
 
@@ -25,7 +25,7 @@ export function useCreateOrUpdateMember() {
       loading.value = false;
       memberStore.memberInput = {} as MemberInputType;
 
-      successMsg(data.message);
+      showSuccess(data.message);
       return { success: true, data };
     } catch (error) {
       loading.value = false;
