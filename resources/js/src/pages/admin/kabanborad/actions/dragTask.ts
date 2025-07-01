@@ -450,9 +450,12 @@ export function useDragTask(
       </div>
     `;
 
-    // Đặt vị trí ngay dưới ngón tay
-    ghostElement.style.left = x + "px";
-    ghostElement.style.top = y + "px";
+    // Đặt vị trí center theo ngón tay
+    const rect = ghostElement.getBoundingClientRect();
+    const offsetX = rect.width / 2;
+    const offsetY = rect.height / 2;
+    ghostElement.style.left = x - offsetX + "px";
+    ghostElement.style.top = y - offsetY + "px";
     ghostElement.style.transform = "";
 
     document.body.appendChild(ghostElement);
@@ -500,8 +503,11 @@ export function useDragTask(
     if (ghostAnimationFrame) cancelAnimationFrame(ghostAnimationFrame);
     ghostAnimationFrame = requestAnimationFrame(() => {
       if (!ghostElement) return;
-      ghostElement.style.left = x + "px";
-      ghostElement.style.top = y + "px";
+      const rect = ghostElement.getBoundingClientRect();
+      const offsetX = rect.width / 2;
+      const offsetY = rect.height / 2;
+      ghostElement.style.left = x - offsetX + "px";
+      ghostElement.style.top = y - offsetY + "px";
       updateGhostTaskColor(x, y);
     });
   }
