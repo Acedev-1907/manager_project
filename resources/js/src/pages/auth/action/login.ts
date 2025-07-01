@@ -24,8 +24,6 @@ export function useLoginUser() {
 
   async function login() {
     try {
-      console.log("login function called");
-      console.log("loginInput.value:", loginInput.value);
       loading.value = true;
 
       const data = await makeHttpReq<LoginUserType, LoginResponseType>(
@@ -34,7 +32,6 @@ export function useLoginUser() {
         loginInput.value
       );
 
-      console.log("login response:", data);
       loading.value = false;
       loginInput.value = {
         email: "",

@@ -55,20 +55,15 @@ const debugInfo = computed(() => {
 
 // Watch for start date changes - only validate end date
 watch(() => projectStore.projectInput.startDate, (newStartDate) => {
-    console.log('Start date changed:', newStartDate);
-    console.log('Min end date:', minEndDate.value);
 
     // If end date is before start date, clear it
     if (newStartDate && projectStore.projectInput.endDate && projectStore.projectInput.endDate < newStartDate) {
-        console.log('Clearing end date because it\'s before start date');
         projectStore.projectInput.endDate = '';
     }
 });
 
 // Watch for end date changes to log validation
 watch(() => projectStore.projectInput.endDate, (newEndDate) => {
-    console.log('End date changed:', newEndDate);
-    console.log('Current min end date:', minEndDate.value);
 });
 
 async function submitProject() {

@@ -100,10 +100,6 @@ function closeCalendar() {
 
 function selectDate(date: Date) {
     const isoDate = date.toISOString().split('T')[0];
-    console.log('DateInput: Selecting date:', isoDate);
-    console.log('DateInput: Min prop:', props.min);
-    console.log('DateInput: Max prop:', props.max);
-    console.log('DateInput: Is disabled:', isDisabled(date));
 
     displayValue.value = formatDateForDisplay(isoDate);
     emit('update:modelValue', isoDate);
@@ -176,9 +172,6 @@ function isOtherMonth(date: Date): boolean {
 
 function isDisabled(date: Date): boolean {
     const dateString = date.toISOString().split('T')[0];
-    console.log('DateInput: Checking if date is disabled:', dateString);
-    console.log('DateInput: Min prop:', props.min);
-    console.log('DateInput: Max prop:', props.max);
 
     // Only apply constraints if props are provided
     if (props.min && props.min !== undefined && props.min !== '') {
@@ -187,7 +180,6 @@ function isDisabled(date: Date): boolean {
         const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         const minDateOnly = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
         if (dateOnly < minDateOnly) {
-            console.log('DateInput: Date disabled - before min date');
             return true;
         }
     }
@@ -197,11 +189,9 @@ function isDisabled(date: Date): boolean {
         const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
         const maxDateOnly = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
         if (dateOnly > maxDateOnly) {
-            console.log('DateInput: Date disabled - after max date');
             return true;
         }
     }
-    console.log('DateInput: Date is enabled');
     return false;
 }
 

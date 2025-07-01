@@ -275,14 +275,6 @@ export function useDragTask(
       currentX = touch.clientX;
       currentY = touch.clientY;
 
-      console.log(
-        "Touch move:",
-        currentX,
-        currentY,
-        "Ghost exists:",
-        !!ghostElement
-      );
-
       // Update ghost position
       updateMobileGhost(currentX, currentY);
 
@@ -363,7 +355,6 @@ export function useDragTask(
   }
 
   function cleanupDrag() {
-    console.log("[Ghost] Cleaning up drag");
     isDragging = false;
     if (draggedElement) {
       draggedElement.classList.remove("dragging");
@@ -377,12 +368,10 @@ export function useDragTask(
       draggedElement = null;
     }
     if (ghostElement) {
-      console.log("[Ghost] Removing ghost element");
       ghostElement.remove();
       ghostElement = null;
     }
     if (ghostAnimationFrame) {
-      console.log("[Ghost] Cancelling animation frame");
       cancelAnimationFrame(ghostAnimationFrame);
       ghostAnimationFrame = null;
     }
