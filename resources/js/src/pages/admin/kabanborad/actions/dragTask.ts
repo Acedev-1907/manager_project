@@ -186,7 +186,11 @@ export function useDragTask(
 
         if (dragEvent.dataTransfer) {
           dragEvent.dataTransfer.effectAllowed = "move";
-          dragEvent.dataTransfer.setDragImage(ghost, 0, 0);
+          // Đặt ghost-task ở giữa chuột
+          const rect = ghost.getBoundingClientRect();
+          const offsetX = rect.width / 2;
+          const offsetY = rect.height / 2;
+          dragEvent.dataTransfer.setDragImage(ghost, offsetX, offsetY);
         }
       }
     }
