@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useVuelidate } from "@vuelidate/core";
 import { required } from "@vuelidate/validators";
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { taskStore } from "../store/kabanStore";
 import { GetMemberType } from "../../member/actions/getMember";
 import { useSelectMember } from "../actions/selectMember";
@@ -10,7 +10,7 @@ import { useCreateTask } from "../actions/CreateTask";
 import { showError } from "../../../../helper/alert";
 import BaseInput from "../../../../components/BaseInput.vue";
 
-defineProps<{
+const props = defineProps<{
     members: GetMemberType;
     visible: boolean;
 }>();
@@ -62,6 +62,15 @@ async function submitTask() {
 const searchMember = myDebounce(async function () {
     emit('getMembers', 1, query.value);
 }, 200);
+
+watch(() => props.visible, (newVal) => {
+    if (newVal) {
+        taskStore.taskInput.name = "";
+        taskStore.taskInput.memberIds = [];
+        selectedMembers.value = [];
+        v$.value.$reset();
+    }
+});
 </script>
 
 <template>
@@ -149,9 +158,13 @@ const searchMember = myDebounce(async function () {
                                                 <span class="member-id">#{{ member.id }}</span>
                                             </div>
                                         </div>
-                                        <button @click="selectMember(member)" type="button" class="add-member-btn">
-                                            <i class="fas fa-plus"></i>
-                                            Add
+                                        <button @click="selectMember(member)" type="button" class="add-member-btn"
+                                            :disabled="selectedMembers.some(m => m.id === member.id)">
+                                            <i v-if="!selectedMembers.some(m => m.id === member.id)"
+                                                class="fas fa-plus"></i>
+                                            <i v-else class="fas fa-check"></i>
+                                            <span v-if="!selectedMembers.some(m => m.id === member.id)">Add</span>
+                                            <span v-else>Selected</span>
                                         </button>
                                     </div>
                                 </div>
@@ -590,5 +603,18 @@ input:focus,
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px #dbeafe;
     outline: none;
+}
+
+.add-member-btn:disabled {
+    background: #e5e7eb !important;
+    color: #9ca3af !important;
+    cursor: not-allowed !important;
+    border: 1px solid #d1d5db;
+    box-shadow: none;
+    opacity: 0.8;
+}
+
+.add-member-btn:disabled .fa-check {
+    color: #22c55e;
 }
 </style>

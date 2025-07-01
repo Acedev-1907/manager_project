@@ -1,6 +1,6 @@
 import Swal from "sweetalert2";
 
-export function showSuccess(message: string, title = "Thành công") {
+export function showSuccess(message: string, title = "Success") {
   Swal.fire({
     icon: "success",
     title,
@@ -8,7 +8,7 @@ export function showSuccess(message: string, title = "Thành công") {
   });
 }
 
-export function showError(message: string, title = "Lỗi") {
+export function showError(message: string, title = "Error") {
   Swal.fire({
     icon: "error",
     title,
@@ -16,7 +16,7 @@ export function showError(message: string, title = "Lỗi") {
   });
 }
 
-export function showWarning(message: string, title = "Cảnh báo") {
+export function showWarning(message: string, title = "Warning") {
   Swal.fire({
     icon: "warning",
     title,
