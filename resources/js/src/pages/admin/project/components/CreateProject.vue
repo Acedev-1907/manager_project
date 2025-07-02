@@ -113,7 +113,8 @@ if (projectStore.edit && projectStore.projectInput.id) {
                     </div>
                     <div class="col-md-6 col-12">
                         <Error label="End Date" :errors="v$.endDate.$errors" />
-                        <DateInput v-model="projectStore.projectInput.endDate" placeholder="DD/MM/YYYY" />
+                        <DateInput v-model="projectStore.projectInput.endDate" placeholder="DD/MM/YYYY"
+                            :min="projectStore.projectInput.startDate" />
                         <small class="text-muted mt-1 d-block">
                             <i class="bi bi-info-circle"></i>
                             Project end date (must be after start date)

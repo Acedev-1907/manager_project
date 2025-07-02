@@ -216,8 +216,7 @@ onUnmounted(() => {
     <div class="date-input-container" ref="inputRef">
         <div class="date-input-wrapper">
             <input :id="id" :value="displayValue" :placeholder="placeholder" :required="required" :disabled="disabled"
-                class="date-input-field" @input="handleInputChange" @focus="openCalendar" @click="openCalendar"
-                readonly />
+                class="date-input-field" @input="handleInputChange" @focus="openCalendar" @click="openCalendar" />
             <i class="bi bi-calendar3 date-icon" @click="openCalendar"></i>
         </div>
 
