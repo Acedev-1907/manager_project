@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -33,6 +34,9 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('/members', 'store')->name('createMember');
         Route::put('/members', 'update')->name('update');
         Route::get('/members', 'index')->name('indexMember');
+        Route::delete('/members/{id}', 'destroy')->name('deleteMember');
+        Route::post('/members/add-by-email', 'addByEmail')->name('addByEmail');
+        Route::post('/members/add-by-name-or-email', 'addByNameOrEmail')->name('addByNameOrEmail');
     });
 
     Route::controller(TaskController::class)->group(function () {
@@ -44,3 +48,5 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::get('/users/all', [UserController::class, 'allUsers']);

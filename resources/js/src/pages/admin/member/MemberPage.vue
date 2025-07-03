@@ -1,17 +1,20 @@
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue';
 import MemberTable from './components/MemberTable.vue';
-import { MemberType, useGetMembers } from './actions/getMember';
+import { MemberType, useGetMembers, removeMember } from './actions/getMember';
 import { memberStore } from './store/MemberStore';
 import { useRouter } from 'vue-router';
 import { MemberInputType } from './actions/createMember';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import CustomPagination from '../../../components/CustomPagination.vue';
 import MainCardLayout from '../../../components/MainCardLayout.vue';
+import AddMemberModal from './components/AddMemberModal.vue';
+import { addMemberByNameOrEmail } from './actions/createMember';
 
 const { getMembers, memberData, loading: tableLoading } = useGetMembers();
 const isLoading = ref(true);
 const router = useRouter();
+const showAddModal = ref(false);
 
 async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
     if (showLoadingPage) {
@@ -25,14 +28,21 @@ async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
     }
 }
 
-function handleEditMember(member: MemberType) {
-    memberStore.memberInput = {
-        id: member.id,
-        name: member.name,
-        email: member.email
-    };
-    memberStore.edit = true;
-    router.push('/create-members');
+async function handleAddMember(input: string, cb: (err: string | null) => void) {
+    try {
+        await addMemberByNameOrEmail(input);
+        cb(null);
+        showAddModal.value = false;
+        await fetchMembers();
+    } catch (e: any) {
+        let errMsg = e?.error;
+        cb(errMsg || 'Add failed');
+    }
+}
+
+async function handleRemoveMember(member: MemberType) {
+    await removeMember(member.id);
+    await fetchMembers();
 }
 
 onMounted(async () => {
@@ -45,12 +55,13 @@ onMounted(async () => {
     <MainCardLayout title="Member Management" iconClass="bi bi-people-fill"
         containerStyle="padding:1rem 0 1rem 0; position:relative;">
         <template #action>
-            <RouterLink to="/create-members" class="btn btn-primary create-btn">
-                <i class="bi bi-plus-circle me-1"></i> Create Member
-            </RouterLink>
+            <button class="btn btn-primary create-btn" @click="showAddModal = true">
+                <i class="bi bi-plus-circle me-1"></i> Add Member
+            </button>
         </template>
+        <AddMemberModal v-if="showAddModal" @close="showAddModal = false" @add="handleAddMember" />
         <LoadingPage v-if="isLoading" />
-        <MemberTable @getMember="fetchMembers" :loading="tableLoading" @editMember="handleEditMember"
+        <MemberTable @getMember="fetchMembers" :loading="tableLoading" @removeMember="handleRemoveMember"
             :members="memberData">
             <template #pagination>
                 <CustomPagination v-if="memberData?.data" :data="memberData.data" :loading="tableLoading"

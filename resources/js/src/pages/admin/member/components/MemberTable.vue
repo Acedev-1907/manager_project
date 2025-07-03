@@ -9,7 +9,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-    (e: "editMember", member: MemberType): void;
+    (e: "removeMember", member: MemberType): void;
     (e: "getMember", page: number, query: string, showGlobalLoading: boolean): Promise<void>;
 }>();
 
@@ -27,45 +27,27 @@ const handleSearch = async (searchQuery: string) => {
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-header">
                     <tr>
+                        <th width="7%">No.</th>
                         <th width="10%">ID</th>
-                        <th width="35%">Name</th>
+                        <th width="45%">Name</th>
                         <th width="35%">Email</th>
-                        <th width="10%">Edit</th>
-                        <th width="10%">Actions</th>
+                        <th width="10%">Remove</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="!members?.data?.data || members?.data?.data.length === 0">
                         <td colspan="5" class="text-center text-muted">No data</td>
                     </tr>
-                    <tr v-for="member in members?.data?.data" :key="member.id" class="table-row">
+                    <tr v-for="(member, idx) in members?.data?.data" :key="member.id" class="table-row">
+                        <td>{{ (members?.data?.from || 1) + idx }}</td>
                         <td>{{ member.id }}</td>
-                        <td class="fw-bold">{{ member.name }}</td>
-                        <td>{{ member.email }}</td>
+                        <td class="fw-bold">{{ member.member?.name }}</td>
+                        <td>{{ member.member?.email }}</td>
                         <td>
-                            <button @click="emit('editMember', member)" type="button"
-                                class="btn btn-outline-primary action-btn">
-                                <i class="bi bi-pencil-square"></i>
+                            <button @click="emit('removeMember', member)" type="button"
+                                class="btn btn-outline-danger action-btn">
+                                <i class="bi bi-trash"></i>
                             </button>
-                        </td>
-                        <td>
-                            <div class="dropdown">
-                                <button class="btn btn-outline-secondary action-btn" type="button"
-                                    data-bs-toggle="dropdown">
-                                    <i class="bi bi-three-dots-vertical"></i>
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="#" @click="emit('editMember', member)">
-                                            <i class="bi bi-pencil-square me-2"></i>Edit
-                                        </a></li>
-                                    <li>
-                                        <hr class="dropdown-divider">
-                                    </li>
-                                    <li><a class="dropdown-item text-danger" href="#">
-                                            <i class="bi bi-trash me-2"></i>Delete
-                                        </a></li>
-                                </ul>
-                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -83,24 +65,18 @@ const handleSearch = async (searchQuery: string) => {
                             <i class="bi bi-three-dots-vertical"></i>
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" @click="emit('editMember', member)">
-                                    <i class="bi bi-pencil-square me-2"></i>Edit
-                                </a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item text-danger" href="#">
+                            <li><a class="dropdown-item" href="#" @click="emit('removeMember', member)">
                                     <i class="bi bi-trash me-2"></i>Delete
                                 </a></li>
                         </ul>
                     </div>
                 </div>
-                <div class="mobile-member-name mb-1">{{ member.name }}</div>
-                <div class="mobile-member-email mb-2">{{ member.email }}</div>
+                <div class="mobile-member-name mb-1">{{ member.member?.name }}</div>
+                <div class="mobile-member-email mb-2">{{ member.member?.email }}</div>
                 <div class="d-flex justify-content-end mt-2">
-                    <button @click="emit('editMember', member)" type="button"
-                        class="btn btn-outline-primary action-btn-mobile">
-                        <i class="bi bi-pencil-square"></i>
+                    <button @click="emit('removeMember', member)" type="button"
+                        class="btn btn-outline-danger action-btn-mobile">
+                        <i class="bi bi-trash"></i>
                     </button>
                 </div>
             </div>

@@ -9,6 +9,15 @@ class Member extends Model
 {
     use HasFactory;
 
-    protected $guarded=[];
+    protected $guarded = [];
 
+    public function user()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
+    }
+
+    public function member()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'member_id');
+    }
 }

@@ -24,8 +24,12 @@ class ProjectController extends Controller
 
     public function index(Request $request)
     {
+        $userId = $request->user()->id;
         $query = $request->get('query');
-        $projects = Project::with(['task_progress']);
+        $projects = Project::with(['task_progress'])
+            ->whereHas('users', function ($q) use ($userId) {
+                $q->where('users.id', $userId);
+            });
 
         if (!is_null($query)  && $query !== '') {
             $projects->where('name', 'like', '%' . $query . '%')
@@ -38,7 +42,8 @@ class ProjectController extends Controller
 
     public function store(Request $req)
     {
-        return DB::transaction(function () use ($req) {
+        $user = $req->user();
+        return DB::transaction(function () use ($req, $user) {
             $fields = $req->all();
 
             $errs = Validator::make($fields, [
@@ -56,6 +61,9 @@ class ProjectController extends Controller
                 'status' => Project::NOT_STARTED,
                 'slug' => Project::createSlug($fields['name'])
             ]);
+
+            // Add user hiện tại vào project_user
+            $project->users()->attach($user->id);
 
             TaskProgress::create([
                 'projectId' => $project->id,

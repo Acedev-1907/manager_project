@@ -15,9 +15,14 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Xóa hoặc comment đoạn tạo user với email 'test@example.com' để tránh trùng lặp
+        // User::create([
+        //     'name' => 'Test User',
+        //     'email' => 'test@example.com',
+        //     'password' => bcrypt('password'),
+        //     'isValidEmail' => 1,
+        // ]);
+
+        $this->call(\Database\Seeders\MemberSeeder::class);
     }
 }

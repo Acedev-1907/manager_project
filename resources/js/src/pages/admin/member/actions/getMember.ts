@@ -4,8 +4,16 @@ import { showErrorResponse } from "../../../../helper/utils";
 
 export type MemberType = {
   id: number;
-  name: string;
-  email: string;
+  user_id: number;
+  member_id: number;
+  created_at: string;
+  updated_at: string;
+  member: {
+    id: number;
+    name: string;
+    email: string;
+    [key: string]: any;
+  };
 };
 
 export type GetMemberType = {
@@ -37,4 +45,12 @@ export function useGetMembers() {
   }
 
   return { getMembers, memberData, loading };
+}
+
+export async function removeMember(id: number) {
+  try {
+    await makeHttpReq<undefined, any>(`members/${id}`, "DELETE");
+  } catch (error) {
+    showErrorResponse(error);
+  }
 }

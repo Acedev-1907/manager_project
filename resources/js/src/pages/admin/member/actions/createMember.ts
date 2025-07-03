@@ -53,3 +53,17 @@ async function updateMember() {
   memberStore.edit = false;
   return data;
 }
+
+export async function addMemberByEmail(email: string) {
+  return makeHttpReq<{ email: string }, any>("members/add-by-email", "POST", {
+    email,
+  });
+}
+
+export async function addMemberByNameOrEmail(input: string) {
+  return makeHttpReq<{ input: string }, any>(
+    "members/add-by-name-or-email",
+    "POST",
+    { input }
+  );
+}
