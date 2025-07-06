@@ -3,7 +3,7 @@ import { useVuelidate } from "@vuelidate/core";
 import { required } from "@vuelidate/validators";
 import { ref, watch, onMounted, computed } from "vue";
 import { taskStore } from "../store/kabanStore";
-import { GetMemberType } from "../../member/actions/getMember";
+// import { GetMemberType } from "../../member/actions/getMember";
 import { useSelectMember } from "../actions/selectMember";
 import { myDebounce } from "../../../../helper/utils";
 import { useCreateTask } from "../actions/CreateTask";
@@ -166,10 +166,10 @@ watch(() => props.visible, (newVal) => {
                                         @click="unSelectedMember(member.id)">
                                         <div class="member-avatar">
                                             <span>{{ member && member.name ? member.name.charAt(0).toUpperCase() : '?'
-                                                }}</span>
+                                            }}</span>
                                         </div>
                                         <span class="member-name">{{ member && member.name ? member.name : 'No Name'
-                                            }}</span>
+                                        }}</span>
                                         <i class="fas fa-times remove-icon"></i>
                                     </div>
                                 </div>
