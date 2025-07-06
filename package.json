@@ -6,7 +6,6 @@
         "build": "vue-tsc --noEmit && vite build"
     },
     "devDependencies": {
-        "axios": "^1.6.4",
         "globals": "^16.0.0",
         "laravel-echo": "^1.19.0",
         "laravel-vite-plugin": "^1.0",

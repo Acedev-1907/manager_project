@@ -17,7 +17,6 @@ export function getUserData(): LoginResponseType | null {
 
     return null;
   } catch (error) {
-    console.warn("Error parsing user data from localStorage:", error);
     return null;
   }
 }
@@ -26,7 +25,7 @@ export function setUserData(userData: LoginResponseType): void {
   try {
     localStorage.setItem("userData", JSON.stringify(userData));
   } catch (error) {
-    console.error("Error saving user data to localStorage:", error);
+    // console.error("Error saving user data to localStorage:", error);
   }
 }
 
@@ -34,7 +33,7 @@ export function clearUserData(): void {
   try {
     localStorage.removeItem("userData");
   } catch (error) {
-    console.error("Error clearing user data from localStorage:", error);
+    // console.error("Error clearing user data from localStorage:", error);
   }
 }
 

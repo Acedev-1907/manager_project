@@ -20,6 +20,7 @@ onMounted(async () => {
         await getChartData(project.value.id);
     }
     isLoading.value = false;
+
 })
 </script>
 

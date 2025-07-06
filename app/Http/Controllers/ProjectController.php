@@ -2,20 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\NewProjectCreated;
-use App\Models\Member;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskProgress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use App\Services\ProjectService;
+use App\Http\Requests\Project\UpdateProjectRequest;
 
 class ProjectController extends Controller
 {
+    protected $service;
+
+    public function __construct(ProjectService $service)
+    {
+        $this->service = $service;
+    }
+
     public function getProject($slug)
     {
-        $project = Project::with(['tasks.task_members.members', 'task_progress'])
+        $project = Project::with(['tasks.task_members.user', 'task_progress', 'users'])
             ->where('projects.slug', $slug)
             ->first();
 
@@ -26,7 +33,7 @@ class ProjectController extends Controller
     {
         $userId = $request->user()->id;
         $query = $request->get('query');
-        $projects = Project::with(['task_progress'])
+        $projects = Project::with(['task_progress', 'creator', 'users'])
             ->whereHas('users', function ($q) use ($userId) {
                 $q->where('users.id', $userId);
             });
@@ -43,61 +50,24 @@ class ProjectController extends Controller
     public function store(Request $req)
     {
         $user = $req->user();
-        return DB::transaction(function () use ($req, $user) {
-            $fields = $req->all();
 
-            $errs = Validator::make($fields, [
-                'name' => 'required',
-                'startDate' => 'required',
-                'endDate' => 'required',
-            ]);
+        $result = $this->service->createProject($req->all(), $user);
 
-            if ($errs->fails()) return response($errs->errors()->all(), 422);
-
-            $project = Project::create([
-                'name' => $fields['name'],
-                'startDate' => $fields['startDate'],
-                'endDate' => $fields['endDate'],
-                'status' => Project::NOT_STARTED,
-                'slug' => Project::createSlug($fields['name'])
-            ]);
-
-            // Add user hiện tại vào project_user
-            $project->users()->attach($user->id);
-
-            TaskProgress::create([
-                'projectId' => $project->id,
-                'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
-                'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
-            ]);
-
-            $count = Project::count();
-            NewProjectCreated::dispatch($count);
-
-            return response(['message' => 'Project created'], 200);
-        });
+        if (isset($result['errors'])) {
+            return response($result['errors'], $result['status']);
+        }
+        return response(['message' => $result['message']], $result['status']);
     }
 
-    public function update(Request $req)
+    public function update(UpdateProjectRequest $request)
     {
-        $fields = $req->all();
+        $user = $request->user();
+        $result = $this->service->updateProject($request->all(), $user);
 
-        $errs = Validator::make($fields, [
-            'id' => 'required',
-            'name' => 'required',
-            // 'email' => 'required',
-        ]);
-
-        if ($errs->fails()) return response($errs->errors()->all(), 422);
-
-        Project::where('id', $fields['id'])->update([
-            'name' => $fields['name'],
-            'startDate' => $fields['startDate'],
-            'endDate' => $fields['endDate']
-            // 'email' => $fields['email'],
-        ]);
-
-        return response(['message' => 'Project updated'], 200);
+        if (isset($result['errors'])) {
+            return response($result['errors'], $result['status']);
+        }
+        return response(['message' => $result['message']], $result['status']);
     }
 
     public function pinnendProject(Request $req)
@@ -172,5 +142,12 @@ class ProjectController extends Controller
                 'progress' => intval($taskProjess->progress)
             ]
         );
+    }
+
+    // API: Get members of a specific project
+    public function getProjectMembers($id)
+    {
+        $project = Project::with('users')->findOrFail($id);
+        return response(['data' => $project->users], 200);
     }
 }

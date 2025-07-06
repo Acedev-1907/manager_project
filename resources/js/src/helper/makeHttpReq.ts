@@ -45,59 +45,55 @@ export function makeHttpReq<TInput, TResponse>(
       const userData = getUserData();
       const authHeader = userData?.token ? `Bearer ${userData.token}` : "";
 
-      const fetchOptions: RequestInit = {
+      let url = `${APP.apiBaseURL}/${endpoint}`;
+      let fetchOptions: RequestInit = {
         method: verb,
         headers: {
-          "Content-Type": "application/json",
           ...(authHeader && { Authorization: authHeader }),
           ...headers,
+          "Content-Type": "application/json",
         },
-        signal: AbortSignal.timeout(timeout),
+        credentials: "include",
       };
 
-      // Chỉ thêm body nếu không phải GET và có input
       if (verb !== "GET" && input !== undefined) {
         fetchOptions.body = JSON.stringify(input);
+      } else if (verb === "GET" && input) {
+        // append params to url
+        const params = new URLSearchParams(input as any).toString();
+        url += `?${params}`;
       }
 
-      const response = await fetch(
-        `${APP.apiBaseURL}/${endpoint}`,
-        fetchOptions
-      );
+      // Timeout logic
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      fetchOptions.signal = controller.signal;
+
+      const response = await fetch(url, fetchOptions);
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
 
       if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ message: "Network error", status: response.status }));
-
-        if (showGlobalLoading) hideLoading();
-
-        // Xử lý lỗi authentication
         if (
-          isAuthError({ status: response.status, message: errorData?.message })
+          isAuthError({
+            status: response.status,
+            message: data?.message,
+          })
         ) {
           handleAuthError();
+          if (showGlobalLoading) hideLoading();
           return reject(new Error("Not authenticated"));
         }
-
-        return reject(errorData);
+        if (showGlobalLoading) hideLoading();
+        return reject(data);
       }
-
-      const data: TResponse = await response.json();
 
       if (showGlobalLoading) hideLoading();
       resolve(data);
-    } catch (error) {
+    } catch (error: any) {
       if (showGlobalLoading) hideLoading();
-
-      // Xử lý lỗi network hoặc lỗi khác
-      if (isAuthError(error)) {
-        handleAuthError();
-      } else {
-        // Xử lý các lỗi chung khác
-        handleGeneralError(error);
-      }
-
+      handleGeneralError(error);
       reject(error);
     }
   });

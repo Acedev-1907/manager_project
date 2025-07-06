@@ -9,7 +9,9 @@ class MemberRepository
 {
     public function getContacts($userId, $query = null)
     {
-        $contacts = Member::with('member')->where('user_id', $userId);
+        $contacts = Member::with('member')
+            ->where('user_id', $userId)
+            ->where('member_id', '!=', $userId);
         if (!empty($query)) {
             $contacts = $contacts->whereHas('member', function ($q) use ($query) {
                 $q->where('name', 'like', "%$query%")

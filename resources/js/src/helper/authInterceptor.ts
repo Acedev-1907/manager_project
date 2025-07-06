@@ -43,8 +43,6 @@ export function isAuthError(error: any): boolean {
 
 // Thêm function để xử lý lỗi chung
 export function handleGeneralError(error: any) {
-  console.error("General error:", error);
-
   // Nếu là lỗi authentication, xử lý như auth error
   if (isAuthError(error)) {
     handleAuthError();
@@ -58,6 +56,4 @@ export function handleGeneralError(error: any) {
     router.push("/login");
     return;
   }
-
-  // Các lỗi khác - giữ nguyên behavior
 }

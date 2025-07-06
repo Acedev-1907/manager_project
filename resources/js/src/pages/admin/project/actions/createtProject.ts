@@ -9,6 +9,7 @@ export type ProjectInputType = {
   name: string;
   startDate: string;
   endDate: string;
+  members?: number[];
 };
 export type ProjectResponseType = {
   message: string;

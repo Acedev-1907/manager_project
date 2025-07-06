@@ -26,7 +26,6 @@ export function useLogOutUser() {
         return true;
       }
 
-      console.warn("Logout error:", error);
       return false;
     }
   }

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::controller(AuthController::class)->group(function () {
     Route::post('/register', 'register');
-    Route::post('/login', 'login');
+    Route::post('/login', 'login')->name('login');
 });
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
@@ -19,24 +19,25 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('/logout', 'logoutUser');
     });
 
+    Route::controller(MemberController::class)->group(function () {
+        Route::post('/members', 'store')->name('createMember');
+        Route::put('/members', 'update')->name('updateMember');
+        Route::get('/members', 'index')->name('indexMember');
+        Route::delete('/members/{id}', 'destroy')->name('deleteMember');
+        Route::post('/members/add-by-email', 'addByEmail')->name('addByEmail');
+        Route::post('/members/add-by-name-or-email', 'addByNameOrEmail')->name('addByNameOrEmail');
+    });
+
     Route::controller(ProjectController::class)->group(function () {
         Route::post('/projects', 'store')->name('createProject');
-        Route::put('/projects', 'update')->name('update');
+        Route::put('/projects', 'update')->name('updateProject');
         Route::get('/projects', 'index')->name('indexProject');
         Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
         Route::get('projects/{slug}', 'getProject')->name('getProject');
         Route::get('/count/projects', 'countProject')->name('countProject');
         Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
         Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
-    });
-
-    Route::controller(MemberController::class)->group(function () {
-        Route::post('/members', 'store')->name('createMember');
-        Route::put('/members', 'update')->name('update');
-        Route::get('/members', 'index')->name('indexMember');
-        Route::delete('/members/{id}', 'destroy')->name('deleteMember');
-        Route::post('/members/add-by-email', 'addByEmail')->name('addByEmail');
-        Route::post('/members/add-by-name-or-email', 'addByNameOrEmail')->name('addByNameOrEmail');
+        Route::get('/projects/{id}/members', 'getProjectMembers')->name('getProjectMembers');
     });
 
     Route::controller(TaskController::class)->group(function () {

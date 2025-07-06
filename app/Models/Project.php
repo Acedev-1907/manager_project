@@ -45,4 +45,9 @@ class Project extends Model
   {
     return $this->belongsToMany(\App\Models\User::class, 'project_user', 'project_id', 'user_id');
   }
+
+  public function creator()
+  {
+    return $this->belongsTo(\App\Models\User::class, 'creator_id');
+  }
 }

@@ -526,7 +526,5 @@ export async function changeTaskStatus(
       taskId: taskId,
       projectId: projectId,
     });
-  } catch (error) {
-    console.error("Error changing task status:", error);
-  }
+  } catch (error) {}
 }

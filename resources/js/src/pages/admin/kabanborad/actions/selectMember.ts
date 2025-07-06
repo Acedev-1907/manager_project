@@ -4,8 +4,10 @@ import { showError } from "../../../../helper/alert";
 import { taskStore } from "../store/kabanStore";
 
 export function useSelectMember() {
-  const selectedMembers = ref<Array<MemberType>>([]);
-  function selectMember(member: MemberType) {
+  const selectedMembers = ref<
+    Array<{ id: number; name: string; email: string }>
+  >([]);
+  function selectMember(member: { id: number; name: string; email: string }) {
     // Ensure memberIds is always an array
     if (!Array.isArray(taskStore.taskInput.memberIds)) {
       taskStore.taskInput.memberIds = [];

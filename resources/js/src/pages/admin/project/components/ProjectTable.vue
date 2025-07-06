@@ -32,21 +32,32 @@ const handleSearch = async (searchQuery: string) => {
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-header">
                     <tr>
-                        <th width="5%">ID</th>
-                        <th width="28%">Project Name</th>
-                        <th width="20%">Completion</th>
-                        <th width="5%">Edit</th>
-                        <th width="12%">Pin</th>
-                        <th width="15%">View</th>
+                        <th width="7%">No.</th>
+                        <th width="25%">Project Name</th>
+                        <th width="15%">Creator</th>
+                        <th width="15%">Members</th>
+                        <th width="20%">Progress</th>
+                        <th width="18%">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-if="!projects?.data?.data || projects?.data?.data.length === 0">
                         <td colspan="6" class="text-center text-muted">No data</td>
                     </tr>
-                    <tr v-for="project in projects?.data?.data" :key="project.id" class="table-row">
-                        <td>{{ project.id }}</td>
+                    <tr v-for="(project, idx) in projects?.data?.data" :key="project.id" class="table-row">
+                        <td>{{ idx + 1 }}</td>
                         <td class="fw-bold">{{ project.name }}</td>
+                        <td class="text-success">{{ project.creator?.name || 'N/A' }}</td>
+                        <td>
+                            <span v-if="project.users && project.users.length > 0">
+                                <span v-for="(user, uidx) in project.users.slice(0, 3)" :key="user.id"
+                                    class="badge bg-light text-dark me-1">
+                                    {{ user.name }}
+                                </span>
+                                <span v-if="project.users.length > 3">+{{ project.users.length - 3 }}</span>
+                            </span>
+                            <span v-else>-</span>
+                        </td>
                         <td>
                             <div class="progress custom-progress" role="progressbar"
                                 :aria-valuenow="project?.task_progress?.progress" aria-valuemin="0" aria-valuemax="100">
@@ -57,21 +68,20 @@ const handleSearch = async (searchQuery: string) => {
                             </div>
                         </td>
                         <td>
-                            <button @click="emit('editProject', project)" type="button"
-                                class="btn btn-outline-primary action-btn">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                        </td>
-                        <td>
-                            <button @click="emit('pinnedProject', project.id)" type="button"
-                                class="btn btn-outline-warning action-btn">
-                                <i class="bi bi-pin-angle"></i>
-                            </button>
-                        </td>
-                        <td>
-                            <RouterLink class="btn btn-outline-success action-btn" :to="'/kaban?query=' + project.slug">
-                                <i class="bi bi-eye"></i>
-                            </RouterLink>
+                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                <button @click="emit('editProject', project)" type="button"
+                                    class="btn btn-outline-primary action-btn" title="Edit">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <button @click="emit('pinnedProject', project.id)" type="button"
+                                    class="btn btn-outline-warning action-btn" title="Pin">
+                                    <i class="bi bi-pin-angle"></i>
+                                </button>
+                                <RouterLink class="btn btn-outline-success action-btn"
+                                    :to="'/kaban?query=' + project.slug" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </RouterLink>
+                            </div>
                         </td>
                     </tr>
                 </tbody>

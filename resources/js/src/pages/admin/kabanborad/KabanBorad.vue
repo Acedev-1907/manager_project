@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import BreadCrumb from './components/BreadCrumb.vue';
+// import BreadCrumb from './components/BreadCrumb.vue';
 import { useGetProjectDetail } from './actions/getProjectDetail';
-import ProjectDetail from './components/ProjectData.vue';
+// import ProjectDetail from './components/ProjectData.vue';
 import ProjectProgress from './components/ProjectProgress.vue';
 import PendingColumn from './components/PendingColumn.vue';
 import CompletedColumn from './components/CompletedColumn.vue';
@@ -13,12 +13,14 @@ import { taskStore } from './store/kabanStore';
 import NotStartedColumn from './components/NotStartedColumn.vue';
 import { useDragTask } from './actions/dragTask';
 import LoadingPage from '../../../components/LoadingPage.vue';
+import { useGetProjectMembers } from '../project/actions/getProjectMembers';
 
 const route = useRoute();
 const router = useRouter();
 
 const { ProjectData, getProjectDetail, loading: projectLoading } = useGetProjectDetail();
 const { getMembers, loading, memberData } = useGetMembers();
+const { getProjectMembers, members: projectMembers, loading: membersLoading } = useGetProjectMembers();
 
 const slug = route.query?.query as string;
 const modalVisible = ref(false);
@@ -34,6 +36,7 @@ onMounted(async () => {
 async function openTaskModal() {
     const projectId = ProjectData.value?.data?.id;
     if (!projectId) return;
+    await getProjectMembers(projectId);
     taskStore.taskInput.projectId = projectId;
     taskStore.taskInput.memberIds = [];
     modalVisible.value = true;
@@ -64,6 +67,18 @@ watch(() => ProjectData.value?.data?.tasks, () => {
         setupTaskCardDragListeners();
     }, 100);
 }, { deep: true });
+
+async function handleRefreshKabanBoard() {
+    await getProjectDetail(slug);
+}
+
+async function handleProjectUpdated() {
+    const projectId = ProjectData.value?.data?.id;
+    await getProjectDetail(slug);
+    if (projectId) {
+        await getProjectMembers(projectId);
+    }
+}
 </script>
 
 <template>
@@ -155,8 +170,8 @@ watch(() => ProjectData.value?.data?.tasks, () => {
         </div>
 
         <!-- Add Task Modal -->
-        <AddTaskModal :members="memberData" :visible="modalVisible" @getMembers="getMembers"
-            @closeModal="closeTaskModal" />
+        <AddTaskModal :members="projectMembers" :visible="modalVisible" @getMembers="getMembers"
+            @closeModal="closeTaskModal" @refreshKabanBoard="handleRefreshKabanBoard" />
     </div>
 </template>
 

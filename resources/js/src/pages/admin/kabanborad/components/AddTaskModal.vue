@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useVuelidate } from "@vuelidate/core";
 import { required } from "@vuelidate/validators";
-import { ref, watch } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
 import { taskStore } from "../store/kabanStore";
 import { GetMemberType } from "../../member/actions/getMember";
 import { useSelectMember } from "../actions/selectMember";
@@ -11,7 +11,7 @@ import { showError } from "../../../../helper/alert";
 import BaseInput from "../../../../components/BaseInput.vue";
 
 const props = defineProps<{
-    members: GetMemberType;
+    members: Array<{ id: number; name: string; email: string }>;
     visible: boolean;
 }>();
 
@@ -30,6 +30,25 @@ const query = ref("");
 
 const { selectMember, selectedMembers, unSelectedMember } = useSelectMember()
 const { loading, createTask } = useCreateTask();
+
+const currentUser = ref<{ id: number; name: string; email: string } | null>(null);
+
+const projectMembers = computed(() => {
+    const members = (props.members || []).slice();
+    if (currentUser.value && currentUser.value.id && !members.some(m => m.id === currentUser.value!.id)) {
+        members.push({
+            id: currentUser.value.id,
+            name: currentUser.value.name,
+            email: currentUser.value.email
+        });
+    }
+    return members;
+});
+
+onMounted(() => {
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    currentUser.value = userData;
+});
 
 function closeModal() {
     emit('closeModal');
@@ -53,7 +72,8 @@ async function submitTask() {
         taskStore.taskInput.memberIds = []
         taskStore.taskInput.name = ""
         v$.value.$reset();
-        closeModal();
+        emit('refreshKabanBoard');
+        emit('closeModal');
     } else {
         showError('please select a member');
     }
@@ -69,6 +89,18 @@ watch(() => props.visible, (newVal) => {
         taskStore.taskInput.memberIds = [];
         selectedMembers.value = [];
         v$.value.$reset();
+        // Auto add current user to selectedMembers if not present
+        if (
+            currentUser.value &&
+            currentUser.value.id &&
+            !selectedMembers.value.some(m => m.id === currentUser.value!.id)
+        ) {
+            selectMember({
+                id: currentUser.value.id,
+                name: currentUser.value.name,
+                email: currentUser.value.email
+            });
+        }
     }
 });
 </script>
@@ -133,9 +165,11 @@ watch(() => props.visible, (newVal) => {
                                     <div v-for="member in selectedMembers" :key="member.id" class="member-tag"
                                         @click="unSelectedMember(member.id)">
                                         <div class="member-avatar">
-                                            <span>{{ member.name.charAt(0).toUpperCase() }}</span>
+                                            <span>{{ member && member.name ? member.name.charAt(0).toUpperCase() : '?'
+                                                }}</span>
                                         </div>
-                                        <span class="member-name">{{ member.name }}</span>
+                                        <span class="member-name">{{ member && member.name ? member.name : 'No Name'
+                                            }}</span>
                                         <i class="fas fa-times remove-icon"></i>
                                     </div>
                                 </div>
@@ -148,13 +182,16 @@ watch(() => props.visible, (newVal) => {
                                     Available Members
                                 </label>
                                 <div class="members-list">
-                                    <div v-for="member in members?.data?.data" :key="member.id" class="member-item">
+                                    <div v-for="member in projectMembers" :key="member.id" class="member-item">
                                         <div class="member-info">
                                             <div class="member-avatar-small">
-                                                <span>{{ member.name.charAt(0).toUpperCase() }}</span>
+                                                <span>{{ member && member.name ? member.name.charAt(0).toUpperCase() :
+                                                    '?' }}</span>
                                             </div>
                                             <div class="member-details">
-                                                <span class="member-name">{{ member.name }}</span>
+                                                <span class="member-name">
+                                                    {{ member && member.name ? member.name : 'No Name' }}
+                                                </span>
                                                 <span class="member-id">#{{ member.id }}</span>
                                             </div>
                                         </div>

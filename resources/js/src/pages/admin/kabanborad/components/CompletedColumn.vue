@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { SingleProjectResponseType, TaskStatus } from '../actions/getProjectDetail.type';
+import MemberAvatar from './MemberAvatar.vue';
 
 const props = defineProps<{
     projectData: SingleProjectResponseType
@@ -61,7 +62,7 @@ function openTaskModal() {
                             <div v-if="task.task_members && task.task_members.length > 0" class="assignees">
                                 <div v-for="(member, index) in task.task_members.slice(0, 3)" :key="member.id"
                                     class="member-avatar" :class="`member-${index + 1}`">
-                                    <span>{{ member.members.name.charAt(0).toUpperCase() }}</span>
+                                    <MemberAvatar :member="member" />
                                 </div>
                                 <div v-if="task.task_members.length > 3" class="more-members">
                                     +{{ task.task_members.length - 3 }}

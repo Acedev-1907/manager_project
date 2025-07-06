@@ -15,6 +15,16 @@ export type ProjectType = {
     created_at: string;
     updated_at: string;
   };
+  creator?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  users?: Array<{
+    id: number;
+    name: string;
+    email: string;
+  }>;
 };
 
 export type GetProjectType = {

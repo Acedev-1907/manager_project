@@ -4,17 +4,48 @@ import { ProjectType, useGetProject } from './actions/GetProject';
 import ProjectTable from './components/ProjectTable.vue';
 import { useRouter } from 'vue-router';
 import { projectStore } from './store/projectStore';
-import { ProjectInputType } from './actions/createtProject';
+import { ProjectInputType, useCreateOrUpdateProject } from './actions/createtProject';
 import { usepinnendProject } from './actions/pinnendProject';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import CustomPagination from '../../../components/CustomPagination.vue';
 import MainCardLayout from '../../../components/MainCardLayout.vue';
+import CreateProjectModal from './components/CreateProjectModal.vue';
+import ProjectModal from './components/ProjectModal.vue';
 
 const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
 const tableLoading = ref(false);
 const router = useRouter();
 const { pinnendProject } = usepinnendProject();
+const showCreateModal = ref(false);
+const showProjectModal = ref(false);
+const isEdit = ref(false);
+const loading = ref(false);
+const { createOrUpdate } = useCreateOrUpdateProject();
+
+// Add a function to setup Echo listener
+function setupEchoListener() {
+    const userDataRaw = localStorage.getItem('userData');
+    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
+    const userId = userData.id || (userData.user && userData.user.id);
+
+    if (!userId) {
+        console.error('No user ID found for Echo channel');
+        return;
+    }
+
+    try {
+        window.Echo.private(`user.${userId}`)
+            .listen('App\\Events\\NewProjectForMembers', (e: any) => {
+                fetchProjects();
+            })
+            .error((error: any) => {
+                console.error('Echo channel error:', error);
+            });
+    } catch (error) {
+        console.error('Error setting up Echo listener:', error);
+    }
+}
 
 async function fetchProjects(page = 1, query = "", showLoadingPage = true) {
     if (showLoadingPage) {
@@ -28,17 +59,6 @@ async function fetchProjects(page = 1, query = "", showLoadingPage = true) {
     }
 }
 
-function handleEditProject(project: ProjectType) {
-    projectStore.projectInput = {
-        id: project.id,
-        name: project.name,
-        startDate: project.startDate,
-        endDate: project.endDate
-    };
-    projectStore.edit = true;
-    router.push('/create-project');
-}
-
 async function handlePinProject(projectId: number) {
     isLoading.value = true;
     await pinnendProject(projectId);
@@ -46,10 +66,52 @@ async function handlePinProject(projectId: number) {
     router.push('/admin');
 }
 
+function openCreateProject() {
+    projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
+    isEdit.value = false;
+    showProjectModal.value = true;
+}
+
+function openEditProject(project: ProjectType) {
+    projectStore.projectInput = {
+        ...project,
+        startDate: project.startDate || '',
+        endDate: project.endDate || '',
+        members: (project.users || []).map(u => u.id)
+    };
+    isEdit.value = true;
+    showProjectModal.value = true;
+}
+
+async function handleSubmitProject(data: ProjectInputType) {
+    loading.value = true;
+    projectStore.projectInput = {
+        ...data,
+        startDate: data.startDate || '',
+        endDate: data.endDate || '',
+    };
+    await createOrUpdate();
+    loading.value = false;
+    showProjectModal.value = false;
+    fetchProjects();
+
+    // Setup Echo listener after project is created successfully
+    setupEchoListener();
+}
+
 onMounted(async () => {
     await fetchProjects();
     projectStore.edit = false;
-    projectStore.projectInput = {} as ProjectInputType;
+    projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
+
+    // Remove the Echo setup from here - we'll do it after project creation
+    const userDataRaw = localStorage.getItem('userData');
+    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
+    const userId = userData.id || (userData.user && userData.user.id);
+    window.Echo.private(`user.${userId}`)
+        .listen('NewProjectForMembers', (e: any) => {
+            fetchProjects();
+        });
 });
 </script>
 
@@ -57,25 +119,27 @@ onMounted(async () => {
     <MainCardLayout title="Project Management" iconClass="bi bi-kanban-fill"
         containerStyle="padding:1rem 0 1rem 0; position:relative;">
         <template #action>
-            <RouterLink to="/create-project" class="btn btn-primary create-btn">
+            <button class="btn btn-primary create-btn" @click="openCreateProject">
                 <i class="bi bi-plus-circle me-1"></i> Create Project
-            </RouterLink>
+            </button>
         </template>
         <LoadingPage v-if="isLoading" />
-        <ProjectTable @getProject="fetchProjects" :loading="tableLoading" @editProject="handleEditProject"
+        <ProjectTable @getProject="fetchProjects" :loading="tableLoading" @editProject="openEditProject"
             :projects="projectData" @pinnedProject="handlePinProject">
             <template #pagination>
                 <CustomPagination v-if="projectData?.data" :data="projectData.data" :loading="tableLoading"
                     @pagination-change-page="fetchProjects" />
             </template>
         </ProjectTable>
+        <ProjectModal v-if="showProjectModal" :isEdit="isEdit" :projectInput="projectStore.projectInput"
+            :loading="loading" @close="showProjectModal = false" @submit="handleSubmitProject" />
         <template #fab>
-            <RouterLink to="/create-project" class="fab-add-project d-md-none">
+            <button class="fab-add-project d-md-none" @click="showCreateModal = true">
                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="13" y="6" width="2" height="16" rx="1" fill="white" />
                     <rect x="6" y="13" width="16" height="2" rx="1" fill="white" />
                 </svg>
-            </RouterLink>
+            </button>
         </template>
     </MainCardLayout>
 </template>

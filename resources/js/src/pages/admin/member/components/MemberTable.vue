@@ -39,7 +39,7 @@ const handleSearch = async (searchQuery: string) => {
                         <td colspan="5" class="text-center text-muted">No data</td>
                     </tr>
                     <tr v-for="(member, idx) in members?.data?.data" :key="member.id" class="table-row">
-                        <td>{{ (members?.data?.from || 1) + idx }}</td>
+                        <td>{{ idx + 1 }}</td>
                         <td>{{ member.id }}</td>
                         <td class="fw-bold">{{ member.member?.name }}</td>
                         <td>{{ member.member?.email }}</td>

@@ -9,10 +9,15 @@ class TaskMember extends Model
 {
     use HasFactory;
 
-    protected $guarded=[];
+    protected $guarded = [];
 
-     public function members()
+    public function members()
     {
         return $this->belongsTo(Member::class, 'memberId');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'memberId', 'id');
     }
 }
