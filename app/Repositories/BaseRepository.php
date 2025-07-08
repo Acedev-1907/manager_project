@@ -63,5 +63,4 @@ abstract class BaseRepository
 
         return $this->model->find($model)->update($update);
     }
-
 }

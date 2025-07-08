@@ -89,6 +89,7 @@ async function handleSubmitProject(data: ProjectInputType) {
         ...data,
         startDate: data.startDate || '',
         endDate: data.endDate || '',
+        members: data.members ?? [],
     };
     await createOrUpdate();
     loading.value = false;

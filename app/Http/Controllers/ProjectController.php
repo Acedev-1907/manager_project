@@ -22,10 +22,7 @@ class ProjectController extends Controller
 
     public function getProject($slug)
     {
-        $project = Project::with(['tasks.task_members.user', 'task_progress', 'users'])
-            ->where('projects.slug', $slug)
-            ->first();
-
+        $project = $this->service->getProjectBySlug($slug);
         return response(['data' => $project]);
     }
 
@@ -33,18 +30,8 @@ class ProjectController extends Controller
     {
         $userId = $request->user()->id;
         $query = $request->get('query');
-        $projects = Project::with(['task_progress', 'creator', 'users'])
-            ->whereHas('users', function ($q) use ($userId) {
-                $q->where('users.id', $userId);
-            });
-
-        if (!is_null($query)  && $query !== '') {
-            $projects->where('name', 'like', '%' . $query . '%')
-                ->orderBy('id', 'desc');
-
-            return response(['data' => $projects->paginate(6)], 200);
-        }
-        return response(['data' => $projects->paginate(6)], 200);
+        $projects = $this->service->getProjectsForUser($userId, $query);
+        return response(['data' => $projects], 200);
     }
 
     public function store(Request $req)
@@ -62,6 +49,17 @@ class ProjectController extends Controller
     public function update(UpdateProjectRequest $request)
     {
         $user = $request->user();
+        $projectId = $request->input('id'); // hoặc $request->route('id') nếu truyền qua route
+        $project = Project::find($projectId);
+
+        if (!$project) {
+            return response(['message' => 'Project không tồn tại'], 404);
+        }
+
+        if ($project->creator_id !== $user->id) {
+            return response(['message' => 'Bạn không thể edit project này'], 403);
+        }
+
         $result = $this->service->updateProject($request->all(), $user);
 
         if (isset($result['errors'])) {

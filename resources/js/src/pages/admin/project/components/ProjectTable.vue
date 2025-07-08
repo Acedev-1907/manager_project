@@ -2,6 +2,8 @@
 import { ref } from 'vue';
 import { GetProjectType, ProjectType } from '../actions/GetProject';
 import SearchInput from '../../../../components/SearchInput.vue';
+import { getUserData } from '../../../../helper/getUserData';
+import { onMounted } from 'vue';
 
 defineProps<{
     projects: GetProjectType;
@@ -18,6 +20,12 @@ const emit = defineEmits<{
 }>()
 
 const query = ref("");
+const currentUserId = ref<number | null>(null);
+
+onMounted(() => {
+    const userData = getUserData();
+    currentUserId.value = userData?.user?.id ?? null;
+});
 
 const handleSearch = async (searchQuery: string) => {
     query.value = searchQuery;
@@ -69,7 +77,8 @@ const handleSearch = async (searchQuery: string) => {
                         </td>
                         <td>
                             <div class="d-flex align-items-center justify-content-center gap-2">
-                                <button @click="emit('editProject', project)" type="button"
+                                <button v-if="currentUserId !== null && project.creator?.id === currentUserId"
+                                    @click="emit('editProject', project)" type="button"
                                     class="btn btn-outline-primary action-btn" title="Edit">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
@@ -104,7 +113,8 @@ const handleSearch = async (searchQuery: string) => {
                         :style="{ width: (project?.task_progress?.progress || 0) + '%' }"></div>
                 </div>
                 <div class="d-flex justify-content-between mt-2">
-                    <button @click="emit('editProject', project)" type="button"
+                    <button v-if="currentUserId !== null && project.creator?.id === currentUserId"
+                        @click="emit('editProject', project)" type="button"
                         class="btn btn-outline-primary action-btn-mobile">
                         <i class="bi bi-pencil-square"></i>
                     </button>

@@ -87,4 +87,14 @@ class ProjectService
             return ['message' => 'Project updated', 'status' => 200];
         });
     }
+
+    public function getProjectBySlug($slug)
+    {
+        return $this->repo->getBySlugWithRelations($slug);
+    }
+
+    public function getProjectsForUser($userId, $query = null)
+    {
+        return $this->repo->getProjectsForUser($userId, $query);
+    }
 }

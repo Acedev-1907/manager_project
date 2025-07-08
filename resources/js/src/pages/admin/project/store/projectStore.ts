@@ -3,7 +3,13 @@ import { ProjectInputType } from "../actions/createtProject";
 
 const userProjectStore = defineStore("project", {
   state: () => ({
-    projectInput: { id: 0, name: "", startDate: "", endDate: "", members: [] },
+    projectInput: {
+      id: 0,
+      name: "",
+      startDate: "",
+      endDate: "",
+      members: [] as number[],
+    },
     edit: false,
   }),
 });

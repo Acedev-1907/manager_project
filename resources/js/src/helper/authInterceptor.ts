@@ -33,10 +33,10 @@ export function isAuthError(error: any): boolean {
   if (error?.message?.includes("fetch")) return true;
 
   // Kiểm tra cho các lỗi HTTP 4xx liên quan đến auth
-  if (error?.status >= 400 && error?.status < 500) {
-    // Nếu là lỗi 403, 401, hoặc các lỗi auth khác
-    if (error?.status === 403 || error?.status === 401) return true;
-  }
+  // if (error?.status >= 400 && error?.status < 500) {
+  //   // Nếu là lỗi 403, 401, hoặc các lỗi auth khác
+  //   if (error?.status === 403 || error?.status === 401) return true;
+  // }
 
   return false;
 }
