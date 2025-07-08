@@ -44,12 +44,9 @@ class AuthController extends Controller
         return response()->json($result);
     }
 
-    public function logoutUser(Request $req)
+    public function logoutUser(Request $req, AuthService $authService)
     {
-        DB::table('personal_access_tokens')
-            ->where('tokenable_id', $req->userId)
-            ->delete();
-
-        return response(['message' => 'logout user'], 200);
+        $result = $authService->logoutUser($req->userId);
+        return response($result, 200);
     }
 }

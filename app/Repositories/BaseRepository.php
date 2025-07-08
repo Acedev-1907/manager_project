@@ -2,65 +2,45 @@
 
 namespace App\Repositories;
 
-use Illuminate\Database\Eloquent\Model;
 
 abstract class BaseRepository
 {
-    const LIMIT = 30;
+    protected $model;
 
-    const OFFSET = 0;
-
-    const OPERATOR_WHERE = 'where';
-
-    const OPERATOR_WHERE_BETWEEN = 'between';
-
-    const OPERATOR_WHERE_NOT_IN = 'where_not_in';
-
-    const OPERATOR_WHERE_IN = 'where_in';
-
-    protected $baseModel;
-    protected $tableName;
-
-    public function __construct(?array $params = [])
+    public function __construct()
     {
-        $this->baseModel = app()->make($this->getModel());
-        $this->tableName = $this->baseModel->getTable();
-        if (!empty($params)) {
-            $this->baseModel = $this->baseQuery($params);
-        }
+        $modelClass = $this->getModel();
+        $this->model = new $modelClass;
     }
 
-    public function __get($property)
-    {
-        if ($property === 'model') {
-            return clone $this->baseModel;
-        }
-
-        return $this->$property;
-    }
     abstract protected function getModel(): string;
 
-    private function baseQuery($multi_conditions)
+    public function create(array $data)
     {
-        return $this->model->where(function ($query) use ($multi_conditions) {
-            foreach ($multi_conditions as $method => $conditions) {
-                foreach ($conditions as $condition) {
-                    if (is_callable($condition)) {
-                        $query->{$method}($condition);
-                    } else {
-                        $query->{$method}(...$condition);
-                    }
-                }
-            }
-        });
+        return $this->model->create($data);
     }
 
-    public function updateByPK(int|Model|null $model = null, array $update = [])
+    public function find($id, $relations = [])
     {
-        if ($model instanceof Model) {
-            return $model->update($update);
-        }
+        return $this->model->with($relations)->find($id);
+    }
 
-        return $this->model->find($model)->update($update);
+    public function updateById($id, array $data)
+    {
+        $model = $this->model->find($id);
+        if ($model) {
+            $model->update($data);
+            return $model;
+        }
+        return null;
+    }
+
+    public function delete($id)
+    {
+        $model = $this->model->find($id);
+        if ($model) {
+            return $model->delete();
+        }
+        return false;
     }
 }

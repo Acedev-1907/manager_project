@@ -4,11 +4,11 @@ namespace App\Repositories;
 
 use App\Models\Project;
 
-class ProjectRepository
+class ProjectRepository extends BaseRepository
 {
-    public function create(array $data)
+    protected function getModel(): string
     {
-        return Project::create($data);
+        return Project::class;
     }
 
     public function attachUsers(Project $project, array $userIds)
@@ -21,15 +21,9 @@ class ProjectRepository
         $project->users()->sync($userIds);
     }
 
-    public function update(Project $project, array $data)
-    {
-        $project->update($data);
-        return $project;
-    }
-
     public function getBySlugWithRelations($slug)
     {
-        return Project::with([
+        return $this->model->with([
             'tasks' => function ($q) {
                 $q->orderBy('created_at', 'desc');
             },
@@ -41,7 +35,7 @@ class ProjectRepository
 
     public function getProjectsForUser($userId, $query = null)
     {
-        $projects = Project::with(['task_progress', 'creator', 'users'])
+        $projects = $this->model->with(['task_progress', 'creator', 'users'])
             ->whereHas('users', function ($q) use ($userId) {
                 $q->where('users.id', $userId);
             });

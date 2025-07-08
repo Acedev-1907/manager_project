@@ -66,9 +66,15 @@ class ProjectService
 
     public function updateProject($fields, $user)
     {
-        return DB::transaction(function () use ($fields, $user) {
-            $project = \App\Models\Project::findOrFail($fields['id']);
-            $this->repo->update($project, [
+        return \DB::transaction(function () use ($fields, $user) {
+            $project = $this->repo->find($fields['id']);
+            if (!$project) {
+                return ['errors' => ['Project không tồn tại'], 'status' => 404];
+            }
+            if ($project->creator_id !== $user->id) {
+                return ['errors' => ['Bạn không thể edit project này'], 'status' => 403];
+            }
+            $this->repo->updateById($fields['id'], [
                 'name' => $fields['name'],
                 'startDate' => $fields['startDate'],
                 'endDate' => $fields['endDate'],
@@ -81,7 +87,7 @@ class ProjectService
 
             // Broadcast event cho tất cả thành viên
             foreach ($allMembers as $memberId) {
-                broadcast(new NewProjectForMembers($project, $memberId));
+                broadcast(new \App\Events\NewProjectForMembers($project, $memberId));
             }
 
             return ['message' => 'Project updated', 'status' => 200];

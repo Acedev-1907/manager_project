@@ -53,11 +53,11 @@ class ProjectController extends Controller
         $project = Project::find($projectId);
 
         if (!$project) {
-            return response(['message' => 'Project không tồn tại'], 404);
+            return response(['message' => 'Project does not exist'], 404);
         }
 
         if ($project->creator_id !== $user->id) {
-            return response(['message' => 'Bạn không thể edit project này'], 403);
+            return response(['message' => 'You cannot edit this project'], 403);
         }
 
         $result = $this->service->updateProject($request->all(), $user);
@@ -68,7 +68,7 @@ class ProjectController extends Controller
         return response(['message' => $result['message']], $result['status']);
     }
 
-    public function pinnendProject(Request $req)
+    public function pinnedProject(Request $req)
     {
         return DB::transaction(function () use ($req) {
             $fields = $req->all();
@@ -100,7 +100,7 @@ class ProjectController extends Controller
         return response(['count' => $count]);
     }
 
-    public function getPinnnedProject()
+    public function getPinnedProject()
     {
         $project = DB::table('task_progress')
             ->join('projects', 'task_progress.projectId', '=', 'projects.id')
@@ -120,7 +120,7 @@ class ProjectController extends Controller
         $projectId = $req->projectId;
         $task = Task::where('projectId', $projectId)->get();
 
-        $taskProjess = TaskProgress::where('projectId', $projectId)->select('progress')->first();
+        $taskProject = TaskProgress::where('projectId', $projectId)->select('progress')->first();
 
         $pending = 0;
         $completed = 0;
@@ -137,7 +137,7 @@ class ProjectController extends Controller
         return response(
             [
                 'tasks' => [$pending, $completed],
-                'progress' => intval($taskProjess->progress)
+                'progress' => intval($taskProject->progress)
             ]
         );
     }

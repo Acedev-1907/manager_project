@@ -5,11 +5,16 @@ namespace App\Repositories;
 use App\Models\Member;
 use App\Models\User;
 
-class MemberRepository
+class MemberRepository extends BaseRepository
 {
+    protected function getModel(): string
+    {
+        return Member::class;
+    }
+
     public function getContacts($userId, $query = null)
     {
-        $contacts = Member::with('member')
+        $contacts = $this->model->with('member')
             ->where('user_id', $userId)
             ->where('member_id', '!=', $userId);
         if (!empty($query)) {
@@ -23,22 +28,22 @@ class MemberRepository
 
     public function exists($userId, $memberId)
     {
-        return Member::where('user_id', $userId)
+        return $this->model->where('user_id', $userId)
             ->where('member_id', $memberId)
             ->exists();
     }
 
-    public function create($userId, $memberId)
+    public function createMember($userId, $memberId)
     {
-        return Member::create([
+        return $this->model->create([
             'user_id' => $userId,
             'member_id' => $memberId,
         ]);
     }
 
-    public function delete($id, $userId)
+    public function deleteMember($id, $userId)
     {
-        $member = Member::where('id', $id)->where('user_id', $userId)->first();
+        $member = $this->model->where('id', $id)->where('user_id', $userId)->first();
         if ($member) {
             $member->delete();
             return true;

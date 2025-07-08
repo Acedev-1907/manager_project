@@ -32,10 +32,10 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::post('/projects', 'store')->name('createProject');
         Route::put('/projects', 'update')->name('updateProject');
         Route::get('/projects', 'index')->name('indexProject');
-        Route::post('/projects/pinned', 'pinnendProject')->name('pinnendProject');
+        Route::post('/projects/pinned', 'pinnedProject')->name('pinnedProject');
         Route::get('projects/{slug}', 'getProject')->name('getProject');
         Route::get('/count/projects', 'countProject')->name('countProject');
-        Route::get('/pinned/projects', 'getPinnnedProject')->name('getPinnnedProject');
+        Route::get('/pinned/projects', 'getPinnedProject')->name('getPinnedProject');
         Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
         Route::get('/projects/{id}/members', 'getProjectMembers')->name('getProjectMembers');
     });
