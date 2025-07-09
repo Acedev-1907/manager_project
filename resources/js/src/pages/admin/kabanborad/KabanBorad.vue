@@ -14,6 +14,7 @@ import NotStartedColumn from './components/NotStartedColumn.vue';
 import { useDragTask } from './actions/dragTask';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import { useGetProjectMembers } from '../project/actions/getProjectMembers';
+import { showErrorResponse } from '../../../helper/utils';
 
 const route = useRoute();
 const router = useRouter();
@@ -31,6 +32,19 @@ onMounted(async () => {
     setTimeout(() => {
         setupAllDropListeners();
     }, 100);
+
+    const userDataRaw = localStorage.getItem('userData');
+    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
+    const userId = userData.id || (userData.user && userData.user.id);
+    if (userId) {
+        window.Echo.private(`user.${userId}`)
+            .listen('UserRemovedFromProject', (e: { projectId: number, message: string }) => {
+                if (e.projectId && ProjectData.value?.data?.id === e.projectId) {
+                    showErrorResponse(e.message);
+                    router.push('/projects');
+                }
+            });
+    }
 });
 
 async function openTaskModal() {
@@ -70,14 +84,6 @@ watch(() => ProjectData.value?.data?.tasks, () => {
 
 async function handleRefreshKabanBoard() {
     await getProjectDetail(slug);
-}
-
-async function handleProjectUpdated() {
-    const projectId = ProjectData.value?.data?.id;
-    await getProjectDetail(slug);
-    if (projectId) {
-        await getProjectMembers(projectId);
-    }
 }
 </script>
 

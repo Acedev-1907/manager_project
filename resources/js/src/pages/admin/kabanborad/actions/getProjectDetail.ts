@@ -3,6 +3,7 @@ import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { SingleProjectResponseType } from "./getProjectDetail.type";
 import { showErrorResponse } from "../../../../helper/utils";
 import { eventBus } from "../../../../helper/eventBus";
+import { useRouter } from "vue-router";
 
 export function useGetProjectDetail() {
   const loading = ref(false);
@@ -10,20 +11,21 @@ export function useGetProjectDetail() {
     {} as SingleProjectResponseType
   );
   let currentSlug = "";
+  const router = useRouter();
 
   async function getProjectDetail(slug: string, showLoading = true) {
     try {
       if (showLoading) loading.value = true;
-      currentSlug = slug; // Cập nhật slug hiện tại
+      currentSlug = slug;
       const data = await makeHttpReq<undefined, SingleProjectResponseType>(
         `projects/${slug}`,
         "GET"
       );
       loading.value = false;
       ProjectData.value = data;
-    } catch (error) {
-      loading.value = false;
+    } catch (error: any) {
       showErrorResponse(error);
+      router.push("/projects");
     }
   }
 

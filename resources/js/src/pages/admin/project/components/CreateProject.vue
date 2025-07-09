@@ -104,7 +104,7 @@ if (projectStore.edit && projectStore.projectInput.id) {
                     </div>
                     <div class="col-md-6 col-12">
                         <Error label="Start Date" :errors="v$.startDate.$errors" />
-                        <DateInput v-model="projectStore.projectInput.startDate || ''" placeholder="DD/MM/YYYY" />
+                        <DateInput v-model="projectStore.projectInput.startDate" placeholder="DD/MM/YYYY" />
                         <small class="text-muted mt-1 d-block">
                             <i class="bi bi-info-circle"></i>
                             Project start date (can be any date)
@@ -112,7 +112,7 @@ if (projectStore.edit && projectStore.projectInput.id) {
                     </div>
                     <div class="col-md-6 col-12">
                         <Error label="End Date" :errors="v$.endDate.$errors" />
-                        <DateInput v-model="projectStore.projectInput.endDate || ''" placeholder="DD/MM/YYYY"
+                        <DateInput v-model="projectStore.projectInput.endDate" placeholder="DD/MM/YYYY"
                             :min="projectStore.projectInput.startDate" />
                         <small class="text-muted mt-1 d-block">
                             <i class="bi bi-info-circle"></i>

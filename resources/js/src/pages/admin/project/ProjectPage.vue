@@ -9,7 +9,6 @@ import { usepinnendProject } from './actions/pinnendProject';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import CustomPagination from '../../../components/CustomPagination.vue';
 import MainCardLayout from '../../../components/MainCardLayout.vue';
-import CreateProjectModal from './components/CreateProjectModal.vue';
 import ProjectModal from './components/ProjectModal.vue';
 
 const { getProjects, projectData } = useGetProject();
@@ -36,7 +35,10 @@ function setupEchoListener() {
 
     try {
         window.Echo.private(`user.${userId}`)
-            .listen('App\\Events\\NewProjectForMembers', (e: any) => {
+            .listen('NewProjectForMembers', (e: any) => {
+                fetchProjects();
+            })
+            .listen('UserRemovedFromProject', (e: any) => {
                 fetchProjects();
             })
             .error((error: any) => {
@@ -105,14 +107,7 @@ onMounted(async () => {
     projectStore.edit = false;
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
 
-    // Remove the Echo setup from here - we'll do it after project creation
-    const userDataRaw = localStorage.getItem('userData');
-    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
-    const userId = userData.id || (userData.user && userData.user.id);
-    window.Echo.private(`user.${userId}`)
-        .listen('NewProjectForMembers', (e: any) => {
-            fetchProjects();
-        });
+    setupEchoListener(); // Đảm bảo gọi hàm này khi mount
 });
 </script>
 

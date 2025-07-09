@@ -68,26 +68,30 @@ class ProjectService
     {
         return \DB::transaction(function () use ($fields, $user) {
             $project = $this->repo->find($fields['id']);
-            if (!$project) {
-                return ['errors' => ['Project không tồn tại'], 'status' => 404];
-            }
-            if ($project->creator_id !== $user->id) {
-                return ['errors' => ['Bạn không thể edit project này'], 'status' => 403];
-            }
+
+            // Lấy danh sách user cũ trước khi update
+            $oldMembers = $project->users->pluck('id')->toArray();
+
             $this->repo->updateById($fields['id'], [
                 'name' => $fields['name'],
                 'startDate' => $fields['startDate'],
                 'endDate' => $fields['endDate'],
             ]);
 
-            // Đồng bộ thành viên (bao gồm cả creator, không trùng lặp)
             $members = $fields['members'] ?? [];
             $allMembers = array_unique(array_merge($members, [$user->id]));
             $this->repo->syncUsers($project, $allMembers);
 
-            // Broadcast event cho tất cả thành viên
+            // Xác định user bị remove
+            $removedMembers = array_diff($oldMembers, $allMembers);
+
+            // Broadcast cho user bị remove
+            foreach ($removedMembers as $removedId) {
+                broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
+            }
+
             foreach ($allMembers as $memberId) {
-                broadcast(new \App\Events\NewProjectForMembers($project, $memberId));
+                broadcast(new NewProjectForMembers($project, $memberId));
             }
 
             return ['message' => 'Project updated', 'status' => 200];

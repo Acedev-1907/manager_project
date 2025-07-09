@@ -23,6 +23,11 @@ class ProjectController extends Controller
     public function getProject($slug)
     {
         $project = $this->service->getProjectBySlug($slug);
+        $user = request()->user();
+
+        if (!$project || !$project->users->contains('id', $user->id)) {
+            return response(['message' => 'You do not have permission to access this project!'], 403);
+        }
         return response(['data' => $project]);
     }
 

@@ -52,12 +52,17 @@ function parseDisplayDate(displayDate: string): string {
 
     if (isNaN(day) || isNaN(month) || isNaN(year)) return '';
 
-    const date = new Date(year, month, day);
+    // Set giờ 12:00 để tránh lệch múi giờ
+    const date = new Date(year, month, day, 12, 0, 0);
     if (date.getDate() !== day || date.getMonth() !== month || date.getFullYear() !== year) {
         return '';
     }
 
-    return date.toISOString().split('T')[0];
+    // Xuất yyyy-mm-dd local
+    const yyyy = date.getFullYear();
+    const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+    const dd = date.getDate().toString().padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
 }
 
 // Initialize display value
@@ -99,8 +104,11 @@ function closeCalendar() {
 }
 
 function selectDate(date: Date) {
-    const isoDate = date.toISOString().split('T')[0];
-
+    // Lấy ngày theo local, không dùng toISOString
+    const yyyy = date.getFullYear();
+    const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+    const dd = date.getDate().toString().padStart(2, '0');
+    const isoDate = `${yyyy}-${mm}-${dd}`;
     displayValue.value = formatDateForDisplay(isoDate);
     emit('update:modelValue', isoDate);
     closeCalendar();
@@ -248,16 +256,16 @@ onUnmounted(() => {
                     <span v-if="props.min">From: {{ formatDateForDisplay(props.min) }}</span>
                     <span v-if="props.min && props.max"> | </span>
                     <span v-if="props.max">To: {{ formatDateForDisplay(props.max) }}</span>
-                    <span v-if="props.min && !props.max"> | No maximum limit</span>
+                    <!-- <span v-if="props.min && !props.max"> | No maximum limit</span> -->
                 </small>
             </div>
 
             <!-- Show when no constraints -->
-            <div v-if="!props.min && !props.max" class="calendar-constraints">
+            <!-- <div v-if="!props.min && !props.max" class="calendar-constraints">
                 <small class="text-muted">
                     <span>No date restrictions - free selection</span>
                 </small>
-            </div>
+            </div> -->
 
             <!-- Debug info for troubleshooting -->
             <div v-if="false" class="calendar-debug">
@@ -351,24 +359,27 @@ onUnmounted(() => {
 
 .calendar-dropdown {
     position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
+    left: 100%;
+    top: 0;
+    right: auto;
     background: white;
     border: 2px solid #e5e7eb;
     border-radius: 0.75rem;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    margin-top: 0.25rem;
+    z-index: 3000;
+    margin-left: 0.5rem;
     padding: 1rem;
-    min-width: 280px;
+    min-width: 210px;
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
 }
 
 .calendar-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    margin-bottom: 0.3rem;
+    min-height: 1.5rem;
 }
 
 .calendar-nav-btn {
@@ -390,40 +401,41 @@ onUnmounted(() => {
 .calendar-title {
     font-weight: 600;
     color: #374151;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.1;
 }
 
 .calendar-weekdays {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 0.25rem;
-    margin-bottom: 0.5rem;
+    gap: 0.1rem;
+    margin-bottom: 0.1rem;
 }
 
 .weekday {
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: #6b7280;
-    padding: 0.5rem 0;
+    padding: 0.15rem 0;
 }
 
 .calendar-days {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 0.25rem;
+    gap: 0.05rem;
 }
 
 .calendar-day {
     background: none;
     border: none;
-    padding: 0.5rem;
+    padding: 0.15rem;
     border-radius: 0.25rem;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: #374151;
     transition: all 0.2s;
-    min-height: 2rem;
+    min-height: 1.1rem;
     display: flex;
     align-items: center;
     justify-content: center;

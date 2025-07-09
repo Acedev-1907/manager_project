@@ -25,7 +25,13 @@ export function useCreateOrUpdateProject() {
         ? await updateProject()
         : await createProject();
       loading.value = false;
-      projectStore.projectInput = {} as ProjectInputType;
+      projectStore.projectInput = {
+        id: 0,
+        name: "",
+        startDate: "",
+        endDate: "",
+        members: [],
+      };
 
       showSuccess(data.message);
       return { success: true, data };

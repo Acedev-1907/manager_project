@@ -3,7 +3,6 @@ import { isAuthError, handleAuthError } from "./authInterceptor";
 
 // Error handling utilities
 export function showErrorResponse(err: unknown) {
-  // Kiểm tra lỗi authentication trước
   if (isAuthError(err)) {
     handleAuthError();
     return;
@@ -13,8 +12,12 @@ export function showErrorResponse(err: unknown) {
     for (const message of err as string[]) {
       showError(message);
     }
+  } else if (typeof err === "string") {
+    showError(err);
+  } else if (typeof err === "object" && err && "message" in err) {
+    showError((err as any).message);
   } else {
-    showError((err as Error).message);
+    showError("Đã xảy ra lỗi!");
   }
 }
 
