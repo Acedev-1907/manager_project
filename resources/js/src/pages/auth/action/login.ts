@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
 import { showError, showSuccess } from "../../../helper/alert";
 import { showErrorResponse } from "../../../helper/utils";
+import router from "../../../router";
 
 export type LoginUserType = {
   email: string;
@@ -39,9 +40,9 @@ export function useLoginUser() {
       };
       if (data && data.token && data.user) {
         localStorage.setItem("userData", JSON.stringify(data));
-        window.location.href = "/app/admin";
+        router.push("/dashboard");
       } else {
-        showError("Đăng nhập thất bại!");
+        showError("Login failed!");
       }
     } catch (error) {
       console.error("login error:", error);

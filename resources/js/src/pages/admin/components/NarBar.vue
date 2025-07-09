@@ -7,7 +7,7 @@ import { eventBus } from '../../../helper/eventBus';
 const navigation = ref([
     {
         name: "Dashboard",
-        link: "/admin",
+        link: "/dashboard",
         icon: "bi bi-speedometer2",
     },
     {
