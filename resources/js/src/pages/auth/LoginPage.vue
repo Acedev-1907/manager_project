@@ -48,11 +48,6 @@ async function submitLogin() {
                 <div class="form-group mt-3 text-center">
                     <RouterLink to="/register" class="login-link">Don't have an account? Register</RouterLink>
                 </div>
-                <div class="form-group mt-2 text-center">
-                    <small class="text-muted">
-                        Demo: admin.yi@gmail.com / Admin@123
-                    </small>
-                </div>
             </form>
         </div>
     </div>

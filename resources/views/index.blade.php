@@ -9,7 +9,7 @@
     <script src="https://kit.fontawesome.com/d615c16483.js" crossorigin="anonymous"></script>
     <title>App Task</title>
 </head>
-<script>
+{{-- <script>
     const randomizeColour = () => {
         const colours = ["#22d3ee", "#a78bfa", "#f9a8d4"];
         const random = Math.floor(Math.random() * colours.length)
@@ -153,7 +153,7 @@
             }
         }
     }
-</style>
+</style> --}}
 
 <body>
     <div id="app"></div>

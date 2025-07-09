@@ -65,7 +65,7 @@ async function handlePinProject(projectId: number) {
     isLoading.value = true;
     await pinnendProject(projectId);
     isLoading.value = false;
-    router.push('/admin');
+    router.push('/dashboard');
 }
 
 function openCreateProject() {
