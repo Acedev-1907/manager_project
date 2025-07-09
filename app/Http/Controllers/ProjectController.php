@@ -49,7 +49,7 @@ class ProjectController extends Controller
     public function update(UpdateProjectRequest $request)
     {
         $user = $request->user();
-        $projectId = $request->input('id'); // hoặc $request->route('id') nếu truyền qua route
+        $projectId = $request->input('id');
         $project = Project::find($projectId);
 
         if (!$project) {

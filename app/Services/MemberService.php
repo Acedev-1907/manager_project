@@ -26,7 +26,7 @@ class MemberService
         if ($this->memberRepo->exists($user->id, $memberId)) {
             return ['error' => 'Already exists in your contact list'];
         }
-        $this->memberRepo->create($user->id, $memberId);
+        $this->memberRepo->createMember($user->id, $memberId);
         return ['message' => 'Added to contact list'];
     }
 

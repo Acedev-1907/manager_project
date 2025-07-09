@@ -41,30 +41,55 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label"><i class="fas fa-users"></i> Invite Members</label>
+                            <!-- Selected Members UI -->
+                            <div v-if="selectedMembers.length > 0" class="selected-members mb-2">
+                                <div class="selected-members-title">
+                                    <i class="bi bi-people-fill"></i> Selected Members ({{ selectedMembers.length }})
+                                </div>
+                                <div class="selected-members-list">
+                                    <span v-for="id in selectedMembers" :key="id" class="selected-member-tag">
+                                        <span class="avatar-tag">
+                                            {{ getMemberById(id)?.name?.charAt(0).toUpperCase() || '?' }}
+                                        </span>
+                                        {{ getMemberById(id)?.name || 'Unknown' }}
+                                        <button type="button" class="remove-tag-btn" @click="toggleMember(id)">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- Search box -->
                             <input v-model="searchQuery" type="text" class="form-control mb-2"
                                 placeholder="Search members by name or email..." />
+                            <!-- Available Members UI -->
                             <div class="members-list">
                                 <template v-if="filteredMembers.length > 0">
                                     <div v-for="(memberObj, idx) in filteredMembers" :key="memberObj.member.id"
                                         class="member-item">
                                         <div class="member-info">
                                             <div class="member-avatar-small">
-                                                <span>{{ memberObj.member.name ?
-                                                    memberObj.member.name.charAt(0).toUpperCase() : '?' }}</span>
+                                                <span>{{ memberObj.member.name ? memberObj.member.name.charAt(0).toUpperCase() : '?' }}</span>
                                             </div>
                                             <div class="member-details">
                                                 <span class="member-name">{{ memberObj.member.name }}</span>
-                                                <span class="member-id">{{ memberObj.member.email }}</span>
+                                                <span class="member-id">#{{ memberObj.member.id }}</span>
                                             </div>
                                         </div>
-                                        <button @click="toggleMember(memberObj.member.id)" type="button"
+                                        <button
+                                            v-if="selectedMembers.includes(memberObj.member.id)"
+                                            type="button"
+                                            class="add-member-btn selected"
+                                            disabled
+                                        >
+                                            <i class="fas fa-check"></i> Selected
+                                        </button>
+                                        <button
+                                            v-else
+                                            @click="toggleMember(memberObj.member.id)"
+                                            type="button"
                                             class="add-member-btn"
-                                            :class="{ selected: selectedMembers.includes(memberObj.member.id) }">
-                                            <i v-if="!selectedMembers.includes(memberObj.member.id)"
-                                                class="fas fa-plus"></i>
-                                            <i v-else class="fas fa-check"></i>
-                                            <span v-if="!selectedMembers.includes(memberObj.member.id)">Add</span>
-                                            <span v-else>Selected</span>
+                                        >
+                                            <i class="fas fa-plus"></i> Add
                                         </button>
                                     </div>
                                 </template>
@@ -130,6 +155,10 @@ const filteredMembers = computed(() => {
             m.member.email.toLowerCase().includes(keyword)
         );
 });
+
+function getMemberById(id: number) {
+    return (memberData.value?.data?.data || []).find(m => m.member.id === id)?.member;
+}
 </script>
 
 <style scoped>
@@ -309,5 +338,60 @@ const filteredMembers = computed(() => {
 
 .add-member-btn.selected .fa-check {
     color: #22c55e;
+}
+
+.selected-members {
+    margin-bottom: 0.5rem;
+}
+.selected-members-title {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    color: #2563eb;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.selected-members-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.selected-member-tag {
+    display: flex;
+    align-items: center;
+    background: #2563eb;
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem 0.25rem 0.5rem;
+    font-size: 0.95rem;
+    gap: 0.5rem;
+    box-shadow: 0 2px 6px rgba(34, 34, 59, 0.08);
+}
+.avatar-tag {
+    background: #fff;
+    color: #2563eb;
+    border-radius: 50%;
+    width: 1.7em;
+    height: 1.7em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 0.4em;
+    font-size: 1em;
+}
+.remove-tag-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    margin-left: 0.2em;
+    font-size: 1.1em;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
+.remove-tag-btn:hover {
+    color: #ff4d4f;
 }
 </style>
