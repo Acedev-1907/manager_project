@@ -20,7 +20,7 @@ class MemberSeeder extends Seeder
         DB::table('members')->truncate();
         DB::table('users')->truncate();
 
-        // Tạo 5 user mẫu
+        // Tạo 8 user mẫu
         $user1 = User::create([
             'name' => 'Test User 1',
             'email' => 'test1@example.com',
@@ -51,8 +51,26 @@ class MemberSeeder extends Seeder
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
+        $user6 = User::create([
+            'name' => 'Test User 6',
+            'email' => 'test6@example.com',
+            'password' => bcrypt('password'),
+            'isValidEmail' => 1,
+        ]);
+        $user7 = User::create([
+            'name' => 'Test User 7',
+            'email' => 'test7@example.com',
+            'password' => bcrypt('password'),
+            'isValidEmail' => 1,
+        ]);
+        $user8 = User::create([
+            'name' => 'Test User 8',
+            'email' => 'test8@example.com',
+            'password' => bcrypt('password'),
+            'isValidEmail' => 1,
+        ]);
 
-        $users = [$user1, $user2, $user3, $user4, $user5];
+        $users = [$user1, $user2, $user3, $user4, $user5, $user6, $user7, $user8];
         // Mỗi user add 4 user còn lại vào danh bạ
         foreach ($users as $u) {
             foreach ($users as $other) {

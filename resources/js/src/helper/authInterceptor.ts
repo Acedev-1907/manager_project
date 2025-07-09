@@ -23,8 +23,10 @@ export function handleAuthError() {
 export function isAuthError(error: any): boolean {
   // Kiểm tra các trường hợp lỗi authentication
   if (error?.status === 401) return true;
+  if (error?.status === 405) return true; // Thêm lỗi 405
   if (error?.message === "Not authenticated") return true;
   if (error?.response?.status === 401) return true;
+  if (error?.response?.status === 405) return true; // Thêm lỗi 405
   if (error?.response?.data?.message === "Not authenticated") return true;
 
   // Thêm kiểm tra cho network errors và timeout

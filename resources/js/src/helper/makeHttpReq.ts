@@ -72,13 +72,32 @@ export function makeHttpReq<TInput, TResponse>(
       const response = await fetch(url, fetchOptions);
       clearTimeout(timeoutId);
 
-      const data = await response.json();
+      // Parse response
+      let data;
+      try {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          data = await response.json();
+        } else {
+          data = await response.text();
+          // Nếu là HTML, xử lý như lỗi xác thực
+          handleAuthError();
+          if (showGlobalLoading) hideLoading();
+          return reject(new Error("Not authenticated"));
+        }
+      } catch (e) {
+        // Nếu parse lỗi, cũng xử lý như lỗi xác thực
+        handleAuthError();
+        if (showGlobalLoading) hideLoading();
+        return reject(new Error("Not authenticated"));
+      }
 
       if (!response.ok) {
         if (
           isAuthError({
             status: response.status,
             message: data?.message,
+            response: { status: response.status, data },
           })
         ) {
           handleAuthError();
