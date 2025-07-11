@@ -70,7 +70,6 @@ onUnmounted(() => {
     min-width: 0;
     position: relative;
     padding-top: 10px;
-    /* Đảm bảo không bị navbar che */
     padding-left: 0;
     padding-right: 0;
 }

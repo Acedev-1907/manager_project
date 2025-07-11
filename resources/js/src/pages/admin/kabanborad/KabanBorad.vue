@@ -401,10 +401,11 @@ async function handleRefreshKabanBoard() {
 /* Content Section */
 .kanban-content {
     flex: 1;
-    padding-right: 8px;
+    padding: 28px;
     min-height: 0;
     max-width: 100%;
     box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 /* Progress Section */
