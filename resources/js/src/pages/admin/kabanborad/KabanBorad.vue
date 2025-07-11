@@ -237,7 +237,7 @@ async function handleRefreshKabanBoard() {
     box-sizing: border-box;
     position: sticky;
     top: 71px;
-    z-index: 51;
+    z-index: 20;
 }
 
 .header-content {
