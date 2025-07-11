@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { onMounted, ref } from 'vue';
 import { ProjectType, useGetProject } from './actions/GetProject';
-import ProjectTable from './components/ProjectTable.vue';
+import ProjectCard from './components/ProjectCard.vue';
 import { useRouter } from 'vue-router';
 import { projectStore } from './store/projectStore';
 import { ProjectInputType, useCreateOrUpdateProject } from './actions/createtProject';
@@ -13,6 +13,7 @@ import ProjectModal from './components/ProjectModal.vue';
 import FabButton from '../../../components/FabButton.vue';
 import { deleteProject } from './actions/deleteProject';
 import { showConfirm } from '../../../helper/alert';
+import SearchInput from '../../../components/SearchInput.vue';
 
 const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
@@ -24,6 +25,12 @@ const showProjectModal = ref(false);
 const isEdit = ref(false);
 const loading = ref(false);
 const { createOrUpdate } = useCreateOrUpdateProject();
+const query = ref("");
+
+// Get current user ID from localStorage
+const userDataRaw = localStorage.getItem('userData');
+const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
+const currentUserId = userData.id || (userData.user && userData.user.id) || null;
 
 // Add a function to setup Echo listener
 function setupEchoListener() {
@@ -118,6 +125,11 @@ async function handleSubmitProject(data: ProjectInputType) {
     setupEchoListener();
 }
 
+const handleSearch = async (searchQuery: string) => {
+    query.value = searchQuery;
+    await fetchProjects(1, searchQuery, false);
+};
+
 onMounted(async () => {
     await fetchProjects();
     projectStore.edit = false;
@@ -136,13 +148,25 @@ onMounted(async () => {
             </button>
         </template>
         <LoadingPage v-if="isLoading" />
-        <ProjectTable @getProject="fetchProjects" :loading="tableLoading" @editProject="openEditProject"
-            :projects="projectData" @pinnedProject="handlePinProject" @deleteProject="handleDeleteProject">
-            <template #pagination>
-                <CustomPagination v-if="projectData?.data" :data="projectData.data" :loading="tableLoading"
-                    @pagination-change-page="fetchProjects" />
+        <!-- Project Search Bar -->
+        <div class="mb-3" style="max-width: 500px; margin: 0 auto;">
+            <SearchInput v-model="query" placeholder="Search project..." :loading="tableLoading"
+                @search="handleSearch" />
+        </div>
+        <!-- Project Card Grid -->
+        <div v-if="!isLoading" class="project-card-grid">
+            <template v-if="projectData?.data?.data && projectData.data.data.length > 0">
+                <ProjectCard v-for="project in projectData.data.data" :key="project.id" :project="project"
+                    :currentUserId="currentUserId" @editProject="openEditProject" @deleteProject="handleDeleteProject"
+                    @pinnedProject="handlePinProject"
+                    @viewProjectDetail="(id) => $router.push('/kaban?query=' + project.slug)" />
             </template>
-        </ProjectTable>
+            <div v-else class="no-data-center">No data</div>
+        </div>
+        <div class="p-3 d-flex justify-content-center">
+            <CustomPagination v-if="projectData?.data" :data="projectData.data" :loading="tableLoading"
+                @pagination-change-page="fetchProjects" />
+        </div>
         <ProjectModal v-if="showProjectModal" :isEdit="isEdit" :projectInput="projectStore.projectInput"
             :loading="loading" @close="showProjectModal = false" @submit="handleSubmitProject" />
         <template #fab>
@@ -203,5 +227,42 @@ onMounted(async () => {
     .fab-add-project {
         display: none !important;
     }
+}
+
+.project-card-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.2rem;
+    margin: 0 auto 1.5rem auto;
+    max-width: 1100px;
+    padding: 0 0.5rem;
+    min-height: 220px;
+    /* Ensure enough height for centering 'No data' */
+}
+
+@media (min-width: 600px) {
+    .project-card-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 992px) {
+    .project-card-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.no-data-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+    width: 100%;
+    font-size: 1.15rem;
+    color: #a0aec0;
+    font-weight: 500;
+    grid-column: 1 / -1;
+    /* Span all columns */
+    text-align: center;
 }
 </style>
