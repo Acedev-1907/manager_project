@@ -98,6 +98,31 @@ class ProjectService
         });
     }
 
+    /**
+     * Delete a project and all related data if the user is the creator.
+     *
+     * @param int $projectId
+     * @param \App\Models\User $user
+     * @return array
+     */
+    public function deleteProject($projectId, $user)
+    {
+        $project = $this->repo->find($projectId);
+        if (!$project) {
+            return ['errors' => ['Project does not exist'], 'status' => 404];
+        }
+        if ($project->creator_id !== $user->id) {
+            return ['errors' => ['You cannot delete this project'], 'status' => 403];
+        }
+        // Broadcast UserRemovedFromProject for all members except creator
+        $memberIds = $project->users->pluck('id')->filter(fn($id) => $id !== $user->id);
+        foreach ($memberIds as $memberId) {
+            broadcast(new \App\Events\UserRemovedFromProject($project, $memberId));
+        }
+        $project->delete();
+        return ['message' => 'Project and related data deleted successfully', 'status' => 200];
+    }
+
     public function getProjectBySlug($slug)
     {
         return $this->repo->getBySlugWithRelations($slug);
@@ -106,5 +131,10 @@ class ProjectService
     public function getProjectsForUser($userId, $query = null)
     {
         return $this->repo->getProjectsForUser($userId, $query);
+    }
+
+    public function countProjectsForUser($userId)
+    {
+        return $this->repo->countProjectsForUser($userId);
     }
 }

@@ -19,6 +19,14 @@ class Project extends Model
 
   protected $guarded = [];
 
+  protected static function booted()
+  {
+    static::deleting(function ($project) {
+      // Detach all users from the pivot table when deleting a project
+      $project->users()->detach();
+    });
+  }
+
   public static function createSlug($name)
   {
     $code = Str::random(10) . time();

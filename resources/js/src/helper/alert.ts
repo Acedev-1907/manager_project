@@ -24,10 +24,25 @@ export function showWarning(message: string, title = "Warning") {
   });
 }
 
-export function showInfo(message: string, title = "Thông tin") {
+export function showInfo(message: string, title = "Info") {
   Swal.fire({
     icon: "info",
     title,
     text: message,
   });
+}
+
+export function showConfirm(
+  message: string,
+  title = "Confirmation"
+): Promise<boolean> {
+  return Swal.fire({
+    title,
+    text: message,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Delete",
+    cancelButtonText: "Cancel",
+    reverseButtons: true,
+  }).then((result) => !!result.isConfirmed);
 }

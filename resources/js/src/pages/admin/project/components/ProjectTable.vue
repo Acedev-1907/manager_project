@@ -15,8 +15,7 @@ const emit = defineEmits<{
     (e: 'editProject', project: ProjectType): void
     (e: 'viewProjectDetail', projectId: number): void
     (e: 'getProject', page: number, query: string, showGlobalLoading: boolean): Promise<void>
-
-
+    (e: 'deleteProject', projectId: number): void
 }>()
 
 const query = ref("");
@@ -90,6 +89,11 @@ const handleSearch = async (searchQuery: string) => {
                                     :to="'/kaban?query=' + project.slug" title="View">
                                     <i class="bi bi-eye"></i>
                                 </RouterLink>
+                                <button v-if="currentUserId !== null && project.creator?.id === currentUserId"
+                                    @click="emit('deleteProject', project.id)" type="button"
+                                    class="btn btn-outline-danger action-btn" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -125,6 +129,11 @@ const handleSearch = async (searchQuery: string) => {
                     <RouterLink class="btn btn-outline-success action-btn-mobile" :to="'/kaban?query=' + project.slug">
                         <i class="bi bi-eye"></i>
                     </RouterLink>
+                    <button v-if="currentUserId !== null && project.creator?.id === currentUserId"
+                        @click="emit('deleteProject', project.id)" type="button"
+                        class="btn btn-outline-danger action-btn-mobile">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             </div>
         </div>

@@ -13,10 +13,13 @@ return new class extends Migration
     {
         Schema::create('task_members', function (Blueprint $table) {
             $table->id();
-            $table->integer('projectId');
-            $table->integer('taskId');
+            $table->unsignedBigInteger('projectId');
+            $table->unsignedBigInteger('taskId');
             $table->integer('memberId');
             $table->timestamps();
+
+            $table->foreign('projectId')->references('id')->on('projects')->onDelete('cascade');
+            $table->foreign('taskId')->references('id')->on('tasks')->onDelete('cascade');
         });
     }
 

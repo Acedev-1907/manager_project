@@ -10,6 +10,9 @@ import LoadingPage from '../../../components/LoadingPage.vue';
 import CustomPagination from '../../../components/CustomPagination.vue';
 import MainCardLayout from '../../../components/MainCardLayout.vue';
 import ProjectModal from './components/ProjectModal.vue';
+import FabButton from '../../../components/FabButton.vue';
+import { deleteProject } from './actions/deleteProject';
+import { showConfirm } from '../../../helper/alert';
 
 const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
@@ -68,6 +71,19 @@ async function handlePinProject(projectId: number) {
     router.push('/dashboard');
 }
 
+async function handleDeleteProject(projectId: number) {
+    const confirmed = await showConfirm('Are you sure you want to delete this project?');
+    if (!confirmed) return;
+    isLoading.value = true;
+    try {
+        await deleteProject(projectId);
+        await fetchProjects();
+    } catch (e: any) {
+        alert(e?.message || 'Delete project failed!');
+    }
+    isLoading.value = false;
+}
+
 function openCreateProject() {
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
     isEdit.value = false;
@@ -121,7 +137,7 @@ onMounted(async () => {
         </template>
         <LoadingPage v-if="isLoading" />
         <ProjectTable @getProject="fetchProjects" :loading="tableLoading" @editProject="openEditProject"
-            :projects="projectData" @pinnedProject="handlePinProject">
+            :projects="projectData" @pinnedProject="handlePinProject" @deleteProject="handleDeleteProject">
             <template #pagination>
                 <CustomPagination v-if="projectData?.data" :data="projectData.data" :loading="tableLoading"
                     @pagination-change-page="fetchProjects" />
@@ -130,12 +146,9 @@ onMounted(async () => {
         <ProjectModal v-if="showProjectModal" :isEdit="isEdit" :projectInput="projectStore.projectInput"
             :loading="loading" @close="showProjectModal = false" @submit="handleSubmitProject" />
         <template #fab>
-            <button class="fab-add-project d-md-none" @click="showCreateModal = true">
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="13" y="6" width="2" height="16" rx="1" fill="white" />
-                    <rect x="6" y="13" width="16" height="2" rx="1" fill="white" />
-                </svg>
-            </button>
+            <FabButton @click="openCreateProject">
+                <i class="bi bi-kanban-fill" style="font-size: 1.8rem; color: white;"></i>
+            </FabButton>
         </template>
     </MainCardLayout>
 </template>

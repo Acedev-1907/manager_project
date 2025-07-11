@@ -99,9 +99,10 @@ class ProjectController extends Controller
         });
     }
 
-    public function countProject()
+    public function countProject(Request $request)
     {
-        $count = Project::count();
+        $user = $request->user();
+        $count = $this->service->countProjectsForUser($user->id);
         return response(['count' => $count]);
     }
 
@@ -152,5 +153,22 @@ class ProjectController extends Controller
     {
         $project = Project::with('users')->findOrFail($id);
         return response(['data' => $project->users], 200);
+    }
+
+    /**
+     * Delete a project if the user is the creator. Also deletes all related tasks, members, and related data.
+     *
+     * @param int $id
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy($id, Request $request)
+    {
+        $user = $request->user();
+        $result = $this->service->deleteProject($id, $user);
+        if (isset($result['errors'])) {
+            return response($result['errors'], $result['status']);
+        }
+        return response(['message' => $result['message']], $result['status']);
     }
 }

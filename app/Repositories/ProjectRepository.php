@@ -44,4 +44,17 @@ class ProjectRepository extends BaseRepository
         }
         return $projects->orderBy('created_at', 'desc')->paginate(6);
     }
+
+    public function countProjectsForUser($userId)
+    {
+        // Get project IDs where user is creator
+        $createdProjectIds = $this->model->where('creator_id', $userId)->pluck('id')->toArray();
+        // Get project IDs where user is a member
+        $memberProjectIds = $this->model->whereHas('users', function ($q) use ($userId) {
+            $q->where('users.id', $userId);
+        })->pluck('id')->toArray();
+        // Merge and get unique project IDs
+        $allProjectIds = array_unique(array_merge($createdProjectIds, $memberProjectIds));
+        return count($allProjectIds);
+    }
 }

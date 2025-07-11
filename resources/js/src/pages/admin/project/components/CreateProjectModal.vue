@@ -64,22 +64,21 @@ async function submitProject() {
                 </div>
                 <form @submit.prevent="submitProject">
                     <div class="modal-body">
-                        <Error label="Project Name" :errors="v$.name.$errors" />
                         <BaseInput v-model="projectStore.projectInput.name" placeholder="Enter project name" />
+                        <Error label="Project Name" :errors="v$.name.$errors" />
                         <div class="row mt-3">
                             <div class="col-6">
+                                <DateInput v-model="projectStore.projectInput.startDate" placeholder="DD/MM/YYYY" />
                                 <Error label="Start Date" :errors="v$.startDate.$errors" />
-                                <DateInput v-model="projectStore.projectInput.startDate || ''"
-                                    placeholder="DD/MM/YYYY" />
                                 <small class="text-muted mt-1 d-block">
                                     <i class="bi bi-info-circle"></i>
                                     Project start date (can be any date)
                                 </small>
                             </div>
                             <div class="col-6">
-                                <Error label="End Date" :errors="v$.endDate.$errors" />
-                                <DateInput v-model="projectStore.projectInput.endDate || ''" placeholder="DD/MM/YYYY"
+                                <DateInput v-model="projectStore.projectInput.endDate" placeholder="DD/MM/YYYY"
                                     :min="projectStore.projectInput.startDate" />
+                                <Error label="End Date" :errors="v$.endDate.$errors" />
                                 <small class="text-muted mt-1 d-block">
                                     <i class="bi bi-info-circle"></i>
                                     Project end date (must be after start date)
@@ -167,5 +166,46 @@ async function submitProject() {
     gap: 0.5rem;
     padding: 1rem 1.5rem 1.2rem 1.5rem;
     border-top: 1px solid #eee;
+}
+</style>
+
+<style scoped>
+@media (max-width: 600px) {
+    .modal-dialog {
+        max-width: 98vw;
+        width: 98vw;
+        margin: 0;
+    }
+
+    .modal-content {
+        border-radius: 0.7rem;
+        padding: 0;
+    }
+
+    .modal-header,
+    .modal-footer {
+        padding: 0.7rem 0.7rem 0.7rem 0.7rem;
+    }
+
+    .modal-body {
+        padding: 1rem 0.7rem;
+    }
+
+    .form-label,
+    .modal-title {
+        font-size: 1rem;
+    }
+
+    .form-select,
+    input,
+    .BaseInput,
+    .DateInput {
+        font-size: 1rem !important;
+        min-height: 2.4rem;
+    }
+
+    small.text-muted {
+        font-size: 0.85rem;
+    }
 }
 </style>

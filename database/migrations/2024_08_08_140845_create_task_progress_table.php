@@ -13,10 +13,12 @@ return new class extends Migration
     {
         Schema::create('task_progress', function (Blueprint $table) {
             $table->id();
-            $table->integer('projectId');
+            $table->unsignedBigInteger('projectId');
             $table->integer('pinned_on_dashboard');
             $table->string('progress');
             $table->timestamps();
+
+            $table->foreign('projectId')->references('id')->on('projects')->onDelete('cascade');
         });
     }
 

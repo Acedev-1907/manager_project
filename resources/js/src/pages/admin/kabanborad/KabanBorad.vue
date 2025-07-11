@@ -184,15 +184,15 @@ async function handleRefreshKabanBoard() {
 <style scoped>
 /* Main Container */
 .kanban-container {
-    height: 100vh;
     background: white;
     padding: 24px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
     max-width: 100vw;
     box-sizing: border-box;
     position: relative;
+    min-height: 100vh;
+    /* Đảm bảo container chiếm đủ chiều cao */
 }
 
 /* Loading Page Overlay */
@@ -235,6 +235,9 @@ async function handleRefreshKabanBoard() {
     flex-shrink: 0;
     max-width: 100%;
     box-sizing: border-box;
+    position: sticky;
+    top: 71px;
+    z-index: 51;
 }
 
 .header-content {
@@ -398,8 +401,6 @@ async function handleRefreshKabanBoard() {
 /* Content Section */
 .kanban-content {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
     padding-right: 8px;
     min-height: 0;
     max-width: 100%;
@@ -611,7 +612,6 @@ async function handleRefreshKabanBoard() {
 @media (max-width: 480px) {
     .kanban-container {
         padding: 8px;
-        overflow-x: hidden;
     }
 
     .kanban-header {

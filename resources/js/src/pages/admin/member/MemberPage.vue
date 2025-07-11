@@ -10,6 +10,7 @@ import CustomPagination from '../../../components/CustomPagination.vue';
 import MainCardLayout from '../../../components/MainCardLayout.vue';
 import AddMemberModal from './components/AddMemberModal.vue';
 import { addMemberByNameOrEmail } from './actions/createMember';
+import FabButton from '../../../components/FabButton.vue';
 
 const { getMembers, memberData, loading: tableLoading } = useGetMembers();
 const isLoading = ref(true);
@@ -69,12 +70,9 @@ onMounted(async () => {
             </template>
         </MemberTable>
         <template #fab>
-            <RouterLink to="/create-members" class="fab-add-project d-md-none">
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="13" y="6" width="2" height="16" rx="1" fill="white" />
-                    <rect x="6" y="13" width="16" height="2" rx="1" fill="white" />
-                </svg>
-            </RouterLink>
+            <FabButton @click="showAddModal = true">
+                <i class="bi bi-person-plus" style="font-size: 1.8rem; color: white;"></i>
+            </FabButton>
         </template>
     </MainCardLayout>
 </template>

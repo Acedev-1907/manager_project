@@ -24,19 +24,34 @@
                 </div>
                 <form @submit.prevent="submitProject">
                     <div class="modal-body">
-                        <BaseInput v-model="projectInput.name" placeholder="Project Name" prefix-icon="fas fa-folder" class="mb-3" />
+                        <div class="mb-3">
+                            <BaseInput v-model="projectInput.name" placeholder="Project Name"
+                                prefix-icon="fas fa-folder" />
+                            <div v-if="errors.name" class="text-danger error-message">{{ errors.name }}</div>
+                        </div>
                         <div class="form-group row mb-3" style="gap: 0.5rem;">
-                            <DateInput v-model="projectInput.startDate" placeholder="Start Date" prefix-icon="fas fa-calendar-alt" class="col" />
-                            <DateInput v-model="projectInput.endDate" placeholder="End Date" prefix-icon="fas fa-calendar-check" class="col" :min="projectInput.startDate" />
+                            <div class="col">
+                                <DateInput v-model="projectInput.startDate" placeholder="Start Date"
+                                    prefix-icon="fas fa-calendar-alt" />
+                                <div v-if="errors.startDate" class="text-danger error-message">{{ errors.startDate }}
+                                </div>
+                            </div>
+                            <div class="col">
+                                <DateInput v-model="projectInput.endDate" placeholder="End Date"
+                                    prefix-icon="fas fa-calendar-check" :min="projectInput.startDate" />
+                                <div v-if="errors.endDate" class="text-danger error-message">{{ errors.endDate }}</div>
+                            </div>
                         </div>
                         <div class="form-group mb-2">
                             <div class="selected-members-minimal" @click="showAvailable = !showAvailable">
                                 <i class="bi bi-people-fill"></i>
-                                <span v-for="(id, idx) in selectedMembers.slice(0,2)" :key="id" class="tag-minimal">
+                                <span v-for="(id, idx) in selectedMembers.slice(0, 2)" :key="id" class="tag-minimal">
                                     {{ getMemberById(id)?.name || 'Unknown' }}
-                                    <button type="button" class="remove-tag-btn-minimal" @click.stop="toggleMember(id)"><i class="bi bi-x"></i></button>
+                                    <button type="button" class="remove-tag-btn-minimal"
+                                        @click.stop="toggleMember(id)"><i class="bi bi-x"></i></button>
                                 </span>
-                                <span v-if="selectedMembers.length > 2" class="tag-minimal more" @click.stop="showAll = true">
+                                <span v-if="selectedMembers.length > 2" class="tag-minimal more"
+                                    @click.stop="showAll = true">
                                     +{{ selectedMembers.length - 2 }}
                                 </span>
                                 <span class="select-hint">Select Members</span>
@@ -45,12 +60,15 @@
                             <div v-if="showAll" class="popup-all-selected">
                                 <div class="popup-header">
                                     <span>Selected Members</span>
-                                    <button class="popup-close-btn" @click="showAll = false"><i class="bi bi-x-lg"></i></button>
+                                    <button class="popup-close-btn" @click="showAll = false"><i
+                                            class="bi bi-x-lg"></i></button>
                                 </div>
                                 <div class="popup-list">
                                     <div v-for="id in selectedMembers" :key="id" class="selected-member-row">
-                                        <span class="popup-avatar">{{ getMemberById(id)?.name?.charAt(0).toUpperCase() || '?' }}</span>
-                                        <span class="popup-name">{{ getMemberById(id)?.name || '(ID: ' + id + ')' }}</span>
+                                        <span class="popup-avatar">{{ getMemberById(id)?.name?.charAt(0).toUpperCase()
+                                            || '?' }}</span>
+                                        <span class="popup-name">{{ getMemberById(id)?.name || '(ID: ' + id + ')'
+                                            }}</span>
                                         <button class="popup-remove-btn" @click="toggleMember(id)">
                                             <i class="bi bi-x"></i>
                                         </button>
@@ -59,28 +77,25 @@
                             </div>
                             <!-- Available Members xổ xuống -->
                             <div v-if="showAvailable" class="members-list-minimal">
-                                <input v-model="searchQuery" type="text" class="form-control mb-2" placeholder="Search members..." />
+                                <input v-model="searchQuery" type="text" class="form-control mb-2"
+                                    placeholder="Search members..." />
                                 <div v-if="filteredMembers.length > 0" class="user-card-list">
-                                    <div v-for="(memberObj, idx) in filteredMembers" :key="memberObj.member.id" class="user-card">
+                                    <div v-for="(memberObj, idx) in filteredMembers" :key="memberObj.member.id"
+                                        class="user-card">
                                         <div class="user-avatar">
-                                            {{ memberObj.member.name ? memberObj.member.name.charAt(0).toUpperCase() : '?' }}
+                                            {{ memberObj.member.name ? memberObj.member.name.charAt(0).toUpperCase() :
+                                                '?' }}
                                         </div>
                                         <div class="user-info">
                                             <div class="user-name">{{ memberObj.member.name }}</div>
                                             <div class="user-email">{{ memberObj.member.email }}</div>
                                         </div>
-                                        <button
-                                            v-if="selectedMembers.includes(memberObj.member.id)"
-                                            class="user-select-btn selected"
-                                            disabled
-                                        >
+                                        <button v-if="selectedMembers.includes(memberObj.member.id)"
+                                            class="user-select-btn selected" disabled>
                                             <i class="fas fa-check"></i>
                                         </button>
-                                        <button
-                                            v-else
-                                            @click="toggleMember(memberObj.member.id)"
-                                            class="user-select-btn"
-                                        >
+                                        <button v-else @click="toggleMember(memberObj.member.id)"
+                                            class="user-select-btn">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
@@ -111,6 +126,8 @@ const currentUserId = ref<number | null>(null);
 const searchQuery = ref('');
 const showAvailable = ref(false);
 const showAll = ref(false);
+// Thêm biến errors để lưu lỗi các trường
+const errors = ref<{ name?: string; startDate?: string; endDate?: string }>({});
 
 onMounted(async () => {
     projectStore.edit = props.isEdit;
@@ -138,7 +155,23 @@ function toggleMember(id: number) {
     }
 }
 
+// Hàm validate các trường bắt buộc
+function validate() {
+    errors.value = {};
+    if (!props.projectInput.name || !props.projectInput.name.trim()) {
+        errors.value.name = 'Project name is required';
+    }
+    if (!props.projectInput.startDate) {
+        errors.value.startDate = 'Start date is required';
+    }
+    if (!props.projectInput.endDate) {
+        errors.value.endDate = 'End date is required';
+    }
+    return Object.keys(errors.value).length === 0;
+}
+
 function submitProject() {
+    if (!validate()) return;
     emit('submit', { ...props.projectInput, members: selectedMembers.value });
 }
 
@@ -346,6 +379,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
 .selected-members {
     margin-bottom: 0.5rem;
 }
+
 .selected-members-title {
     font-weight: 500;
     margin-bottom: 0.25rem;
@@ -354,11 +388,13 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     align-items: center;
     gap: 0.5rem;
 }
+
 .selected-members-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
 }
+
 .selected-member-tag {
     display: flex;
     align-items: center;
@@ -370,6 +406,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     gap: 0.5rem;
     box-shadow: 0 2px 6px rgba(34, 34, 59, 0.08);
 }
+
 .avatar-tag {
     background: #fff;
     color: #2563eb;
@@ -383,6 +420,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     margin-right: 0.4em;
     font-size: 1em;
 }
+
 .remove-tag-btn {
     background: none;
     border: none;
@@ -394,9 +432,11 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     display: flex;
     align-items: center;
 }
+
 .remove-tag-btn:hover {
     color: #ff4d4f;
 }
+
 .selected-members-minimal {
     display: flex;
     align-items: center;
@@ -409,11 +449,13 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     margin-bottom: 0.5rem;
     flex-wrap: wrap;
 }
+
 .selected-members-minimal .select-hint {
     color: #2563eb;
     font-size: 0.95em;
     margin-left: 0.5em;
 }
+
 .tag-minimal {
     display: inline-flex;
     align-items: center;
@@ -428,10 +470,12 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     height: 1.7rem;
     min-width: 0;
 }
+
 .tag-minimal.more {
     background: #60a5fa;
     cursor: pointer;
 }
+
 .remove-tag-btn-minimal {
     background: none;
     border: none;
@@ -446,14 +490,16 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     width: 1.2em;
     padding: 0;
 }
+
 .remove-tag-btn-minimal:hover {
     color: #ff4d4f;
 }
+
 .popup-all-selected {
     position: absolute;
     background: #fff;
     border-radius: 18px;
-    box-shadow: 0 6px 32px rgba(34,34,59,0.18);
+    box-shadow: 0 6px 32px rgba(34, 34, 59, 0.18);
     padding: 1.2rem 1.2rem 1rem 1.2rem;
     z-index: 2000;
     min-width: 260px;
@@ -463,10 +509,19 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     overflow-y: auto;
     animation: fadeIn 0.18s;
 }
+
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px);}
-  to { opacity: 1; transform: translateY(0);}
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
+
 .popup-header {
     font-weight: 600;
     font-size: 1.08rem;
@@ -475,6 +530,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     justify-content: space-between;
     align-items: center;
 }
+
 .popup-close-btn {
     background: none;
     border: none;
@@ -485,9 +541,11 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     padding: 0.2em 0.5em;
     transition: background 0.15s;
 }
+
 .popup-close-btn:hover {
     background: #f3f6fd;
 }
+
 .popup-list {
     max-height: 220px;
     overflow-y: auto;
@@ -495,6 +553,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     flex-direction: column;
     gap: 0.5rem;
 }
+
 .selected-member-row {
     display: flex;
     align-items: center;
@@ -509,9 +568,11 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     box-shadow: none;
     transition: background 0.15s;
 }
+
 .selected-member-row:hover {
     background: #1d4ed8;
 }
+
 .popup-avatar {
     background: #fff;
     color: #2563eb;
@@ -525,6 +586,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     font-size: 0.98em;
     margin-right: 0.2em;
 }
+
 .popup-name {
     flex: 1;
     font-weight: 400;
@@ -533,6 +595,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 .popup-remove-btn {
     background: none;
     border: none;
@@ -549,10 +612,12 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     justify-content: center;
     transition: background 0.15s, color 0.15s;
 }
+
 .popup-remove-btn:hover {
     background: #fff;
     color: #ff4d4f;
 }
+
 .tag-minimal-full {
     background: #2563eb;
     color: #fff;
@@ -564,15 +629,17 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     gap: 0.3rem;
     margin-bottom: 0.3rem;
 }
+
 .members-list-minimal {
     background: #f8fafc;
     border-radius: 8px;
     padding: 0.7rem 0.7rem 0.5rem 0.7rem;
     margin-top: 0.2rem;
-    box-shadow: 0 1px 4px rgba(34,34,59,0.06);
+    box-shadow: 0 1px 4px rgba(34, 34, 59, 0.06);
     position: relative;
     z-index: 100;
 }
+
 .member-item-minimal {
     display: flex;
     align-items: center;
@@ -581,9 +648,11 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     border-bottom: 1px solid #e5e7eb;
     font-size: 1rem;
 }
+
 .member-item-minimal:last-child {
     border-bottom: none;
 }
+
 .add-member-btn {
     background: none;
     border: none;
@@ -594,77 +663,101 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     display: flex;
     align-items: center;
 }
+
 .add-member-btn.selected {
     color: #22c55e;
     cursor: default;
 }
+
 .user-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: 320px;
-  overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow-y: auto;
 }
+
 .user-card {
-  display: flex;
-  align-items: center;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 1px 6px rgba(34,34,59,0.07);
-  padding: 0.6rem 1rem;
-  gap: 1rem;
-  transition: box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 6px rgba(34, 34, 59, 0.07);
+    padding: 0.6rem 1rem;
+    gap: 1rem;
+    transition: box-shadow 0.2s;
 }
+
 .user-card:hover {
-  box-shadow: 0 4px 16px rgba(34,34,59,0.13);
+    box-shadow: 0 4px 16px rgba(34, 34, 59, 0.13);
 }
+
 .user-avatar {
-  width: 2.2rem;
-  height: 2.2rem;
-  border-radius: 50%;
-  background: #2563eb;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 1.1rem;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
 }
+
 .user-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
+
 .user-name {
-  font-weight: 500;
-  font-size: 1rem;
+    font-weight: 500;
+    font-size: 1rem;
 }
+
 .user-email {
-  font-size: 0.92rem;
-  color: #64748b;
+    font-size: 0.92rem;
+    color: #64748b;
 }
+
 .user-select-btn {
-  background: #f3f6fd;
-  border: none;
-  border-radius: 8px;
-  color: #2563eb;
-  font-size: 1.2em;
-  width: 2.1rem;
-  height: 2.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+    background: #f3f6fd;
+    border: none;
+    border-radius: 8px;
+    color: #2563eb;
+    font-size: 1.2em;
+    width: 2.1rem;
+    height: 2.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
 }
+
 .user-select-btn.selected {
-  color: #22c55e;
-  background: #e0fbe0;
-  cursor: default;
+    color: #22c55e;
+    background: #e0fbe0;
+    cursor: default;
 }
+
 .user-select-btn:hover:not(.selected) {
-  background: #2563eb;
-  color: #fff;
+    background: #2563eb;
+    color: #fff;
+}
+
+.text-danger {
+    color: #e3342f;
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+.error-message {
+    font-size: 0.95em;
+    margin-top: 2px;
+    min-height: 18px;
+    line-height: 1.2;
 }
 </style>

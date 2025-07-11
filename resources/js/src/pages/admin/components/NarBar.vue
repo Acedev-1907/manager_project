@@ -21,6 +21,18 @@ const route = useRoute()
 function isActive(link: string) {
     return route.path.startsWith(link)
 }
+
+// Thêm biến để kiểm soát hover label
+const hoverNavIndex = ref<number | null>(null)
+function handleNavMouseEnter(idx: number) {
+    hoverNavIndex.value = idx
+}
+function handleNavMouseLeave() {
+    hoverNavIndex.value = null
+}
+function handleNavClick() {
+    hoverNavIndex.value = null
+}
 </script>
 <template>
     <nav class="top-navbar">
@@ -31,10 +43,15 @@ function isActive(link: string) {
         <button class="navbar-hamburger d-md-none" @click="toggleMenu">
             <span></span><span></span><span></span>
         </button>
-        <ul class="navbar-menu d-none d-md-flex">
-            <li v-for="nav in navigation" :key="nav.name">
-                <RouterLink :to="nav.link" class="navbar-link" :class="{ active: isActive(nav.link) }">
-                    <i :class="nav.icon"></i> <span>{{ nav.name }}</span>
+        <ul class="navbar-menu d-flex">
+            <li v-for="(nav, idx) in navigation" :key="nav.name" class="navbar-icon-item">
+                <RouterLink :to="nav.link" class="navbar-link" :class="{ active: isActive(nav.link) }"
+                    @mouseenter="handleNavMouseEnter(idx)" @mouseleave="handleNavMouseLeave" @click="handleNavClick">
+                    <div class="navbar-icon-stack">
+                        <i :class="nav.icon"></i>
+                        <span class="navbar-underline"></span>
+                    </div>
+                    <span class="navbar-label" v-if="hoverNavIndex === idx">{{ nav.name }}</span>
                 </RouterLink>
             </li>
         </ul>
@@ -76,7 +93,7 @@ function isActive(link: string) {
     width: 100%;
     position: sticky;
     top: 0;
-    z-index: 1200;
+    z-index: 50;
     background: #fff;
     box-shadow: 0 2px 12px rgba(36, 112, 220, 0.10), 0 1.5px 8px rgba(36, 112, 220, 0.07);
     display: flex;
@@ -114,31 +131,81 @@ function isActive(link: string) {
 .navbar-menu {
     display: flex;
     align-items: center;
-    gap: 1.2rem;
+    gap: 3.5rem;
     margin: 0;
     padding: 0;
     list-style: none;
+    justify-content: center;
 }
 
 .navbar-link {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 1.08rem;
+    font-size: 1.7rem;
     font-weight: 500;
-    color: #222;
+    color: #bdbdbd;
     background: none;
     border: none;
-    border-radius: 8px;
-    padding: 0.7rem 1.2rem;
+    border-radius: 12px;
+    padding: 0.5rem 0;
     text-decoration: none;
-    transition: background 0.18s, color 0.18s;
+    transition: color 0.18s;
+    min-width: 48px;
+    min-height: 48px;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    flex-direction: column;
+    /* Xóa nền xanh nhạt khi active/hover */
+    box-shadow: none;
 }
 
 .navbar-link.active,
 .navbar-link.router-link-active {
-    background: #2470dc;
-    color: #fff;
+    color: #2563eb;
+    background: none;
+}
+
+.navbar-link:hover,
+.navbar-link:focus {
+    color: #2563eb;
+    background: none;
+}
+
+.navbar-link .navbar-icon-stack i {
+    transition: color 0.18s;
+}
+
+.navbar-link.active .navbar-icon-stack i,
+.navbar-link:hover .navbar-icon-stack i {
+    color: #2563eb;
+}
+
+.navbar-label {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 8px);
+    transform: translateX(-50%);
+    background: #fff;
+    color: #222;
+    padding: 0.18rem 0.8rem;
+    border-radius: 1.2rem;
+    font-size: 0.98rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(36, 112, 220, 0.08);
+    transition: opacity 0.18s, top 0.18s;
+    z-index: 9999;
+    display: block;
+}
+
+.navbar-link:hover .navbar-label,
+.navbar-link:focus .navbar-label {
+    opacity: 1;
+    top: calc(100% + 16px);
 }
 
 .navbar-link:hover {
@@ -334,6 +401,37 @@ function isActive(link: string) {
     opacity: 0;
 }
 
+.navbar-underline {
+    display: block;
+    width: 22px;
+    height: 3px;
+    background: transparent;
+    border-radius: 2px;
+    margin: 0 auto;
+    margin-top: 6px;
+    transition: background 0.18s, transform 0.18s;
+    transform: scaleX(0.3);
+    box-shadow: none;
+}
+
+.navbar-link.active .navbar-underline {
+    background: #2563eb;
+    transform: scaleX(1);
+    box-shadow: none;
+}
+
+.navbar-link:not(.active) .navbar-underline {
+    display: none;
+}
+
+.navbar-icon-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+}
+
 @media (max-width: 767.98px) {
     .top-navbar {
         padding: 0 0.4rem;
@@ -348,6 +446,21 @@ function isActive(link: string) {
     .navbar-logo {
         width: 34px;
         height: 34px;
+    }
+
+    .navbar-menu {
+        gap: 2.2rem;
+    }
+
+    .navbar-link {
+        font-size: 1.3rem;
+        min-width: 38px;
+        min-height: 38px;
+    }
+
+    .navbar-label {
+        font-size: 0.85rem;
+        padding: 0.18rem 0.5rem;
     }
 
     .navbar-mobile-menu {

@@ -38,6 +38,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::get('/pinned/projects', 'getPinnedProject')->name('getPinnedProject');
         Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
         Route::get('/projects/{id}/members', 'getProjectMembers')->name('getProjectMembers');
+        Route::delete('/projects/{id}', 'destroy')->name('deleteProject');
     });
 
     Route::controller(TaskController::class)->group(function () {
