@@ -32,7 +32,11 @@ class AuthService
         $user = Auth::user();
         $token = $user->createToken('api_token')->plainTextToken;
         return [
-            'user' => $user,
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+            ],
             'token' => $token,
         ];
     }

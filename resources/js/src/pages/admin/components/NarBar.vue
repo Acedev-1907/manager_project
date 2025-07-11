@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref } from "vue";
-import { RouterLink, useRouter, useRoute } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
 
 const navigation = ref([
@@ -10,13 +10,12 @@ const navigation = ref([
 ]);
 
 const emit = defineEmits<{ (e: 'logout'): Promise<void> }>()
-defineProps<{ loggedInUserEmail: string | undefined, logoutLoading?: boolean }>()
+defineProps<{ loggedInUserName: string | undefined, logoutLoading?: boolean }>()
 
 const menuOpen = ref(false)
 function toggleMenu() { menuOpen.value = !menuOpen.value }
 function closeMenu() { menuOpen.value = false }
 
-const router = useRouter()
 const route = useRoute()
 function isActive(link: string) {
     return route.path.startsWith(link)
@@ -62,13 +61,13 @@ function handleNavClick() {
         <transition name="fade">
             <div v-if="menuOpen" class="navbar-mobile-dropdown d-md-none">
                 <div class="navbar-mobile-avatar">
-                    <template v-if="loggedInUserEmail && loggedInUserEmail.length > 0">
+                    <template v-if="loggedInUserName && loggedInUserName.length > 0">
                         <span class="avatar-circle">
-                            {{ loggedInUserEmail.charAt(0).toUpperCase() }}
+                            {{ loggedInUserName.charAt(0).toUpperCase() }}
                         </span>
                     </template>
                 </div>
-                <div class="navbar-mobile-user">{{ loggedInUserEmail }}</div>
+                <div class="navbar-mobile-user">{{ loggedInUserName }}</div>
                 <button class="navbar-logout" :disabled="logoutLoading" @click="!logoutLoading && emit('logout')">
                     <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
                     <i v-else class="bi bi-arrow-clockwise spinning"></i>
@@ -97,9 +96,9 @@ function handleNavClick() {
         <!-- Avatar + dropdown desktop -->
         <div class="navbar-user d-none d-md-flex" style="position: relative;">
             <div class="navbar-avatar-btn" @click="menuOpen = !menuOpen" style="position: relative;">
-                <template v-if="loggedInUserEmail && loggedInUserEmail.length > 0">
+                <template v-if="loggedInUserName && loggedInUserName.length > 0">
                     <span class="avatar-circle">
-                        {{ loggedInUserEmail.charAt(0).toUpperCase() }}
+                        {{ loggedInUserName.charAt(0).toUpperCase() }}
                     </span>
                 </template>
                 <span class="avatar-caret">
@@ -109,13 +108,13 @@ function handleNavClick() {
             <transition name="fade">
                 <div v-if="menuOpen" class="navbar-desktop-dropdown">
                     <div class="navbar-desktop-avatar">
-                        <template v-if="loggedInUserEmail && loggedInUserEmail.length > 0">
+                        <template v-if="loggedInUserName && loggedInUserName.length > 0">
                             <span class="avatar-circle avatar-lg">
-                                {{ loggedInUserEmail.charAt(0).toUpperCase() }}
+                                {{ loggedInUserName.charAt(0).toUpperCase() }}
                             </span>
                         </template>
                     </div>
-                    <div class="navbar-desktop-user">{{ loggedInUserEmail }}</div>
+                    <div class="navbar-desktop-user">{{ loggedInUserName }}</div>
                     <button class="navbar-logout" :disabled="logoutLoading" @click="!logoutLoading && emit('logout')">
                         <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
                         <i v-else class="bi bi-arrow-clockwise spinning"></i>

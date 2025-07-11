@@ -9,7 +9,7 @@ export type LoginUserType = {
   password: string;
 };
 export type LoginResponseType = {
-  user: { email: string; id: number };
+  user: { email: string; id: number; name: string };
   message: string;
   isLoggedIn: boolean;
   token: string;
