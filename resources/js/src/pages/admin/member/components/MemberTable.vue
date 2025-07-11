@@ -23,7 +23,9 @@ const handleSearch = async (searchQuery: string) => {
 </script>
 <template>
     <div class="member-table-container" style="position:relative;">
-        <SearchInput v-model="query" placeholder="Search member..." :loading="loading" @search="handleSearch" />
+        <div class="mb-3" style="max-width: 500px; margin: 0 auto;">
+            <SearchInput v-model="query" placeholder="Search member..." :loading="loading" @search="handleSearch" />
+        </div>
         <div v-if="!members?.data?.data || members?.data?.data.length === 0" class="text-center text-muted py-4">
             No data
         </div>
@@ -41,7 +43,6 @@ const handleSearch = async (searchQuery: string) => {
 .member-table-container {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 1.5rem 0.5rem;
 }
 
 .member-card-grid {
