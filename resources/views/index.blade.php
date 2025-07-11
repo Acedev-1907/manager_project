@@ -7,7 +7,8 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script src="https://kit.fontawesome.com/d615c16483.js" crossorigin="anonymous"></script>
-    <title>App Task</title>
+    <link rel="icon" type="image/png" href="/others/logo.png">
+    <title>TaskMgr</title>
 </head>
 {{-- <script>
     const randomizeColour = () => {

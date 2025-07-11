@@ -36,14 +36,53 @@ function handleNavClick() {
 </script>
 <template>
     <nav class="top-navbar">
-        <div class="navbar-left">
+        <!-- Hàng trên: logo + hamburger (mobile) -->
+        <div class="navbar-top-row d-flex d-md-none">
+            <div class="navbar-left">
+                <img :src="`${APP.baseURL}/others/logo.png`" class="navbar-logo" alt="TaskMgr Logo">
+                <span class="navbar-app-name">TaskMgr</span>
+            </div>
+            <button class="navbar-hamburger" @click="toggleMenu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+        <!-- Hàng dưới: các icon -->
+        <ul class="navbar-menu d-flex d-md-none">
+            <li v-for="(nav, idx) in navigation" :key="nav.name" class="navbar-icon-item">
+                <RouterLink :to="nav.link" class="navbar-link" :class="{ active: isActive(nav.link) }"
+                    @mouseenter="handleNavMouseEnter(idx)" @mouseleave="handleNavMouseLeave" @click="handleNavClick">
+                    <div class="navbar-icon-stack">
+                        <i :class="nav.icon"></i>
+                        <span class="navbar-underline"></span>
+                    </div>
+                </RouterLink>
+            </li>
+        </ul>
+        <!-- Dropdown menu khi bấm hamburger (mobile) -->
+        <transition name="fade">
+            <div v-if="menuOpen" class="navbar-mobile-dropdown d-md-none">
+                <div class="navbar-mobile-avatar">
+                    <template v-if="loggedInUserEmail && loggedInUserEmail.length > 0">
+                        <span class="avatar-circle">
+                            {{ loggedInUserEmail.charAt(0).toUpperCase() }}
+                        </span>
+                    </template>
+                </div>
+                <div class="navbar-mobile-user">{{ loggedInUserEmail }}</div>
+                <button class="navbar-logout" :disabled="logoutLoading" @click="!logoutLoading && emit('logout')">
+                    <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
+                    <i v-else class="bi bi-arrow-clockwise spinning"></i>
+                    <span>{{ logoutLoading ? 'Logging out...' : 'Logout' }}</span>
+                </button>
+            </div>
+        </transition>
+        <div v-if="menuOpen" class="navbar-mobile-overlay d-md-none" @click="closeMenu"></div>
+        <!-- Desktop layout -->
+        <div class="navbar-left d-none d-md-flex">
             <img :src="`${APP.baseURL}/others/logo.png`" class="navbar-logo" alt="TaskMgr Logo">
             <span class="navbar-app-name">TaskMgr</span>
         </div>
-        <button class="navbar-hamburger d-md-none" @click="toggleMenu">
-            <span></span><span></span><span></span>
-        </button>
-        <ul class="navbar-menu d-flex">
+        <ul class="navbar-menu d-none d-md-flex">
             <li v-for="(nav, idx) in navigation" :key="nav.name" class="navbar-icon-item">
                 <RouterLink :to="nav.link" class="navbar-link" :class="{ active: isActive(nav.link) }"
                     @mouseenter="handleNavMouseEnter(idx)" @mouseleave="handleNavMouseLeave" @click="handleNavClick">
@@ -55,37 +94,36 @@ function handleNavClick() {
                 </RouterLink>
             </li>
         </ul>
-        <div class="navbar-user d-none d-md-flex">
-            <span class="navbar-email">{{ loggedInUserEmail }}</span>
-            <button class="navbar-logout" :disabled="logoutLoading" @click="!logoutLoading && emit('logout')">
-                <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
-                <i v-else class="bi bi-arrow-clockwise spinning"></i>
-                <span>{{ logoutLoading ? 'Logging out...' : 'Logout' }}</span>
-            </button>
-        </div>
-        <!-- Mobile menu -->
-        <transition name="fade">
-            <div v-if="menuOpen" class="navbar-mobile-menu d-md-none">
-                <ul>
-                    <li v-for="nav in navigation" :key="nav.name">
-                        <RouterLink :to="nav.link" class="navbar-link" :class="{ active: isActive(nav.link) }"
-                            @click="closeMenu">
-                            <i :class="nav.icon"></i> <span>{{ nav.name }}</span>
-                        </RouterLink>
-                    </li>
-                    <li>
-                        <button class="navbar-logout" :disabled="logoutLoading"
-                            @click="!logoutLoading && emit('logout'); closeMenu()">
-                            <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
-                            <i v-else class="bi bi-arrow-clockwise spinning"></i>
-                            <span>{{ logoutLoading ? 'Logging out...' : 'Logout' }}</span>
-                        </button>
-                    </li>
-                </ul>
-                <div class="navbar-mobile-user">{{ loggedInUserEmail }}</div>
+        <!-- Avatar + dropdown desktop -->
+        <div class="navbar-user d-none d-md-flex" style="position: relative;">
+            <div class="navbar-avatar-btn" @click="menuOpen = !menuOpen" style="position: relative;">
+                <template v-if="loggedInUserEmail && loggedInUserEmail.length > 0">
+                    <span class="avatar-circle">
+                        {{ loggedInUserEmail.charAt(0).toUpperCase() }}
+                    </span>
+                </template>
+                <span class="avatar-caret">
+                    <i class="bi bi-caret-down-fill"></i>
+                </span>
             </div>
-        </transition>
-        <div v-if="menuOpen" class="navbar-mobile-overlay d-md-none" @click="closeMenu"></div>
+            <transition name="fade">
+                <div v-if="menuOpen" class="navbar-desktop-dropdown">
+                    <div class="navbar-desktop-avatar">
+                        <template v-if="loggedInUserEmail && loggedInUserEmail.length > 0">
+                            <span class="avatar-circle avatar-lg">
+                                {{ loggedInUserEmail.charAt(0).toUpperCase() }}
+                            </span>
+                        </template>
+                    </div>
+                    <div class="navbar-desktop-user">{{ loggedInUserEmail }}</div>
+                    <button class="navbar-logout" :disabled="logoutLoading" @click="!logoutLoading && emit('logout')">
+                        <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
+                        <i v-else class="bi bi-arrow-clockwise spinning"></i>
+                        <span>{{ logoutLoading ? 'Logging out...' : 'Logout' }}</span>
+                    </button>
+                </div>
+            </transition>
+        </div>
     </nav>
 </template>
 <style>
@@ -102,6 +140,13 @@ function handleNavClick() {
     padding: 0 0.75rem;
     min-height: 64px;
     border-radius: 0 0 1.2rem 1.2rem;
+}
+
+.navbar-top-row {
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
 }
 
 .navbar-left {
@@ -131,11 +176,12 @@ function handleNavClick() {
 .navbar-menu {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 3.5rem;
-    margin: 0;
+    margin: 0 auto;
     padding: 0;
     list-style: none;
-    justify-content: center;
+    width: auto;
 }
 
 .navbar-link {
@@ -377,6 +423,53 @@ function handleNavClick() {
     z-index: 1000;
 }
 
+.navbar-mobile-dropdown {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: 94vw;
+    max-width: 420px;
+    background: #fff;
+    box-shadow: 0 8px 32px rgba(36, 112, 220, 0.13), 0 1.5px 8px rgba(36, 112, 220, 0.07);
+    border-radius: 0 0 1.5rem 1.5rem;
+    z-index: 1100;
+    padding: 1.5rem 1.2rem 1.2rem 1.2rem;
+    animation: fadeInDown 0.28s cubic-bezier(.4, 1.4, .6, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.navbar-mobile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e0e7ef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2563eb;
+    box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
+}
+
+.avatar-circle {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: #e0e7ef;
+    color: #2563eb;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
 .spinning {
     animation: spin 1s linear infinite;
 }
@@ -432,11 +525,101 @@ function handleNavClick() {
     width: 100%;
 }
 
+.navbar-avatar-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e0e7ef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2563eb;
+    box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
+    cursor: pointer;
+    transition: box-shadow 0.18s;
+}
+
+.navbar-avatar-btn:hover {
+    box-shadow: 0 4px 16px rgba(36, 112, 220, 0.18);
+}
+
+.navbar-desktop-dropdown {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    min-width: 180px;
+    background: #fff;
+    border-radius: 1.2rem;
+    box-shadow: 0 8px 32px rgba(36, 112, 220, 0.13), 0 1.5px 8px rgba(36, 112, 220, 0.07);
+    padding: 1.2rem 1.2rem 1rem 1.2rem;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.navbar-desktop-avatar .avatar-lg {
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+}
+
+.navbar-desktop-user {
+    font-size: 1.05rem;
+    color: #222;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.avatar-caret {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    background: #f3f4f6;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    font-size: 13px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    border: 2px solid #fff;
+    z-index: 2;
+}
+
 @media (max-width: 767.98px) {
     .top-navbar {
-        padding: 0 0.4rem;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0;
+    }
+
+    .navbar-top-row {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.7rem;
         min-height: 56px;
-        box-shadow: 0 4px 18px rgba(36, 112, 220, 0.13), 0 1.5px 8px rgba(36, 112, 220, 0.10);
+        box-shadow: none;
+    }
+
+    .navbar-menu {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        justify-content: center;
+        padding: 0.2rem 0.2rem 0.3rem 0.2rem;
+        background: none;
+        box-shadow: none;
+        gap: 0;
     }
 
     .navbar-app-name {
@@ -448,38 +631,45 @@ function handleNavClick() {
         height: 34px;
     }
 
-    .navbar-menu {
-        gap: 2.2rem;
+    .navbar-icon-item {
+        flex: 1 1 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-width: 0;
     }
 
     .navbar-link {
-        font-size: 1.3rem;
-        min-width: 38px;
-        min-height: 38px;
+        width: 48px;
+        height: 48px;
+        min-width: 48px;
+        min-height: 48px;
+        border-radius: 12px;
+        background: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        padding: 0;
+        font-size: 1.5rem;
+        transition: background 0.18s, color 0.18s;
+        box-shadow: none;
+        position: relative;
+    }
+
+    .navbar-link.active,
+    .navbar-link:focus,
+    .navbar-link:hover {
+        background: #f0f4ff;
+        color: #2563eb;
     }
 
     .navbar-label {
-        font-size: 0.85rem;
-        padding: 0.18rem 0.5rem;
+        display: none !important;
     }
 
-    .navbar-mobile-menu {
-        top: 56px;
-        left: 0;
-        right: 0;
-        margin: 0 auto;
-        padding: 1.1rem 0.7rem 1rem 0.7rem;
-        max-width: 98vw;
-    }
-
-    .navbar-mobile-menu .navbar-link,
-    .navbar-mobile-menu .navbar-logout {
-        font-size: 1.08rem;
-        padding: 0.85rem 1rem;
-    }
-
-    .navbar-mobile-overlay {
-        top: 56px;
+    .navbar-underline {
+        margin-top: 4px;
     }
 }
 </style>
