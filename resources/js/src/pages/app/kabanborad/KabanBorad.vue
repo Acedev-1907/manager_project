@@ -20,8 +20,8 @@ const route = useRoute();
 const router = useRouter();
 
 const { ProjectData, getProjectDetail, loading: projectLoading } = useGetProjectDetail();
-const { getMembers, loading, memberData } = useGetMembers();
-const { getProjectMembers, members: projectMembers, loading: membersLoading } = useGetProjectMembers();
+const { getMembers } = useGetMembers();
+const { getProjectMembers, members: projectMembers } = useGetProjectMembers();
 
 const slug = route.query?.query as string;
 const modalVisible = ref(false);

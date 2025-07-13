@@ -112,7 +112,7 @@ onMounted(async () => {
         <LoadingPage v-if="isLoading" />
         <h2 class="dashboard-title">Dashboard</h2>
         <div class="dashboard-project-title">
-            Project: {{ project?.name }}
+            Your priority project: {{ project?.name }}
         </div>
         <div class="dashboard-row">
             <div class="dashboard-card">

@@ -11,11 +11,16 @@ const sameAsPassword = helpers.withMessage(
     sameAs(passwordValue)
 );
 
+const requiredName = helpers.withMessage('Name is required', required);
+const requiredEmail = helpers.withMessage('Email is required', required);
+const requiredPassword = helpers.withMessage('Password is required', required);
+const requiredPasswordConfirmation = helpers.withMessage('Confirm password is required', required);
+
 const rules = {
-    name: { required },
-    email: { required, email },
-    password: { required },
-    password_confirmation: { required, sameAsPassword }
+    name: { required: requiredName },
+    email: { required: requiredEmail, email },
+    password: { required: requiredPassword },
+    password_confirmation: { required: requiredPasswordConfirmation, sameAsPassword }
 }
 
 const v$ = useVuelidate(rules, registerInput);

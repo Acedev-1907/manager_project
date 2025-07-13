@@ -22,41 +22,41 @@ const router = createRouter({
       ],
     },
     {
-      path: "/admin",
-      name: "admin",
-      component: () => import("../pages/admin/AdminPage.vue"),
+      path: "/app",
+      name: "app",
+      component: () => import("../pages/app/AppPage.vue"),
       meta: { requiresAuth: true },
       children: [
         {
           path: "/dashboard",
           name: "dashboard",
-          component: () => import("../pages/admin/dashboard/DashboardPage.vue"),
+          component: () => import("../pages/app/dashboard/DashboardPage.vue"),
         },
         {
           path: "/members",
           name: "members",
-          component: () => import("../pages/admin/member/MemberPage.vue"),
+          component: () => import("../pages/app/member/MemberPage.vue"),
         },
         {
           path: "/create-members",
           name: "create-members",
-          component: () => import("../pages/admin/member/CreateMember.vue"),
+          component: () => import("../pages/app/member/CreateMember.vue"),
         },
         {
           path: "/projects",
           name: "projects",
-          component: () => import("../pages/admin/project/ProjectPage.vue"),
+          component: () => import("../pages/app/project/ProjectPage.vue"),
         },
         {
           path: "/create-project",
           name: "create-project",
           component: () =>
-            import("../pages/admin/project/components/CreateProject.vue"),
+            import("../pages/app/project/components/CreateProject.vue"),
         },
         {
           path: "/kaban",
           name: "kaban",
-          component: () => import("../pages/admin/kabanborad/KabanBorad.vue"),
+          component: () => import("../pages/app/kabanborad/KabanBorad.vue"),
         },
       ],
     },
@@ -89,7 +89,6 @@ router.beforeEach((to, from, next) => {
       }
     }
 
-    // Nếu đã đăng nhập mà vào trang login hoặc register thì chuyển sang /admin
     if (
       isAuthenticated &&
       (to.path === "/login" || to.path === "/register" || to.path === "/auth")
@@ -98,7 +97,6 @@ router.beforeEach((to, from, next) => {
       return;
     }
 
-    // Nếu cần auth mà chưa đăng nhập
     if (to.meta.requiresAuth && !isAuthenticated) {
       next({ path: "/login" });
       return;
@@ -108,7 +106,6 @@ router.beforeEach((to, from, next) => {
     next();
   } catch (error) {
     console.error("Router guard error:", error);
-    // Nếu có lỗi, clear localStorage và chuyển về login
     localStorage.removeItem("userData");
     next({ path: "/login" });
   }

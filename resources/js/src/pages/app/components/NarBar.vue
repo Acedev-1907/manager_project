@@ -577,7 +577,7 @@ function handleNavClick() {
 .avatar-caret {
     position: absolute;
     right: 0;
-    bottom: 0;
+    top: 31px;
     width: 18px;
     height: 18px;
     background: #f3f4f6;

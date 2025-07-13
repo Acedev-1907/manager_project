@@ -1,11 +1,15 @@
 <script lang="ts" setup>
 import useVuelidate from '@vuelidate/core';
-import { required, email } from '@vuelidate/validators';
+import { required, email, helpers } from '@vuelidate/validators';
 import { loginInput, useLoginUser } from './action/login';
 
+// Custom error messages for login fields
+const requiredEmail = helpers.withMessage('Email is required', required);
+const requiredPassword = helpers.withMessage('Password is required', required);
+
 const rules = {
-    email: { required, email },
-    password: { required }
+    email: { required: requiredEmail, email: helpers.withMessage('Email is invalid', email) },
+    password: { required: requiredPassword }
 }
 
 const v$ = useVuelidate(rules, loginInput);

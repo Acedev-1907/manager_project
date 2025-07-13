@@ -44,13 +44,11 @@ export function useLoginUser() {
       } else {
         showError("Login failed!");
       }
-    } catch (error) {
-      console.error("login error:", error);
-      showErrorResponse(error);
+    } catch (error: any) {
       loading.value = false;
-      for (const message of error as string) {
-        showError(message);
-      }
+      const message =
+        error?.response?.data?.message || error?.message || "Login failed!";
+      showError(message);
     }
   }
 

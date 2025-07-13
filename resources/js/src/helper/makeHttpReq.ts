@@ -102,7 +102,7 @@ export function makeHttpReq<TInput, TResponse>(
         ) {
           handleAuthError();
           if (showGlobalLoading) hideLoading();
-          return reject(new Error("Not authenticated"));
+          return reject(data);
         }
         if (showGlobalLoading) hideLoading();
         return reject(data);
