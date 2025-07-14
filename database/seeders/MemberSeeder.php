@@ -24,48 +24,64 @@ class MemberSeeder extends Seeder
         $user1 = User::create([
             'name' => 'Test User 1',
             'email' => 'test1@example.com',
+            'phone' => '0123456781',
+            'avatar' => 'https://i.pravatar.cc/150?img=1',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
         $user2 = User::create([
             'name' => 'Test User 2',
             'email' => 'test2@example.com',
+            'phone' => '0123456782',
+            'avatar' => 'https://i.pravatar.cc/150?img=2',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
         $user3 = User::create([
             'name' => 'Test User 3',
             'email' => 'test3@example.com',
+            'phone' => '0123456783',
+            'avatar' => 'https://i.pravatar.cc/150?img=3',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
         $user4 = User::create([
             'name' => 'Test User 4',
             'email' => 'test4@example.com',
+            'phone' => '0123456784',
+            'avatar' => 'https://i.pravatar.cc/150?img=4',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
         $user5 = User::create([
             'name' => 'Test User 5',
             'email' => 'test5@example.com',
+            'phone' => '0123456785',
+            'avatar' => 'https://i.pravatar.cc/150?img=5',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
         $user6 = User::create([
             'name' => 'Test User 6',
             'email' => 'test6@example.com',
+            'phone' => '0123456786',
+            'avatar' => 'https://i.pravatar.cc/150?img=6',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
         $user7 = User::create([
             'name' => 'Test User 7',
             'email' => 'test7@example.com',
+            'phone' => '0123456787',
+            'avatar' => 'https://i.pravatar.cc/150?img=7',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);
         $user8 = User::create([
             'name' => 'Test User 8',
             'email' => 'test8@example.com',
+            'phone' => '0123456788',
+            'avatar' => 'https://i.pravatar.cc/150?img=8',
             'password' => bcrypt('password'),
             'isValidEmail' => 1,
         ]);

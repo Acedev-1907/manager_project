@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
 
@@ -10,11 +10,34 @@ const navigation = ref([
 ]);
 
 const emit = defineEmits<{ (e: 'logout'): Promise<void> }>()
-defineProps<{ loggedInUserName: string | undefined, logoutLoading?: boolean }>()
+defineProps<{ loggedInUserName: string | undefined, avatar?: string | undefined, logoutLoading?: boolean }>()
 
 const menuOpen = ref(false)
 function toggleMenu() { menuOpen.value = !menuOpen.value }
 function closeMenu() { menuOpen.value = false }
+
+const dropdownRef = ref<HTMLElement | null>(null);
+
+// Đóng dropdown khi click ra ngoài
+function handleClickOutside(event: MouseEvent) {
+    const dropdown = dropdownRef.value;
+    const avatarBtn = document.querySelector('.navbar-avatar-btn');
+    if (
+        menuOpen.value &&
+        dropdown &&
+        avatarBtn &&
+        !dropdown.contains(event.target as Node) &&
+        !avatarBtn.contains(event.target as Node)
+    ) {
+        closeMenu();
+    }
+}
+onMounted(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('mousedown', handleClickOutside);
+});
 
 const route = useRoute()
 function isActive(link: string) {
@@ -35,15 +58,26 @@ function handleNavClick() {
 </script>
 <template>
     <nav class="top-navbar">
-        <!-- Hàng trên: logo + hamburger (mobile) -->
+        <!-- Hàng trên: logo + avatar (mobile) -->
         <div class="navbar-top-row d-flex d-md-none">
             <div class="navbar-left">
                 <img :src="`${APP.baseURL}/others/logo.png`" class="navbar-logo" alt="TaskMgr Logo">
                 <span class="navbar-app-name">TaskMgr</span>
             </div>
-            <button class="navbar-hamburger" @click="toggleMenu">
-                <span></span><span></span><span></span>
-            </button>
+            <div class="navbar-avatar-btn" @click="toggleMenu" style="position: relative; margin-left: auto;">
+                <template v-if="loggedInUserName && loggedInUserName.length > 0">
+                    <span v-if="avatar" class="avatar-circle">
+                        <img :src="avatar" alt="avatar"
+                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                    </span>
+                    <span v-else class="avatar-circle">
+                        {{ loggedInUserName.charAt(0).toUpperCase() }}
+                    </span>
+                </template>
+                <span class="avatar-caret">
+                    <i class="bi bi-caret-down-fill"></i>
+                </span>
+            </div>
         </div>
         <!-- Hàng dưới: các icon -->
         <ul class="navbar-menu d-flex d-md-none">
@@ -57,22 +91,31 @@ function handleNavClick() {
                 </RouterLink>
             </li>
         </ul>
-        <!-- Dropdown menu khi bấm hamburger (mobile) -->
+        <!-- Dropdown menu khi bấm avatar (mobile & desktop dùng chung) -->
         <transition name="fade">
-            <div v-if="menuOpen" class="navbar-mobile-dropdown d-md-none">
-                <div class="navbar-mobile-avatar">
-                    <template v-if="loggedInUserName && loggedInUserName.length > 0">
-                        <span class="avatar-circle">
-                            {{ loggedInUserName.charAt(0).toUpperCase() }}
-                        </span>
-                    </template>
+            <div v-if="menuOpen" class="custom-dropdown d-md-none" ref="dropdownRef">
+                <!-- Tài khoản -->
+                <div class="custom-user-list">
+                    <div class="custom-user-item">
+                        <img v-if="avatar" :src="avatar" class="custom-avatar-img" />
+                        <span v-else-if="loggedInUserName" class="avatar-circle">{{
+                            loggedInUserName.charAt(0).toUpperCase()
+                            }}</span>
+                        <span v-else class="avatar-circle">?</span>
+                        <span v-if="loggedInUserName" class="custom-user-name">{{ loggedInUserName }}</span>
+                        <span v-else class="custom-user-name">Unknown</span>
+                    </div>
                 </div>
-                <div class="navbar-mobile-user">{{ loggedInUserName }}</div>
-                <button class="navbar-logout" :disabled="logoutLoading" @click="!logoutLoading && emit('logout')">
-                    <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
-                    <i v-else class="bi bi-arrow-clockwise spinning"></i>
-                    <span>{{ logoutLoading ? 'Logging out...' : 'Logout' }}</span>
-                </button>
+                <hr class="custom-divider" />
+                <!-- Menu -->
+                <div class="custom-menu">
+                    <RouterLink to="/profile" class="custom-menu-item" @click="closeMenu"><i class="bi bi-person"></i>
+                        Profile
+                    </RouterLink>
+                    <div class="custom-menu-item" @click="closeMenu(); emit('logout')"><i
+                            class="bi bi-box-arrow-right"></i>
+                        Logout</div>
+                </div>
             </div>
         </transition>
         <div v-if="menuOpen" class="navbar-mobile-overlay d-md-none" @click="closeMenu"></div>
@@ -97,7 +140,11 @@ function handleNavClick() {
         <div class="navbar-user d-none d-md-flex" style="position: relative;">
             <div class="navbar-avatar-btn" @click="menuOpen = !menuOpen" style="position: relative;">
                 <template v-if="loggedInUserName && loggedInUserName.length > 0">
-                    <span class="avatar-circle">
+                    <span v-if="avatar" class="avatar-circle">
+                        <img :src="avatar" alt="avatar"
+                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                    </span>
+                    <span v-else class="avatar-circle">
                         {{ loggedInUserName.charAt(0).toUpperCase() }}
                     </span>
                 </template>
@@ -106,20 +153,29 @@ function handleNavClick() {
                 </span>
             </div>
             <transition name="fade">
-                <div v-if="menuOpen" class="navbar-desktop-dropdown">
-                    <div class="navbar-desktop-avatar">
-                        <template v-if="loggedInUserName && loggedInUserName.length > 0">
-                            <span class="avatar-circle avatar-lg">
-                                {{ loggedInUserName.charAt(0).toUpperCase() }}
-                            </span>
-                        </template>
+                <div v-if="menuOpen" class="custom-dropdown" ref="dropdownRef">
+                    <!-- Tài khoản -->
+                    <div class="custom-user-list">
+                        <div class="custom-user-item">
+                            <img v-if="avatar" :src="avatar" class="custom-avatar-img" />
+                            <span v-else-if="loggedInUserName" class="avatar-circle">{{
+                                loggedInUserName.charAt(0).toUpperCase()
+                                }}</span>
+                            <span v-else class="avatar-circle">?</span>
+                            <span v-if="loggedInUserName" class="custom-user-name">{{ loggedInUserName }}</span>
+                            <span v-else class="custom-user-name">Unknown</span>
+                        </div>
                     </div>
-                    <div class="navbar-desktop-user">{{ loggedInUserName }}</div>
-                    <button class="navbar-logout" :disabled="logoutLoading" @click="!logoutLoading && emit('logout')">
-                        <i v-if="!logoutLoading" class="bi bi-box-arrow-right"></i>
-                        <i v-else class="bi bi-arrow-clockwise spinning"></i>
-                        <span>{{ logoutLoading ? 'Logging out...' : 'Logout' }}</span>
-                    </button>
+                    <hr class="custom-divider" />
+                    <!-- Menu -->
+                    <div class="custom-menu">
+                        <RouterLink to="/profile" class="custom-menu-item" @click="closeMenu"><i
+                                class="bi bi-person"></i>
+                            Profile</RouterLink>
+                        <div class="custom-menu-item" @click="closeMenu(); emit('logout')"><i
+                                class="bi bi-box-arrow-right"></i>
+                            Logout</div>
+                    </div>
                 </div>
             </transition>
         </div>
@@ -485,7 +541,7 @@ function handleNavClick() {
 
 .fade-enter-active,
 .fade-leave-active {
-    transition: opacity 0.2s;
+    transition: opacity 0.02s;
 }
 
 .fade-enter,
@@ -590,6 +646,128 @@ function handleNavClick() {
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
     border: 2px solid #fff;
     z-index: 2;
+}
+
+.navbar-profile-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    color: #2563eb;
+    font-weight: 600;
+    padding: 10px 0;
+    margin: 10px 0 16px 0;
+    text-decoration: none;
+    border: none;
+    background: #f1f5fd;
+    border-radius: 8px;
+    font-size: 1.08rem;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+    box-shadow: 0 1px 4px rgba(36, 112, 220, 0.04);
+}
+
+.navbar-profile-link:hover {
+    background: #e0e7ff;
+    color: #1d4ed8;
+    text-decoration: none;
+}
+
+.profile-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #e0e7ff;
+    color: #2563eb;
+    font-size: 1.25rem;
+    margin-right: 4px;
+}
+
+.profile-link-text {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.navbar-desktop-dropdown .navbar-profile-link,
+.navbar-mobile-dropdown .navbar-profile-link {
+    width: 90%;
+    margin-left: 5%;
+    margin-right: 5%;
+}
+
+.navbar-desktop-dropdown .navbar-logout,
+.navbar-mobile-dropdown .navbar-logout {
+    margin-top: 0;
+}
+
+.custom-dropdown {
+    position: absolute;
+    top: 48px;
+    right: 0;
+    min-width: 320px;
+    background: #fff;
+    border-radius: 1.2rem;
+    box-shadow: 0 8px 32px rgba(36, 112, 220, 0.13), 0 1.5px 8px rgba(36, 112, 220, 0.07);
+    padding: 1.2rem 0.8rem 1rem 0.8rem;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.custom-user-list {
+    margin-bottom: 0.2rem;
+    margin-top: 0.2rem;
+}
+
+.custom-user-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.2rem 0 0.2rem 0;
+}
+
+.custom-avatar-img {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.custom-user-name {
+    font-weight: 600;
+}
+
+.custom-divider {
+    border: none;
+    border-top: 2px solid #afacac;
+    margin: 0.2rem 0 0.3rem 0;
+}
+
+.custom-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.custom-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: #222;
+    text-decoration: none;
+    font-size: 1.05rem;
+}
+
+.custom-menu-item:hover {
+    background: #f0f2f5;
 }
 
 @media (max-width: 767.98px) {

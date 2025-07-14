@@ -1,54 +1,57 @@
 <?php
 
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\MemberController;
-use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\TaskController;
-use App\Http\Controllers\UserController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\{
+    AuthController,
+    UserController,
+    MemberController,
+    ProjectController,
+    TaskController
+};
 
 Route::controller(AuthController::class)->group(function () {
-    Route::post('/register', 'register');
-    Route::post('/login', 'login')->name('login');
+    Route::post('/register', 'register')->name('auth.register');
+    Route::post('/login', 'login')->name('auth.login');
+    Route::post('/reset-password', 'resetPassword')->name('auth.resetPassword');
 });
 
-Route::group(['middleware' => ['auth:sanctum']], function () {
+Route::post('/check-reset-token', [AuthController::class, 'checkResetToken']);
 
+Route::middleware('auth:sanctum')->group(function () {
     Route::controller(AuthController::class)->group(function () {
-        Route::post('/logout', 'logoutUser');
+        Route::post('/logout', 'logoutUser')->name('auth.logout');
+        Route::post('/user/send-reset-password-link', 'sendResetPasswordLink');
+    });
+
+    Route::controller(UserController::class)->group(function () {
+        Route::get('/user', 'show')->name('users.show');
+        Route::put('/user', 'update')->name('users.update');
     });
 
     Route::controller(MemberController::class)->group(function () {
-        Route::post('/members', 'store')->name('createMember');
-        Route::put('/members', 'update')->name('updateMember');
-        Route::get('/members', 'index')->name('indexMember');
-        Route::delete('/members/{id}', 'destroy')->name('deleteMember');
-        Route::post('/members/add-by-email', 'addByEmail')->name('addByEmail');
-        Route::post('/members/add-by-name-or-email', 'addByNameOrEmail')->name('addByNameOrEmail');
+        Route::post('/members', 'store')->name('members.store');
+        Route::put('/members', 'update')->name('members.update');
+        Route::get('/members', 'index')->name('members.index');
+        Route::delete('/members/{id}', 'destroy')->name('members.destroy');
+        Route::post('/members/add-by-email', 'addByEmail')->name('members.addByEmail');
+        Route::post('/members/add-by-name-or-email', 'addByNameOrEmail')->name('members.addByNameOrEmail');
     });
 
     Route::controller(ProjectController::class)->group(function () {
-        Route::post('/projects', 'store')->name('createProject');
-        Route::put('/projects', 'update')->name('updateProject');
-        Route::get('/projects', 'index')->name('indexProject');
-        Route::post('/projects/pinned', 'pinnedProject')->name('pinnedProject');
-        Route::get('projects/{slug}', 'getProject')->name('getProject');
-        Route::get('/count/projects', 'countProject')->name('countProject');
-        Route::get('/pinned/projects', 'getPinnedProject')->name('getPinnedProject');
-        Route::get('/chart-data/projects', 'getProjectChartData')->name('getProjectChartData');
-        Route::get('/projects/{id}/members', 'getProjectMembers')->name('getProjectMembers');
-        Route::delete('/projects/{id}', 'destroy')->name('deleteProject');
+        Route::post('/projects', 'store')->name('projects.store');
+        Route::put('/projects', 'update')->name('projects.update');
+        Route::get('/projects', 'index')->name('projects.index');
+        Route::post('/projects/pinned', 'pinnedProject')->name('projects.pinned');
+        Route::get('projects/{slug}', 'getProject')->name('projects.show');
+        Route::get('/count/projects', 'countProject')->name('projects.count');
+        Route::get('/pinned/projects', 'getPinnedProject')->name('projects.getPinned');
+        Route::get('/chart-data/projects', 'getProjectChartData')->name('projects.chartData');
+        Route::get('/projects/{id}/members', 'getProjectMembers')->name('projects.members');
+        Route::delete('/projects/{id}', 'destroy')->name('projects.destroy');
     });
 
     Route::controller(TaskController::class)->group(function () {
-        Route::post('/tasks', 'createTask')->name('createTask');
-        Route::post('/task/{transition}', 'transition')->name('transition');
+        Route::post('/tasks', 'createTask')->name('tasks.create');
+        Route::post('/task/{transition}', 'transition')->name('tasks.transition');
     });
 });
-
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
-Route::get('/users/all', [UserController::class, 'allUsers']);

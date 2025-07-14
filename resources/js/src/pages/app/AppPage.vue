@@ -44,7 +44,8 @@ onUnmounted(() => {
 
 <template>
     <div class="admin-layout">
-        <NarBar :loggedInUserName="userData?.user.name" :logoutLoading="loading" @logout="logoutUser" />
+        <NarBar :loggedInUserName="userData?.user.name" :avatar="userData?.user.avatar" :logoutLoading="loading"
+            @logout="logoutUser" />
         <div class="admin-content">
             <router-view v-slot="{ Component, route }">
                 <transition name="fade" mode="out-in">

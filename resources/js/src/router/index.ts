@@ -19,6 +19,16 @@ const router = createRouter({
           name: "login",
           component: () => import("../pages/auth/LoginPage.vue"),
         },
+        {
+          path: "/change-password",
+          name: "change-password",
+          component: () => import("../pages/auth/ChangePassword.vue"),
+        },
+        {
+          path: "/reset-password",
+          name: "reset-password",
+          component: () => import("../pages/auth/ResetPassword.vue"),
+        },
       ],
     },
     {
@@ -57,6 +67,11 @@ const router = createRouter({
           path: "/kaban",
           name: "kaban",
           component: () => import("../pages/app/kabanborad/KabanBorad.vue"),
+        },
+        {
+          path: "/profile",
+          name: "profile",
+          component: () => import("../pages/app/UserProfile.vue"),
         },
       ],
     },

@@ -36,6 +36,8 @@ class AuthService
                 'id' => $user->id,
                 'email' => $user->email,
                 'name' => $user->name,
+                'avatar' => $user->avatar, // add avatar
+                // 'phone' => $user->phone, // optionally add phone
             ],
             'token' => $token,
         ];
