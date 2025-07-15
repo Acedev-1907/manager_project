@@ -41,8 +41,8 @@ export function showConfirm(
     text: message,
     icon: "warning",
     showCancelButton: true,
-    confirmButtonText: "Delete",
-    cancelButtonText: "Cancel",
+    confirmButtonText: "Yes",
+    cancelButtonText: "No",
     reverseButtons: true,
   }).then((result) => !!result.isConfirmed);
 }

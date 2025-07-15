@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
+import { useUserStore } from '../../../state/userStore';
 
 const navigation = ref([
     { name: "Dashboard", link: "/dashboard", icon: "bi bi-speedometer2" },
@@ -55,6 +56,20 @@ function handleNavMouseLeave() {
 function handleNavClick() {
     hoverNavIndex.value = null
 }
+
+// Thêm hàm getAvatarSrc để xử lý avatar qua proxy backend
+function getAvatarSrc(avatar: string | undefined, name: string | undefined) {
+    if (avatar) {
+        // Nếu đã là link proxy (bắt đầu bằng http hoặc /proxy-image) thì trả về luôn
+        if (avatar.startsWith('http') && avatar.includes('/proxy-image?url=')) return avatar;
+        if (avatar.startsWith('/proxy-image?url=')) return avatar;
+        // Nếu là link gốc thì render qua proxy
+        return `${APP.apiBaseURL}/proxy-image?url=${encodeURIComponent(avatar)}`;
+    }
+    return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name || 'U');
+}
+
+const userStore = useUserStore();
 </script>
 <template>
     <nav class="top-navbar">
@@ -65,14 +80,17 @@ function handleNavClick() {
                 <span class="navbar-app-name">TaskMgr</span>
             </div>
             <div class="navbar-avatar-btn" @click="toggleMenu" style="position: relative; margin-left: auto;">
-                <template v-if="loggedInUserName && loggedInUserName.length > 0">
-                    <span v-if="avatar" class="avatar-circle">
-                        <img :src="avatar" alt="avatar"
-                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                <template v-if="userStore.user.value && userStore.user.value.name">
+                    <span v-if="userStore.user.value.avatar && userStore.user.value.avatar.length > 0"
+                        class="avatar-circle">
+                        <img :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)" alt="avatar"
+                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
                     </span>
-                    <span v-else class="avatar-circle">
-                        {{ loggedInUserName.charAt(0).toUpperCase() }}
+                    <span v-else-if="userStore.user.value.name && userStore.user.value.name.length > 0"
+                        class="avatar-circle">
+                        {{ userStore.user.value.name.charAt(0).toUpperCase() }}
                     </span>
+                    <span v-else class="avatar-circle">?</span>
                 </template>
                 <span class="avatar-caret">
                     <i class="bi bi-caret-down-fill"></i>
@@ -97,12 +115,15 @@ function handleNavClick() {
                 <!-- Tài khoản -->
                 <div class="custom-user-list">
                     <div class="custom-user-item">
-                        <img v-if="avatar" :src="avatar" class="custom-avatar-img" />
-                        <span v-else-if="loggedInUserName" class="avatar-circle">{{
-                            loggedInUserName.charAt(0).toUpperCase()
+                        <img v-if="userStore.user.value?.avatar"
+                            :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)"
+                            class="custom-avatar-img" />
+                        <span v-else-if="userStore.user.value?.name" class="avatar-circle">{{
+                            userStore.user.value.name.charAt(0).toUpperCase()
                             }}</span>
                         <span v-else class="avatar-circle">?</span>
-                        <span v-if="loggedInUserName" class="custom-user-name">{{ loggedInUserName }}</span>
+                        <span v-if="userStore.user.value?.name" class="custom-user-name">{{ userStore.user.value.name
+                        }}</span>
                         <span v-else class="custom-user-name">Unknown</span>
                     </div>
                 </div>
@@ -139,14 +160,17 @@ function handleNavClick() {
         <!-- Avatar + dropdown desktop -->
         <div class="navbar-user d-none d-md-flex" style="position: relative;">
             <div class="navbar-avatar-btn" @click="menuOpen = !menuOpen" style="position: relative;">
-                <template v-if="loggedInUserName && loggedInUserName.length > 0">
-                    <span v-if="avatar" class="avatar-circle">
-                        <img :src="avatar" alt="avatar"
-                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                <template v-if="userStore.user.value && userStore.user.value.name">
+                    <span v-if="userStore.user.value.avatar && userStore.user.value.avatar.length > 0"
+                        class="avatar-circle">
+                        <img :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)" alt="avatar"
+                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
                     </span>
-                    <span v-else class="avatar-circle">
-                        {{ loggedInUserName.charAt(0).toUpperCase() }}
+                    <span v-else-if="userStore.user.value.name && userStore.user.value.name.length > 0"
+                        class="avatar-circle">
+                        {{ userStore.user.value.name.charAt(0).toUpperCase() }}
                     </span>
+                    <span v-else class="avatar-circle">?</span>
                 </template>
                 <span class="avatar-caret">
                     <i class="bi bi-caret-down-fill"></i>
@@ -157,12 +181,16 @@ function handleNavClick() {
                     <!-- Tài khoản -->
                     <div class="custom-user-list">
                         <div class="custom-user-item">
-                            <img v-if="avatar" :src="avatar" class="custom-avatar-img" />
-                            <span v-else-if="loggedInUserName" class="avatar-circle">{{
-                                loggedInUserName.charAt(0).toUpperCase()
+                            <img v-if="userStore.user.value?.avatar"
+                                :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)"
+                                class="custom-avatar-img" />
+                            <span v-else-if="userStore.user.value?.name" class="avatar-circle">{{
+                                userStore.user.value.name.charAt(0).toUpperCase()
                                 }}</span>
                             <span v-else class="avatar-circle">?</span>
-                            <span v-if="loggedInUserName" class="custom-user-name">{{ loggedInUserName }}</span>
+                            <span v-if="userStore.user.value?.name" class="custom-user-name">{{
+                                userStore.user.value.name
+                            }}</span>
                             <span v-else class="custom-user-name">Unknown</span>
                         </div>
                     </div>
@@ -470,7 +498,7 @@ function handleNavClick() {
 
 .navbar-mobile-overlay {
     position: fixed;
-    top: 64px;
+    top: 112px;
     left: 0;
     width: 100vw;
     height: 100vh;
@@ -512,17 +540,47 @@ function handleNavClick() {
     box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
 }
 
-.avatar-circle {
-    width: 100%;
-    height: 100%;
+.avatar-circle,
+.custom-avatar-img {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     background-color: #e0e7ef;
     color: #2563eb;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.custom-avatar-img {
+    object-fit: cover;
+}
+
+.custom-user-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.2rem 0 0.2rem 0;
+}
+
+.custom-user-name {
     font-weight: 600;
+    font-size: 1.08rem;
+    color: #222;
+    margin-left: 0.2rem;
+    white-space: nowrap;
+}
+
+.custom-dropdown {
+    min-width: 200px;
+    max-width: 260px;
+    word-break: break-word;
 }
 
 .spinning {

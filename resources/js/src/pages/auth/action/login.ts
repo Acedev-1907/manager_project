@@ -3,6 +3,7 @@ import { makeHttpReq } from "../../../helper/makeHttpReq";
 import { showError, showSuccess } from "../../../helper/alert";
 import { showErrorResponse } from "../../../helper/utils";
 import router from "../../../router";
+import { useUserStore } from "../../../state/userStore";
 
 export type LoginUserType = {
   email: string;
@@ -22,6 +23,7 @@ export const loginInput = ref<LoginUserType>({
 
 export function useLoginUser() {
   const loading = ref(false);
+  const userStore = useUserStore();
 
   async function login() {
     try {
@@ -33,13 +35,19 @@ export function useLoginUser() {
         loginInput.value
       );
 
-      loading.value = false;
-      loginInput.value = {
-        email: "",
-        password: "",
-      };
+      // loading.value = false;
+      // loginInput.value = {
+      //   email: "",
+      //   password: "",
+      // };
       if (data && data.token && data.user) {
         localStorage.setItem("userData", JSON.stringify(data));
+        // Gọi API lấy user mới nhất
+        const userRes = await makeHttpReq<undefined, any>("user", "GET");
+        userStore.setUser({
+          name: userRes.data.name,
+          avatar: userRes.data.avatar || "",
+        });
         router.push("/dashboard");
       } else {
         showError("Login failed!");
