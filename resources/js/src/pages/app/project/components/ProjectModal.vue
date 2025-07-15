@@ -45,57 +45,56 @@
                         <div class="form-group mb-2">
                             <div class="selected-members-minimal" @click="showAvailable = !showAvailable">
                                 <i class="bi bi-people-fill"></i>
-                                <span v-for="(id, idx) in selectedMembers.slice(0, 2)" :key="id" class="tag-minimal">
-                                    {{ getMemberById(id)?.name || 'Unknown' }}
-                                    <button type="button" class="remove-tag-btn-minimal"
-                                        @click.stop="toggleMember(id)"><i class="bi bi-x"></i></button>
+                                <span v-for="(id, idx) in selectedMembers.slice(0, 2)" :key="id"
+                                    class="tag-minimal member-tag" :title="getMemberById(id)?.email">
+                                    <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
+                                        class="avatar-tag" :alt="getMemberById(id)?.name" />
+                                    <span class="member-name-short">{{ getMemberById(id)?.name }}</span>
+                                    <button type="button" class="remove-tag-btn-minimal" @click.stop="toggleMember(id)"
+                                        title="Remove">
+                                        <i class="bi bi-x"></i>
+                                    </button>
                                 </span>
-                                <span v-if="selectedMembers.length > 2" class="tag-minimal more"
-                                    @click.stop="showAll = true">
-                                    +{{ selectedMembers.length - 2 }}
-                                </span>
-                                <span class="select-hint">Select Members</span>
-                            </div>
-                            <!-- Popup xem/xóa tất cả selected -->
-                            <div v-if="showAll" class="popup-all-selected">
-                                <div class="popup-header">
-                                    <span>Selected Members</span>
-                                    <button class="popup-close-btn" @click="showAll = false"><i
-                                            class="bi bi-x-lg"></i></button>
-                                </div>
-                                <div class="popup-list">
-                                    <div v-for="id in selectedMembers" :key="id" class="selected-member-row">
-                                        <span class="popup-avatar">{{ getMemberById(id)?.name?.charAt(0).toUpperCase()
-                                            || '?' }}</span>
-                                        <span class="popup-name">{{ getMemberById(id)?.name || '(ID: ' + id + ')'
-                                            }}</span>
-                                        <button class="popup-remove-btn" @click="toggleMember(id)">
-                                            <i class="bi bi-x"></i>
-                                        </button>
+                                <div v-if="selectedMembers.length > 2" class="selected-members-popup-wrapper"
+                                    @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave"
+                                    style="display: inline-block; position: relative;">
+                                    <span class="tag-minimal more member-tag"
+                                        style="position: relative; z-index: 10; cursor: pointer;">
+                                        +{{ selectedMembers.length - 2 }}
+                                    </span>
+                                    <div v-if="showAll" class="popup-all-selected">
+                                        <div v-for="id in selectedMembers.slice(2)" :key="id" class="popup-member-row">
+                                            <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
+                                                class="avatar-tag" :alt="getMemberById(id)?.name" />
+                                            <span class="member-name-short">{{ getMemberById(id)?.name }}</span>
+                                            <button class="remove-tag-btn-minimal"
+                                                @mousedown.prevent.stop="toggleMember(id); showAll = true"
+                                                title="Remove">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
+                                <span class="select-hint">Select Members</span>
                             </div>
                             <!-- Available Members xổ xuống -->
                             <div v-if="showAvailable" class="members-list-minimal">
                                 <input v-model="searchQuery" type="text" class="form-control mb-2"
                                     placeholder="Search members..." />
                                 <div v-if="filteredMembers.length > 0" class="user-card-list">
-                                    <div v-for="(memberObj, idx) in filteredMembers" :key="memberObj.member.id"
+                                    <div v-for="(memberObj, idx) in filteredMembers" :key="memberObj.id"
                                         class="user-card">
-                                        <div class="user-avatar">
-                                            {{ memberObj.member.name ? memberObj.member.name.charAt(0).toUpperCase() :
-                                                '?' }}
-                                        </div>
+                                        <img :src="getAvatarSrc(memberObj.avatar, memberObj.name)" class="user-avatar"
+                                            :alt="memberObj.name" />
                                         <div class="user-info">
-                                            <div class="user-name">{{ memberObj.member.name }}</div>
-                                            <div class="user-email">{{ memberObj.member.email }}</div>
+                                            <div class="user-name">{{ memberObj.name }}</div>
+                                            <div class="user-email">{{ memberObj.email }}</div>
                                         </div>
-                                        <button v-if="selectedMembers.includes(memberObj.member.id)"
+                                        <button v-if="selectedMembers.includes(memberObj.id)"
                                             class="user-select-btn selected" disabled>
                                             <i class="fas fa-check"></i>
                                         </button>
-                                        <button v-else @click="toggleMember(memberObj.member.id)"
-                                            class="user-select-btn">
+                                        <button v-else @click="toggleMember(memberObj.id)" class="user-select-btn">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </div>
@@ -116,6 +115,7 @@ import BaseInput from '../../../../components/BaseInput.vue';
 import DateInput from '../../../../components/DateInput.vue';
 import { useGetMembers } from '../../member/actions/getMember';
 import { projectStore } from '../store/projectStore';
+import { getAvatarSrc } from '../../../../helper/avatar';
 
 const props = defineProps<{ isEdit: boolean, projectInput: any, loading: boolean }>()
 const emit = defineEmits(['close', 'submit'])
@@ -126,8 +126,18 @@ const currentUserId = ref<number | null>(null);
 const searchQuery = ref('');
 const showAvailable = ref(false);
 const showAll = ref(false);
+const showTooltip = ref(false);
 // Thêm biến errors để lưu lỗi các trường
 const errors = ref<{ name?: string; startDate?: string; endDate?: string }>({});
+
+let closeTimeout: ReturnType<typeof setTimeout> | null = null;
+function handleMouseLeave() {
+    closeTimeout = setTimeout(() => { showAll.value = false }, 180);
+}
+function handleMouseEnter() {
+    if (closeTimeout) clearTimeout(closeTimeout);
+    showAll.value = true;
+}
 
 onMounted(async () => {
     projectStore.edit = props.isEdit;
@@ -178,15 +188,15 @@ function submitProject() {
 const filteredMembers = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase();
     return (memberData.value?.data?.data || [])
-        .filter(m => m.member.id !== currentUserId.value)
+        .filter(m => m.id !== currentUserId.value)
         .filter(m =>
-            m.member.name.toLowerCase().includes(keyword) ||
-            m.member.email.toLowerCase().includes(keyword)
+            m.name.toLowerCase().includes(keyword) ||
+            m.email.toLowerCase().includes(keyword)
         );
 });
 
 function getMemberById(id: number) {
-    return (memberData.value?.data?.data || []).find(m => m.member.id === id)?.member;
+    return (memberData.value?.data?.data || []).find(m => m.id === id);
 }
 
 // Tự động clear ngày kết thúc nếu ngày bắt đầu mới > ngày kết thúc cũ
@@ -419,6 +429,8 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     font-weight: bold;
     margin-right: 0.4em;
     font-size: 1em;
+    object-fit: cover;
+    border: 2px solid #e0e7ff;
 }
 
 .remove-tag-btn {
@@ -479,7 +491,7 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
 .remove-tag-btn-minimal {
     background: none;
     border: none;
-    color: #fff;
+    color: #2563eb;
     font-size: 1em;
     cursor: pointer;
     margin-left: 0.1em;
@@ -489,184 +501,31 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     height: 1.2em;
     width: 1.2em;
     padding: 0;
+    border-radius: 50%;
+    transition: background 0.15s;
 }
 
 .remove-tag-btn-minimal:hover {
-    color: #ff4d4f;
+    background: #fee2e2;
+    color: #b91c1c;
 }
 
-.popup-all-selected {
-    position: absolute;
-    background: #fff;
-    border-radius: 18px;
-    box-shadow: 0 6px 32px rgba(34, 34, 59, 0.18);
-    padding: 1.2rem 1.2rem 1rem 1.2rem;
-    z-index: 2000;
-    min-width: 260px;
-    right: 0;
-    top: 2.5rem;
-    max-height: 340px;
-    overflow-y: auto;
-    animation: fadeIn 0.18s;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.popup-header {
-    font-weight: 600;
-    font-size: 1.08rem;
-    margin-bottom: 0.7rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.popup-close-btn {
-    background: none;
-    border: none;
-    color: #222;
-    font-size: 1.1em;
-    cursor: pointer;
-    border-radius: 6px;
-    padding: 0.2em 0.5em;
-    transition: background 0.15s;
-}
-
-.popup-close-btn:hover {
-    background: #f3f6fd;
-}
-
-.popup-list {
-    max-height: 220px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.selected-member-row {
-    display: flex;
-    align-items: center;
-    background: #2563eb;
-    color: #fff;
-    border-radius: 999px;
-    padding: 0.08rem 0.7rem 0.08rem 0.3rem;
-    font-size: 0.97rem;
-    gap: 0.45rem;
-    margin-bottom: 0.18rem;
-    min-height: 2rem;
-    box-shadow: none;
-    transition: background 0.15s;
-}
-
-.selected-member-row:hover {
-    background: #1d4ed8;
-}
-
-.popup-avatar {
-    background: #fff;
+.badge-count {
+    background: #bfdbfe;
     color: #2563eb;
-    border-radius: 50%;
-    width: 1.45em;
-    height: 1.45em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 0.98em;
-    margin-right: 0.2em;
-}
-
-.popup-name {
-    flex: 1;
-    font-weight: 400;
-    font-size: 0.98em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.popup-remove-btn {
-    background: none;
-    border: none;
-    color: #fff;
-    margin-left: 0.1em;
-    font-size: 1em;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    border-radius: 50%;
-    width: 1.6em;
-    height: 1.6em;
-    justify-content: center;
-    transition: background 0.15s, color 0.15s;
-}
-
-.popup-remove-btn:hover {
-    background: #fff;
-    color: #ff4d4f;
-}
-
-.tag-minimal-full {
-    background: #2563eb;
-    color: #fff;
+    font-weight: 500;
     border-radius: 999px;
-    padding: 0.18rem 0.8rem 0.18rem 0.5rem;
+    padding: 0.12rem 0.7rem;
     font-size: 0.97rem;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    margin-bottom: 0.3rem;
-}
-
-.members-list-minimal {
-    background: #f8fafc;
-    border-radius: 8px;
-    padding: 0.7rem 0.7rem 0.5rem 0.7rem;
-    margin-top: 0.2rem;
-    box-shadow: 0 1px 4px rgba(34, 34, 59, 0.06);
-    position: relative;
-    z-index: 100;
-}
-
-.member-item-minimal {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.3rem 0;
-    border-bottom: 1px solid #e5e7eb;
-    font-size: 1rem;
-}
-
-.member-item-minimal:last-child {
-    border-bottom: none;
-}
-
-.add-member-btn {
-    background: none;
-    border: none;
-    color: #2563eb;
-    font-size: 1.1em;
-    cursor: pointer;
-    margin-left: 0.2em;
-    display: flex;
-    align-items: center;
-}
-
-.add-member-btn.selected {
-    color: #22c55e;
+    margin-right: 0.3rem;
     cursor: default;
+    box-shadow: none;
+    transition: none;
+}
+
+.badge-count:hover {
+    background: #bfdbfe;
+    color: #2563eb;
 }
 
 .user-card-list {
@@ -696,13 +555,10 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     width: 2.2rem;
     height: 2.2rem;
     border-radius: 50%;
-    background: #2563eb;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 1.1rem;
+    object-fit: cover;
+    border: 2px solid #e0e7ff;
+    background: #fff;
+    display: block;
 }
 
 .user-info {
@@ -759,5 +615,126 @@ watch(() => projectStore.projectInput.startDate, (newStart) => {
     margin-top: 2px;
     min-height: 18px;
     line-height: 1.2;
+}
+
+.member-tag {
+    display: flex;
+    align-items: center;
+    background: #e0e7ff;
+    color: #2563eb;
+    border-radius: 999px;
+    padding: 0.12rem 0.7rem 0.12rem 0.3rem;
+    font-size: 0.97rem;
+    gap: 0.3rem;
+    margin-right: 0.3rem;
+    box-shadow: 0 1px 4px rgba(34, 34, 59, 0.07);
+    transition: background 0.18s;
+    cursor: pointer;
+}
+
+.member-tag:hover {
+    background: #c7d2fe;
+}
+
+.avatar-tag {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 0.3em;
+    border: 2px solid #fff;
+    background: #fff;
+}
+
+.member-name-short {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.remove-tag-btn-minimal {
+    background: none;
+    border: none;
+    color: #2563eb;
+    font-size: 1em;
+    cursor: pointer;
+    margin-left: 0.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.2em;
+    width: 1.2em;
+    padding: 0;
+    border-radius: 50%;
+    transition: background 0.15s;
+}
+
+.remove-tag-btn-minimal:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.popup-all-selected {
+    position: absolute;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(34, 34, 59, 0.13);
+    padding: 0.6rem 0.7rem 0.6rem 0.7rem;
+    z-index: 3000;
+    min-width: 170px;
+    right: 0;
+    top: 2.1rem;
+    margin-top: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    animation: fadeIn 0.18s;
+    border: 1px solid #e5e7eb;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tag-minimal.more.member-tag {
+    position: relative;
+    z-index: 10;
+}
+
+.popup-all-selected::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    right: 24px;
+    border-width: 0 10px 10px 10px;
+    border-style: solid;
+    border-color: transparent transparent #fff transparent;
+    filter: drop-shadow(0 -2px 2px rgba(34, 34, 59, 0.08));
+}
+
+.popup-member-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.15rem;
+    padding: 0.15rem 0.1rem;
+}
+
+.popup-member-row:last-child {
+    margin-bottom: 0;
+}
+
+.member-email-popup {
+    color: #64748b;
+    font-size: 0.92rem;
 }
 </style>

@@ -4,16 +4,9 @@ import { showErrorResponse } from "../../../../helper/utils";
 
 export type MemberType = {
   id: number;
-  user_id: number;
-  member_id: number;
-  created_at: string;
-  updated_at: string;
-  member: {
-    id: number;
-    name: string;
-    email: string;
-    [key: string]: any;
-  };
+  name: string;
+  email: string;
+  avatar?: string;
 };
 
 export type GetMemberType = {
