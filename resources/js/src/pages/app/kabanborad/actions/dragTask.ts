@@ -1,6 +1,6 @@
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
-import { showSuccess } from "../../../../helper/alert";
 import { taskStore } from "../store/kabanStore";
+import { getAvatarSrc } from "../../../../helper/avatar";
 
 export function useDragTask(
   fn: (slug: string) => Promise<void>,
@@ -384,6 +384,25 @@ export function useDragTask(
     taskStore.clearDraggedTask();
   }
 
+  function getMemberName(member: any) {
+    return (
+      member?.user?.name ||
+      member?.members?.name ||
+      member?.member?.name ||
+      member?.name ||
+      ""
+    );
+  }
+  function getMemberAvatar(member: any) {
+    return (
+      member?.avatar ||
+      member?.user?.avatar ||
+      member?.members?.avatar ||
+      member?.member?.avatar ||
+      ""
+    );
+  }
+
   function createMobileGhost(x: number, y: number) {
     if (ghostElement) {
       ghostElement.remove();
@@ -415,19 +434,24 @@ export function useDragTask(
     // Lấy thông tin task đang kéo
     let taskName = "";
     let taskDate = "";
-    let taskMembers: string[] = [];
+    let taskMembers: any[] = [];
     if (draggedElement) {
       const nameEl = draggedElement.querySelector(".task-title");
       if (nameEl) taskName = nameEl.textContent || "";
       const dateEl = draggedElement.querySelector(".task-date span");
       if (dateEl) taskDate = dateEl.textContent || "";
-      const memberEls = draggedElement.querySelectorAll(".member-avatar");
-      taskMembers = Array.from(memberEls).map(
-        (el) => el.textContent?.trim() || ""
-      );
+      // Lấy data-task-id để tìm task trong ProjectData
+      const taskId = draggedElement.dataset.taskId;
+      let taskObj = null;
+      if (taskId && ProjectData?.value?.data?.tasks) {
+        taskObj = ProjectData.value.data.tasks.find((t: any) => t.id == taskId);
+      }
+      if (taskObj && Array.isArray(taskObj.task_members)) {
+        taskMembers = taskObj.task_members;
+      }
     }
 
-    // Tạo nội dung HTML cho ghost-task
+    // Tạo nội dung HTML cho ghost-task (hiển thị avatar đúng)
     ghostElement.innerHTML = `
       <div style="font-size:20px;font-weight:bold;margin-bottom:8px;">${taskName}</div>
       <div style="font-size:14px;margin-bottom:8px;">${
@@ -435,10 +459,17 @@ export function useDragTask(
       }</div>
       <div style="display:flex;gap:4px;">
         ${taskMembers
-          .map(
-            (m) =>
-              `<span style='background:#fff;color:#f59e0b;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;border:2px solid #f59e0b;'>${m}</span>`
-          )
+          .map((m: any) => {
+            const avatar = getAvatarSrc(getMemberAvatar(m), getMemberName(m));
+            const name = getMemberName(m);
+            if (avatar && !avatar.includes("ui-avatars.com")) {
+              return `<img src='${avatar}' style='width:28px;height:28px;border-radius:50%;border:2px solid #f59e0b;object-fit:cover;background:#fff;' alt='${name}' title='${name}' />`;
+            } else {
+              return `<span style='background:#fff;color:#f59e0b;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;border:2px solid #f59e0b;'>${
+                name ? name.charAt(0).toUpperCase() : "?"
+              }</span>`;
+            }
+          })
           .join("")}
       </div>
     `;

@@ -9,6 +9,7 @@ import imageCompression from 'browser-image-compression';
 import Cropper from 'cropperjs';
 import 'cropperjs/dist/cropper.css';
 import { showSuccess, showError, showConfirm } from '../../helper/alert';
+import { getAvatarSrc } from '../../helper/avatar';
 
 const router = useRouter();
 const user = ref({ name: '', email: '', phone: '', avatar: '' });
@@ -190,15 +191,6 @@ async function updateUser() {
 }
 function goToChangePassword() {
     router.push('/change-password');
-}
-function getAvatarSrc(avatar: string, name: string) {
-    if (!avatar) {
-        return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name);
-    }
-    if ((avatar.startsWith('http') && avatar.includes('/proxy-image?url=')) || avatar.startsWith('/proxy-image?url=')) {
-        return avatar;
-    }
-    return `${APP.apiBaseURL}/proxy-image?url=${encodeURIComponent(avatar)}`;
 }
 onMounted(fetchUser);
 </script>

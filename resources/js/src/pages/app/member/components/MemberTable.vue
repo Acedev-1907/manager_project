@@ -30,8 +30,7 @@ const handleSearch = async (searchQuery: string) => {
             No data
         </div>
         <div v-else class="member-card-grid">
-            <MemberCard v-for="member in members?.data?.data" :key="member.id"
-                :member="member.member ? { id: member.id, name: member.member.name, email: member.member.email } : { id: member.id, name: '', email: '' }"
+            <MemberCard v-for="member in members?.data?.data" :key="member.id" :member="member"
                 @remove="$emit('removeMember', member)" />
         </div>
         <div class="p-3 d-flex justify-content-center">

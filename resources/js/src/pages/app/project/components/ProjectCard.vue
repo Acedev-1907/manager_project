@@ -2,6 +2,8 @@
 import { defineProps, defineEmits } from 'vue';
 import { ProjectType } from '../actions/GetProject';
 import { RouterLink, useRouter } from 'vue-router';
+import { APP } from '../../../../App/APP';
+import { getAvatarSrc } from '../../../../helper/avatar';
 
 const props = defineProps<{
     project: ProjectType;
@@ -52,14 +54,14 @@ function stopPropagation(e: Event) {
             </span>
         </div>
         <div class="project-members">
-            <span v-if="project.users && project.users.length > 0">
-                <span v-for="(user, uidx) in project.users.slice(0, 3)" :key="user.id"
-                    class="badge bg-light text-dark me-1">
-                    {{ user.name }}
+            <template v-for="user in project.users" :key="user.id">
+                <img v-if="'avatar' in user && typeof user.avatar === 'string' && user.avatar"
+                    :src="getAvatarSrc(user.avatar, user.name)" class="member-avatar" :alt="user.name"
+                    :title="user.name" />
+                <span v-else class="member-avatar member-avatar-fallback" :title="user.name">
+                    {{ user.name.charAt(0).toUpperCase() }}
                 </span>
-                <span v-if="project.users.length > 3">+{{ project.users.length - 3 }}</span>
-            </span>
-            <span v-else>-</span>
+            </template>
         </div>
         <div class="project-progress">
             <div class="progress custom-progress" role="progressbar" :aria-valuenow="project?.task_progress?.progress"
@@ -144,7 +146,28 @@ function stopPropagation(e: Event) {
 }
 
 .project-members {
-    margin: 0.3rem 0 0.2rem 0;
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.member-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e0e7ef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2563eb;
+}
+
+.member-avatar-fallback {
+    background: #e0e7ef;
+    color: #2563eb;
 }
 
 .project-progress {

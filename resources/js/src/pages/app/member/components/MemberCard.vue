@@ -2,6 +2,7 @@
     <div class="member-card">
         <div class="member-info">
             <div class="row-name-id">
+                <img :src="getAvatarSrc(member.avatar, member.name)" class="avatar" alt="avatar" />
                 <span class="member-id">#{{ member.id }}</span>
                 <h5 class="member-name">{{ member.name }}</h5>
             </div>
@@ -14,7 +15,10 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{ member: { id: number; name: string; email: string } }>();
+import { defineProps, defineEmits } from 'vue';
+import { getAvatarSrc } from '../../../../helper/avatar';
+
+defineProps<{ member: { id: number; name: string; email: string; avatar?: string } }>();
 defineEmits(['remove']);
 </script>
 
@@ -91,5 +95,14 @@ defineEmits(['remove']);
     background: #fee2e2;
     color: #b91c1c;
     border-color: #b91c1c;
+}
+
+.avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+    border: 2px solid #e0e7ff;
 }
 </style>

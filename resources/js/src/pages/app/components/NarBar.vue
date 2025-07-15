@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
 import { useUserStore } from '../../../state/userStore';
+import { getAvatarSrc } from '../../../helper/avatar';
 
 const navigation = ref([
     { name: "Dashboard", link: "/dashboard", icon: "bi bi-speedometer2" },
@@ -55,18 +56,6 @@ function handleNavMouseLeave() {
 }
 function handleNavClick() {
     hoverNavIndex.value = null
-}
-
-// Thêm hàm getAvatarSrc để xử lý avatar qua proxy backend
-function getAvatarSrc(avatar: string | undefined, name: string | undefined) {
-    if (avatar) {
-        // Nếu đã là link proxy (bắt đầu bằng http hoặc /proxy-image) thì trả về luôn
-        if (avatar.startsWith('http') && avatar.includes('/proxy-image?url=')) return avatar;
-        if (avatar.startsWith('/proxy-image?url=')) return avatar;
-        // Nếu là link gốc thì render qua proxy
-        return `${APP.apiBaseURL}/proxy-image?url=${encodeURIComponent(avatar)}`;
-    }
-    return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name || 'U');
 }
 
 const userStore = useUserStore();

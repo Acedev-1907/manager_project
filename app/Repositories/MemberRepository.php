@@ -23,7 +23,17 @@ class MemberRepository extends BaseRepository
                     ->orWhere('email', 'like', "%$query%");
             });
         }
-        return $contacts->paginate(6);
+        $paginated = $contacts->paginate(6);
+        // Map lại dữ liệu để mỗi phần tử có avatar, name, email, id
+        $paginated->getCollection()->transform(function ($item) {
+            return [
+                'id' => $item->member->id ?? null,
+                'name' => $item->member->name ?? '',
+                'email' => $item->member->email ?? '',
+                'avatar' => $item->member->avatar ?? '',
+            ];
+        });
+        return $paginated;
     }
 
     public function exists($userId, $memberId)
