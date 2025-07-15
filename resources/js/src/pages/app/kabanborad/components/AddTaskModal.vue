@@ -3,15 +3,15 @@ import { useVuelidate } from "@vuelidate/core";
 import { required } from "@vuelidate/validators";
 import { ref, watch, onMounted, computed } from "vue";
 import { taskStore } from "../store/kabanStore";
-// import { GetMemberType } from "../../member/actions/getMember";
 import { useSelectMember } from "../actions/selectMember";
 import { myDebounce } from "../../../../helper/utils";
 import { useCreateTask } from "../actions/CreateTask";
 import { showError } from "../../../../helper/alert";
 import BaseInput from "../../../../components/BaseInput.vue";
+import { getAvatarSrc } from '../../../../helper/avatar';
 
 const props = defineProps<{
-    members: Array<{ id: number; name: string; email: string }>;
+    members: Array<{ id: number; name: string; email: string; avatar?: string }>; // Thêm avatar optional
     visible: boolean;
 }>();
 
@@ -28,7 +28,7 @@ const rules = {
 const v$ = useVuelidate(rules, taskStore.taskInput);
 const query = ref("");
 
-const { selectMember, selectedMembers, unSelectedMember } = useSelectMember()
+const { selectMember, selectedMembers, unSelectedMember } = useSelectMember();
 const { loading, createTask } = useCreateTask();
 
 const currentUser = ref<{ id: number; name: string; email: string } | null>(null);
@@ -43,6 +43,17 @@ const projectMembers = computed(() => {
         });
     }
     return members;
+});
+
+// Tạo computed để merge avatar vào selectedMembers
+const selectedMembersWithAvatar = computed(() => {
+    return selectedMembers.value.map((sel: { id: number; name: string; email: string; avatar?: string }) => {
+        const found = props.members.find(m => m.id === sel.id);
+        return {
+            ...sel,
+            avatar: sel.avatar || found?.avatar || undefined
+        };
+    });
 });
 
 onMounted(() => {
@@ -156,17 +167,20 @@ watch(() => props.visible, (newVal) => {
                             </div>
 
                             <!-- Selected Members -->
-                            <div v-if="selectedMembers.length > 0" class="form-group">
+                            <div v-if="selectedMembersWithAvatar.length > 0" class="form-group">
                                 <label class="form-label">
                                     <i class="fas fa-users"></i>
-                                    Selected Members ({{ selectedMembers.length }})
+                                    Selected Members ({{ selectedMembersWithAvatar.length }})
                                 </label>
                                 <div class="selected-members">
-                                    <div v-for="member in selectedMembers" :key="member.id" class="member-tag"
+                                    <div v-for="member in selectedMembersWithAvatar" :key="member.id" class="member-tag"
                                         @click="unSelectedMember(member.id)">
                                         <div class="member-avatar">
-                                            <span>{{ member && member.name ? member.name.charAt(0).toUpperCase() : '?'
-                                            }}</span>
+                                            <img v-if="member.avatar" :src="getAvatarSrc(member.avatar, member.name)"
+                                                alt="avatar"
+                                                style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                                            <span v-else>{{ member && member.name ? member.name.charAt(0).toUpperCase()
+                                                : '?' }}</span>
                                         </div>
                                         <span class="member-name">{{ member && member.name ? member.name : 'No Name'
                                         }}</span>
@@ -185,8 +199,11 @@ watch(() => props.visible, (newVal) => {
                                     <div v-for="member in projectMembers" :key="member.id" class="member-item">
                                         <div class="member-info">
                                             <div class="member-avatar-small">
-                                                <span>{{ member && member.name ? member.name.charAt(0).toUpperCase() :
-                                                    '?' }}</span>
+                                                <img v-if="member.avatar?.length"
+                                                    :src="getAvatarSrc(member.avatar, member.name)" alt="avatar"
+                                                    style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                                                <span v-else>{{ member && member.name ?
+                                                    member.name.charAt(0).toUpperCase() : '?' }}</span>
                                             </div>
                                             <div class="member-details">
                                                 <span class="member-name">
@@ -337,19 +354,19 @@ watch(() => props.visible, (newVal) => {
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
     color: white;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.13);
 }
 
 .member-tag:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.18);
 }
 
 .member-avatar {
