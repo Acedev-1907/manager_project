@@ -19,7 +19,7 @@
     "resources/js/**/*.ts",
     "resources/js/**/*.d.ts",
     "resources/js/**/*.vue",
-    "resources/js/app.ts",
-    "env.d.ts"
+    "resources/js/app.ts"
+    // "env.d.ts"
   ]
 }

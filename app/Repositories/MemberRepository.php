@@ -51,9 +51,9 @@ class MemberRepository extends BaseRepository
         ]);
     }
 
-    public function deleteMember($id, $userId)
+    public function deleteMember($member_id, $userId)
     {
-        $member = $this->model->where('id', $id)->where('user_id', $userId)->first();
+        $member = $this->model->where('user_id', $userId)->where('member_id', $member_id)->first();
         if ($member) {
             $member->delete();
             return true;

@@ -12,7 +12,6 @@ RUN npm install
 # ✅ PHẢI copy toàn bộ source code vào trước khi build
 COPY . .
 
-# ✅ Build
 RUN npm run build
 
 

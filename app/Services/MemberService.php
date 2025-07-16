@@ -30,9 +30,9 @@ class MemberService
         return ['message' => 'Added to contact list'];
     }
 
-    public function removeMember($user, $id)
+    public function removeMember($user, $member_id)
     {
-        $deleted = $this->memberRepo->delete($id, $user->id);
+        $deleted = $this->memberRepo->deleteMember($member_id, $user->id);
         if (!$deleted) {
             return ['error' => 'Not found or no permission'];
         }
