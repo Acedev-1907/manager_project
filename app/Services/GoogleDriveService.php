@@ -129,8 +129,8 @@ class GoogleDriveService
                     'type' => 'anyone',
                 ]),
             ]);
-            $permBody = $permResponse->getBody()->getContents();
-            \Log::info('Google Drive permission response', ['body' => $permBody]);
+            // $permBody = $permResponse->getBody()->getContents();
+            // \Log::info('Google Drive permission response', ['body' => $permBody]);
 
             $publicLink = 'https://drive.google.com/uc?export=view&id=' . $data['id'];
             return [
@@ -138,7 +138,7 @@ class GoogleDriveService
                 'link' => $publicLink
             ];
         } catch (\Exception $e) {
-            \Log::error('Google Drive upload error', ['error' => $e->getMessage()]);
+            // \Log::error('Google Drive upload error', ['error' => $e->getMessage()]);
             throw new Exception('Google Drive upload failed: ' . $e->getMessage());
         }
     }
