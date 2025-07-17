@@ -11,7 +11,6 @@ const props = defineProps<{ task: any }>();
             <span v-else class="member-avatar member-avatar-fallback" :title="user.name">
                 {{ user.name.charAt(0).toUpperCase() }}
             </span>
-            <span style="display:none">{{ console.log('Avatar:', user.avatar, 'Name:', user.name) }}</span>
         </template>
     </div>
 </template>
