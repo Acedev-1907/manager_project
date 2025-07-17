@@ -145,11 +145,7 @@ onMounted(async () => {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
     currentUserId.value = userData.id;
     if (props.projectInput.members) {
-        // Loại creator khỏi selectedMembers nếu có
-        const creatorId = props.projectInput.creator_id || props.projectInput.creator?.id;
-        selectedMembers.value = creatorId
-            ? props.projectInput.members.filter((id: number) => id !== creatorId)
-            : [...props.projectInput.members];
+        selectedMembers.value = [...props.projectInput.members];
     }
 });
 
@@ -196,7 +192,11 @@ const filteredMembers = computed(() => {
 });
 
 function getMemberById(id: number) {
-    return (memberData.value?.data?.data || []).find(m => m.id === id);
+    let user = (memberData.value?.data?.data || []).find(m => m.id === id);
+    if (!user && props.projectInput.users) {
+        user = props.projectInput.users.find((u: any) => u.id === id);
+    }
+    return user;
 }
 
 // Tự động clear ngày kết thúc nếu ngày bắt đầu mới > ngày kết thúc cũ
