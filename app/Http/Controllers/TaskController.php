@@ -2,13 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskCommentCreated;
 use App\Models\Task;
 use App\Services\TaskService;
+use App\Services\TaskCommentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class TaskController extends Controller
 {
-    public function __construct(private TaskService $taskService) {}
+
+    public function __construct(private TaskService $taskService, private TaskCommentService $taskCommentService)
+    {
+        $this->taskCommentService = $taskCommentService;
+    }
 
     public function createTask(Request $req)
     {
@@ -16,7 +23,10 @@ class TaskController extends Controller
         if (isset($result['errors'])) {
             return response($result['errors'], $result['status']);
         }
-        return response(['message' => $result['message']], $result['status']);
+        return response([
+            'message' => $result['message'],
+            'task' => $result['task']
+        ], $result['status']);
     }
 
     public function transition(Request $req, string $transition)
@@ -52,5 +62,30 @@ class TaskController extends Controller
             return response($result['errors'], $result['status']);
         }
         return response(['message' => $result['message']], $result['status']);
+    }
+
+    /**
+     * Get the list of comments for a task
+     */
+    public function getTaskComments($id)
+    {
+        $comments = $this->taskCommentService->getCommentsByTask($id);
+        return response(['comments' => $comments], 200);
+    }
+
+    /**
+     * Add a new comment to a task
+     */
+    public function addTaskComment(Request $request, $id)
+    {
+        $userId = Auth::id();
+        $content = $request->input('content');
+        if (!$content) {
+            return response(['error' => 'Content is required'], 422);
+        }
+        $comment = $this->taskCommentService->createComment($id, $userId, $content);
+        // Broadcast realtime event
+        event(new TaskCommentCreated($comment, $id));
+        return response(['message' => 'Comment added successfully', 'comment' => $comment], 201);
     }
 }

@@ -3,21 +3,19 @@ import { useVuelidate } from "@vuelidate/core";
 import { required } from "@vuelidate/validators";
 import { ref, watch, onMounted, computed } from "vue";
 import { taskStore } from "../store/kabanStore";
-import { useSelectMember } from "../actions/selectMember";
-import { myDebounce } from "../../../../helper/utils";
 import { useCreateTask } from "../actions/CreateTask";
 import { showError } from "../../../../helper/alert";
 import BaseInput from "../../../../components/BaseInput.vue";
 import { getAvatarSrc } from '../../../../helper/avatar';
 
 const props = defineProps<{
-    members: Array<{ id: number; name: string; email: string; avatar?: string }>; // Thêm avatar optional
+    members: Array<{ id: number; name: string; email: string; avatar?: string }>;
     visible: boolean;
 }>();
 
 const emit = defineEmits<{
     (e: "closeModal"): void;
-    (e: "refreshKabanBoard",): Promise<void>;
+    (e: "refreshKabanBoard"): Promise<void>;
     (e: "getMembers", page: number, query: string): Promise<void>;
 }>();
 
@@ -26,13 +24,11 @@ const rules = {
 };
 
 const v$ = useVuelidate(rules, taskStore.taskInput);
-const query = ref("");
-
-const { selectMember, selectedMembers, unSelectedMember } = useSelectMember();
+const selectedMembers = ref<number[]>([]);
 const { loading, createTask } = useCreateTask();
-
 const currentUser = ref<{ id: number; name: string; email: string } | null>(null);
 
+// Compute project members, always include current user
 const projectMembers = computed(() => {
     const members = (props.members || []).slice();
     if (currentUser.value && currentUser.value.id && !members.some(m => m.id === currentUser.value!.id)) {
@@ -45,20 +41,46 @@ const projectMembers = computed(() => {
     return members;
 });
 
-// Tạo computed để merge avatar vào selectedMembers
-const selectedMembersWithAvatar = computed(() => {
-    return selectedMembers.value.map((sel: { id: number; name: string; email: string; avatar?: string }) => {
-        const found = props.members.find(m => m.id === sel.id);
-        return {
-            ...sel,
-            avatar: sel.avatar || found?.avatar || undefined
-        };
-    });
+const searchQuery = ref('');
+const showAll = ref(false);
+
+watch(() => taskStore.taskInput.memberIds, (val) => {
+    selectedMembers.value = Array.isArray(val) ? val : [];
 });
+
+function toggleMember(id: number) {
+    if (selectedMembers.value.includes(id)) {
+        selectedMembers.value = selectedMembers.value.filter(m => m !== id);
+        if (selectedMembers.value.length === 0) showAll.value = false;
+    } else {
+        selectedMembers.value.push(id);
+    }
+    taskStore.taskInput.memberIds = [...selectedMembers.value];
+}
+
+function handleMouseLeave() {
+    showAll.value = false;
+}
+function handleMouseEnter() {
+    showAll.value = true;
+}
+
+const filteredMembers = computed(() => {
+    const keyword = searchQuery.value.trim().toLowerCase();
+    return (projectMembers.value || []).filter(m =>
+        m.name.toLowerCase().includes(keyword) ||
+        m.email.toLowerCase().includes(keyword)
+    );
+});
+
+function getMemberById(id: number) {
+    return (projectMembers.value || []).find(m => m.id === id);
+}
 
 onMounted(() => {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
     currentUser.value = userData;
+    selectedMembers.value = Array.isArray(taskStore.taskInput.memberIds) ? [...taskStore.taskInput.memberIds] : [];
 });
 
 function closeModal() {
@@ -66,22 +88,15 @@ function closeModal() {
 }
 
 async function submitTask() {
-    // Ensure memberIds is always an array before validate
     if (!Array.isArray(taskStore.taskInput.memberIds)) {
         taskStore.taskInput.memberIds = [];
     }
     const result = await v$.value.$validate();
-
     if (!result) return;
-
-    // Ensure memberIds is always an array before checking length
-    if (!Array.isArray(taskStore.taskInput.memberIds)) {
-        taskStore.taskInput.memberIds = [];
-    }
     if (taskStore.taskInput.memberIds.length > 0) {
         await createTask();
-        taskStore.taskInput.memberIds = []
-        taskStore.taskInput.name = ""
+        taskStore.taskInput.memberIds = [];
+        taskStore.taskInput.name = "";
         v$.value.$reset();
         emit('refreshKabanBoard');
         emit('closeModal');
@@ -90,137 +105,112 @@ async function submitTask() {
     }
 }
 
-const searchMember = myDebounce(async function () {
-    emit('getMembers', 1, query.value);
-}, 200);
-
 watch(() => props.visible, (newVal) => {
     if (newVal) {
         taskStore.taskInput.name = "";
+        taskStore.taskInput.content = ""; // Reset content khi mở modal
         taskStore.taskInput.memberIds = [];
         selectedMembers.value = [];
         v$.value.$reset();
-        // Auto add current user to selectedMembers if not present
-        if (
-            currentUser.value &&
-            currentUser.value.id &&
-            !selectedMembers.value.some(m => m.id === currentUser.value!.id)
-        ) {
-            selectMember({
-                id: currentUser.value.id,
-                name: currentUser.value.name,
-                email: currentUser.value.email
-            });
-        }
     }
 });
 </script>
 
 <template>
-    <!-- Custom Modal -->
     <Teleport to="body">
-        <div v-if="visible" class="custom-modal-overlay" @click="closeModal">
-            <div class="custom-modal" @click.stop>
-                <div class="custom-modal-content">
-                    <form enctype="multipart/form-data" @submit.prevent="submitTask">
-                        <!-- Simple Header -->
-                        <div class="modal-header">
-                            <div class="header-content-centered">
-                                <h5 class="modal-title">Add New Task</h5>
-                                <p class="modal-subtitle">Create a task for your project</p>
-                            </div>
-                            <div class="header-actions">
-                                <button type="submit" class="btn btn-primary btn-create" :disabled="loading">
-                                    <i v-if="loading" class="fas fa-spinner fa-spin"></i>
-                                    <i v-else class="fas fa-plus"></i>
-                                    <span v-if="!loading"> Create</span>
-                                    <span v-else>Creating...</span>
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-cancel" @click="closeModal">
-                                    Cancel
-                                </button>
-                            </div>
+        <div v-if="visible" class="modal-backdrop">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="header-content-centered">
+                            <h3 class="modal-title">Add New Task</h3>
+                            <p class="modal-subtitle">Create a task for your project</p>
                         </div>
-
+                        <div class="header-actions">
+                            <button type="submit" class="btn btn-primary btn-create" :disabled="loading"
+                                @click="submitTask">
+                                <i v-if="loading" class="fas fa-spinner fa-spin"></i>
+                                <i v-else class="fas fa-plus"></i>
+                                <span v-if="!loading"> Create</span>
+                                <span v-else>Creating...</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-cancel" @click="closeModal">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                    <form @submit.prevent="submitTask">
                         <div class="modal-body">
-                            <!-- Task Name Input -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-tasks"></i>
-                                    Task Name
-                                </label>
-                                <BaseInput placeholder="Enter task name..." v-model="taskStore.taskInput.name" />
+                            <div class="mb-3">
+                                <BaseInput v-model="taskStore.taskInput.name" placeholder="Task Name" />
                                 <div v-if="v$.name.$error" class="error-message">
                                     <i class="fas fa-exclamation-circle"></i>
                                     {{ v$.name.$errors[0].$message }}
                                 </div>
                             </div>
-
-                            <!-- Member Search -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-search"></i>
-                                    Search Members
-                                </label>
-                                <BaseInput type="text" v-model="query" @keydown="searchMember"
-                                    placeholder="Type to search team members..." />
+                            <div class="mb-3">
+                                <textarea v-model="taskStore.taskInput.content" class="form-control" rows="3"
+                                    placeholder="Task Content (optional)"></textarea>
                             </div>
-
-                            <!-- Selected Members -->
-                            <div v-if="selectedMembersWithAvatar.length > 0" class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-users"></i>
-                                    Selected Members ({{ selectedMembersWithAvatar.length }})
-                                </label>
-                                <div class="selected-members">
-                                    <div v-for="member in selectedMembersWithAvatar" :key="member.id" class="member-tag"
-                                        @click="unSelectedMember(member.id)">
-                                        <div class="member-avatar">
-                                            <img v-if="member.avatar" :src="getAvatarSrc(member.avatar, member.name)"
-                                                alt="avatar"
-                                                style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
-                                            <span v-else>{{ member && member.name ? member.name.charAt(0).toUpperCase()
-                                                : '?' }}</span>
-                                        </div>
-                                        <span class="member-name">{{ member && member.name ? member.name : 'No Name'
-                                        }}</span>
-                                        <i class="fas fa-times remove-icon"></i>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Members List -->
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <i class="fas fa-list"></i>
-                                    Available Members
-                                </label>
-                                <div class="members-list">
-                                    <div v-for="member in projectMembers" :key="member.id" class="member-item">
-                                        <div class="member-info">
-                                            <div class="member-avatar-small">
-                                                <img v-if="member.avatar?.length"
-                                                    :src="getAvatarSrc(member.avatar, member.name)" alt="avatar"
-                                                    style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
-                                                <span v-else>{{ member && member.name ?
-                                                    member.name.charAt(0).toUpperCase() : '?' }}</span>
-                                            </div>
-                                            <div class="member-details">
-                                                <span class="member-name">
-                                                    {{ member && member.name ? member.name : 'No Name' }}
-                                                </span>
-                                                <span class="member-id">#{{ member.id }}</span>
-                                            </div>
-                                        </div>
-                                        <button @click="selectMember(member)" type="button" class="add-member-btn"
-                                            :disabled="selectedMembers.some(m => m.id === member.id)">
-                                            <i v-if="!selectedMembers.some(m => m.id === member.id)"
-                                                class="fas fa-plus"></i>
-                                            <i v-else class="fas fa-check"></i>
-                                            <span v-if="!selectedMembers.some(m => m.id === member.id)">Add</span>
-                                            <span v-else>Selected</span>
+                            <div class="form-group mb-2">
+                                <label class="form-label">Select Members</label>
+                                <div class="selected-members-minimal">
+                                    <i class="bi bi-people-fill"></i>
+                                    <span v-for="(id, idx) in selectedMembers.slice(0, 2)" :key="id"
+                                        class="tag-minimal member-tag" :title="getMemberById(id)?.email">
+                                        <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
+                                            class="avatar-tag" :alt="getMemberById(id)?.name" />
+                                        <span class="member-name-short">{{ getMemberById(id)?.name }}</span>
+                                        <button type="button" class="remove-tag-btn-minimal"
+                                            @click.stop="toggleMember(id)" title="Remove">
+                                            <i class="bi bi-x"></i>
                                         </button>
+                                    </span>
+                                    <div v-if="selectedMembers.length > 2"
+                                        style="position: relative; display: inline-block; vertical-align: top;">
+                                        <span class="tag-minimal more member-tag"
+                                            style="position: relative; z-index: 10; cursor: pointer;"
+                                            @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
+                                            +{{ selectedMembers.length - 2 }}
+                                        </span>
+                                        <div v-if="showAll" class="selected-members-popup-wrapper"
+                                            @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
+                                            <div v-for="id in selectedMembers.slice(2)" :key="id"
+                                                class="popup-member-row">
+                                                <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
+                                                    class="avatar-tag" :alt="getMemberById(id)?.name" />
+                                                <span class="member-name-short">{{ getMemberById(id)?.name }}</span>
+                                                <button class="remove-tag-btn-minimal"
+                                                    @mousedown.prevent.stop="toggleMember(id); showAll = true"
+                                                    title="Remove">
+                                                    <i class="bi bi-x"></i>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
+                                    <span class="select-hint">Select Members</span>
+                                </div>
+                                <div class="members-list-minimal">
+                                    <input v-model="searchQuery" type="text" class="form-control mb-2"
+                                        placeholder="Search members..." />
+                                    <div v-if="filteredMembers.length > 0" class="user-card-list">
+                                        <div v-for="member in filteredMembers" :key="member.id" class="user-card">
+                                            <img :src="getAvatarSrc(member.avatar, member.name)" class="user-avatar"
+                                                :alt="member.name" />
+                                            <div class="user-info">
+                                                <div class="user-name">{{ member.name }}</div>
+                                                <div class="user-email">{{ member.email }}</div>
+                                            </div>
+                                            <button v-if="selectedMembers.includes(member.id)"
+                                                class="user-select-btn selected" disabled>
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button v-else @click="toggleMember(member.id)" class="user-select-btn">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div v-else class="text-center text-muted py-2">No member found</div>
                                 </div>
                             </div>
                         </div>
@@ -232,60 +222,38 @@ watch(() => props.visible, (newVal) => {
 </template>
 
 <style scoped>
-/* Custom Modal Styles */
-.custom-modal-overlay {
+.modal-backdrop {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.18);
+    z-index: 1050;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 99999;
-    padding: 12px;
-    box-sizing: border-box;
 }
 
-.custom-modal {
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-    overflow: hidden;
-    max-width: 480px;
-    width: 100%;
-    max-height: 80vh;
-    animation: modalSlideIn 0.3s ease-out;
-}
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px) scale(0.95);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-.custom-modal-content {
+.modal-dialog {
+    max-width: 650px;
     width: 100%;
 }
 
-/* Header */
+.modal-content {
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    padding: 0 1.5rem 1.5rem 1.5rem;
+    /* KHÔNG đặt max-height hoặc overflow-y ở đây */
+}
+
 .modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0;
-    padding: 16px 20px 8px 20px;
-    border-bottom: none;
-    position: relative;
-    background: none;
+    padding: 1.5rem 1.5rem 1rem 1.5rem;
+    border-bottom: 1px solid #eee;
 }
 
 .header-content-centered {
@@ -311,23 +279,24 @@ watch(() => props.visible, (newVal) => {
 
 .modal-title {
     font-size: 1.2rem;
-    font-weight: 700;
-    color: #1e293b;
+    font-weight: bold;
+    color: #333;
     margin: 0;
     text-align: center;
 }
 
 .modal-subtitle {
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: #64748b;
     margin: 0;
     text-align: center;
 }
 
+.modal-body {
+    padding: 1.5rem;
+}
+
 .error-message {
-    display: flex;
-    align-items: center;
-    gap: 6px;
     color: #ef4444;
     font-size: 12px;
     margin-top: 6px;
@@ -337,338 +306,234 @@ watch(() => props.visible, (newVal) => {
     border-left: 3px solid #ef4444;
 }
 
-.error-message i {
-    font-size: 10px;
-}
-
-/* Selected Members */
-.selected-members {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.member-tag {
+/* --- Select Members styles giống ProjectModal --- */
+.selected-members-minimal {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
-    color: white;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
+    gap: 0.5rem;
+    background: #f3f6fd;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.13);
+    min-height: 2.2rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
 }
 
-.member-tag:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.18);
+.selected-members-minimal .select-hint {
+    color: #2563eb;
+    font-size: 0.95em;
+    margin-left: 0.5em;
 }
 
-.member-avatar {
-    width: 20px;
-    height: 20px;
+.tag-minimal {
+    display: inline-flex;
+    align-items: center;
+    background: #e0e7ff;
+    color: #2563eb;
+    border-radius: 999px;
+    padding: 0.12rem 0.7rem 0.12rem 0.3rem;
+    font-size: 0.97rem;
+    gap: 0.3rem;
+    margin-right: 0.3rem;
+    box-shadow: 0 1px 4px rgba(34, 34, 59, 0.07);
+    transition: background 0.18s;
+    cursor: pointer;
+}
+
+.tag-minimal.more {
+    background: #60a5fa;
+    color: #fff;
+    cursor: pointer;
+    margin-right: 0;
+    padding: 0.12rem 0.7rem 0.12rem 0.7rem;
+}
+
+.tag-minimal:hover {
+    background: #c7d2fe;
+}
+
+.avatar-tag {
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
+    object-fit: cover;
+    margin-right: 0.3em;
+    border: 2px solid #fff;
+    background: #fff;
+}
+
+.member-name-short {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.remove-tag-btn-minimal {
+    background: none;
+    border: none;
+    color: #2563eb;
+    font-size: 1em;
+    cursor: pointer;
+    margin-left: 0.1em;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
-    font-weight: 600;
+    height: 1.2em;
+    width: 1.2em;
+    padding: 0;
+    border-radius: 50%;
+    transition: background 0.15s;
 }
 
-.member-name {
-    font-weight: 500;
+.remove-tag-btn-minimal:hover {
+    background: #fee2e2;
+    color: #b91c1c;
 }
 
-.remove-icon {
-    font-size: 10px;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
-}
-
-.member-tag:hover .remove-icon {
-    opacity: 1;
-}
-
-/* Members List */
-.members-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    max-height: 200px;
+.selected-members-popup-wrapper {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 0.5rem;
+    z-index: 2000;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(34, 34, 59, 0.13);
+    padding: 0.6rem 0.7rem;
+    width: 220px;
+    max-height: 220px;
     overflow-y: auto;
     border: 1px solid #e5e7eb;
+}
+
+.popup-all-selected {
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.popup-member-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.popup-member-row:hover {
+    background: #f3f6fd;
+}
+
+.popup-member-row .avatar-tag {
+    width: 1.5em;
+    height: 1.5em;
+    font-size: 0.8em;
+    margin-right: 0.3em;
+}
+
+/* Trong style, ghi đè .popup-member-row .member-name-short để hiển thị đầy đủ tên */
+.popup-member-row .member-name-short {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.popup-member-row .remove-tag-btn-minimal {
+    margin-left: auto;
+    padding: 0.2em 0.4em;
+    font-size: 0.9em;
+}
+
+.members-list-minimal {
+    background: #fff;
     border-radius: 12px;
-    background: #f9fafb;
-    padding: 8px 0;
+    box-shadow: 0 4px 18px rgba(34, 34, 59, 0.13);
+    padding: 0.6rem 0.7rem 0.6rem 0.7rem;
+    z-index: 3000;
+    min-width: 170px;
+    margin-top: 0.5rem;
+    border: 1px solid #e5e7eb;
 }
 
-.member-item {
+.user-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.user-card {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid #f3f4f6;
-    background: white;
-    transition: all 0.3s ease;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 6px rgba(34, 34, 59, 0.07);
+    padding: 0.6rem 1rem;
+    gap: 1rem;
+    transition: box-shadow 0.2s;
 }
 
-.member-item:hover {
-    background: #f8fafc;
+.user-card:hover {
+    box-shadow: 0 4px 16px rgba(34, 34, 59, 0.13);
 }
 
-.member-item:last-child {
-    border-bottom: none;
-}
-
-.member-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.member-avatar-small {
-    width: 32px;
-    height: 32px;
+.user-avatar {
+    width: 2.2rem;
+    height: 2.2rem;
     border-radius: 50%;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    color: white;
+    object-fit: cover;
+    border: 2px solid #e0e7ff;
+    background: #fff;
+    display: block;
+}
+
+.user-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.user-name {
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+.user-email {
+    font-size: 0.92rem;
+    color: #64748b;
+}
+
+.user-select-btn {
+    background: #f3f6fd;
+    border: none;
+    border-radius: 8px;
+    color: #2563eb;
+    font-size: 1.2em;
+    width: 2.1rem;
+    height: 2.1rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.member-details {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.member-details .member-name {
-    font-size: 14px;
-    font-weight: 500;
-    color: #1e293b;
-}
-
-.member-details .member-id {
-    font-size: 11px;
-    color: #6b7280;
-    font-weight: 400;
-}
-
-.add-member-btn {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    transition: background 0.15s, color 0.15s;
 }
 
-.add-member-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
-}
-
-.add-member-btn i {
-    font-size: 8px;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .custom-modal-overlay {
-        padding: 10px;
-    }
-
-    .custom-modal {
-        max-width: 95%;
-    }
-
-    .modal-header {
-        padding: 14px 16px;
-    }
-
-    .header-icon {
-        width: 32px;
-        height: 32px;
-        font-size: 12px;
-    }
-
-    .modal-title {
-        font-size: 16px;
-    }
-
-    .modal-subtitle {
-        font-size: 12px;
-    }
-
-    .modal-body {
-        padding: 12px;
-    }
-
-    .form-group {
-        margin-bottom: 12px;
-    }
-
-    .members-list {
-        max-height: 120px;
-    }
-
-    .member-item {
-        padding: 8px 10px;
-    }
-
-    .member-info {
-        gap: 8px;
-    }
-
-    .member-avatar-small {
-        width: 28px;
-        height: 28px;
-        font-size: 11px;
-    }
-
-    .btn-cancel {
-        padding: 8px 16px;
-        font-size: 13px;
-    }
-
-    .btn-create {
-        padding: 8px 16px;
-        font-size: 13px;
-    }
-}
-
-@media (max-width: 480px) {
-    .custom-modal-overlay {
-        padding: 8px;
-    }
-
-    .modal-header {
-        padding: 12px 14px;
-    }
-
-    .header-content {
-        gap: 10px;
-    }
-
-    .header-icon {
-        width: 28px;
-        height: 28px;
-        font-size: 11px;
-    }
-
-    .modal-title {
-        font-size: 15px;
-    }
-
-    .modal-subtitle {
-        font-size: 11px;
-    }
-
-    .modal-body {
-        padding: 10px;
-    }
-
-    .form-group {
-        margin-bottom: 10px;
-    }
-
-    .members-list {
-        max-height: 195px;
-    }
-
-    .member-item {
-        padding: 6px 8px;
-    }
-
-    .member-avatar-small {
-        width: 24px;
-        height: 24px;
-        font-size: 10px;
-    }
-
-    .add-member-btn {
-        padding: 4px 8px;
-        font-size: 10px;
-    }
-
-    .btn-cancel {
-        padding: 10px 16px;
-    }
-
-    .btn-create {
-        padding: 10px 16px;
-    }
-}
-
-.modal-body {
-    padding: 24px 20px 12px 20px;
-    background: white;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 8px;
-}
-
-.form-label i {
-    color: #3b82f6;
-    font-size: 1rem;
-}
-
-input,
-.base-input,
-input[type='text'] {
-    width: 100%;
-    padding: 12px 14px;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
-    font-size: 1rem;
-    background: #f8fafc;
-    transition: border 0.2s, box-shadow 0.2s;
-    margin-bottom: 2px;
-}
-
-input:focus,
-.base-input:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px #dbeafe;
-    outline: none;
-}
-
-.add-member-btn:disabled {
-    background: #e5e7eb !important;
-    color: #9ca3af !important;
-    cursor: not-allowed !important;
-    border: 1px solid #d1d5db;
-    box-shadow: none;
-    opacity: 0.8;
-}
-
-.add-member-btn:disabled .fa-check {
+.user-select-btn.selected {
     color: #22c55e;
+    background: #e0fbe0;
+    cursor: default;
+}
+
+.user-select-btn:hover:not(.selected) {
+    background: #2563eb;
+    color: #fff;
 }
 </style>

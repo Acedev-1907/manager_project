@@ -58,5 +58,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/tasks', 'createTask')->name('tasks.create');
         Route::post('/task/{transition}', 'transition')->name('tasks.transition');
         Route::delete('/tasks/{id}', 'destroy')->name('tasks.destroy');
+        // API comment cho task
+        Route::get('/tasks/{id}/comments', 'getTaskComments');
+        Route::post('/tasks/{id}/comments', 'addTaskComment');
     });
 });

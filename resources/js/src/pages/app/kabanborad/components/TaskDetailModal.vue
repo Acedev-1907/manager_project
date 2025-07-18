@@ -1,30 +1,166 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { getAvatarSrc } from '../../../../helper/avatar';
+import { getTaskComments, addTaskComment } from '../actions/taskComment';
+import { showError } from '../../../../helper/alert';
+
 const props = defineProps<{ visible: boolean, task: any }>();
 const emit = defineEmits(['close']);
 const comments = ref<any[]>([]);
 const newComment = ref('');
+const loadingComments = ref(false);
+const commentsListRef = ref<HTMLElement | null>(null);
+const showNewMsgBtn = ref(false);
+
+// Lấy userId hiện tại
+const currentUserId = computed(() => {
+    const data = localStorage.getItem("userData");
+    if (data) {
+        const parsed = JSON.parse(data);
+        return parsed.user?.id;
+    }
+    return null;
+});
+const currentUserIdStr = computed(() => String(currentUserId.value));
+
+let channel: any = null;
+
+// Theo dõi khi modal mở và taskId thay đổi để mount/unmount channel realtime
+watch([
+    () => props.visible,
+    () => props.task?.id
+], ([visible, taskId]) => {
+    if (channel) {
+        channel.stopListening('TaskCommentCreated');
+        channel = null;
+    }
+    if (visible && taskId && window.Echo) {
+        channel = window.Echo.private('task.' + taskId)
+            .listen('TaskCommentCreated', (e: any) => {
+                const commentUserId = String(e.comment.user?.id || e.comment.user_id);
+                if (commentUserId !== String(currentUserId.value)) {
+                    handleNewRealtimeComment(e.comment, false);
+                }
+            });
+    }
+});
+
+onUnmounted(() => {
+    if (channel) {
+        channel.stopListening('TaskCommentCreated');
+        channel = null;
+    }
+});
+
 function close() { emit('close'); }
-function sendComment() {
-    if (newComment.value.trim()) {
-        comments.value.push({ id: Date.now(), user: 'You', text: newComment.value });
-        newComment.value = '';
+
+// Load danh sách comment khi mở modal hoặc đổi task
+async function loadComments() {
+    if (!props.task?.id) return;
+    loadingComments.value = true;
+    try {
+        comments.value = await getTaskComments(props.task.id);
+        await nextTick();
+        scrollToBottom();
+    } catch (e: any) {
+        showError(e?.message || 'Failed to load comments');
+    } finally {
+        loadingComments.value = false;
     }
 }
+
+watch(() => props.task, () => {
+    comments.value = [];
+    newComment.value = '';
+    loadComments();
+});
+
+// Theo dõi scroll để ẩn nút khi user tự cuộn xuống cuối
+function onCommentsScroll() {
+    if (isUserAtBottom()) {
+        showNewMsgBtn.value = false;
+    }
+}
+
+// Theo dõi thay đổi comments để ẩn nút khi user tự cuộn xuống cuối
+watch(comments, () => {
+    if (isUserAtBottom()) {
+        showNewMsgBtn.value = false;
+    }
+}, { deep: true });
+
+function scrollToBottom() {
+    if (commentsListRef.value) {
+        commentsListRef.value.scrollTop = commentsListRef.value.scrollHeight;
+    }
+}
+
+// Gửi comment mới
+async function sendComment() {
+    if (!newComment.value.trim()) return;
+    try {
+        const comment = await addTaskComment(props.task.id, newComment.value);
+        newComment.value = '';
+        handleNewRealtimeComment(comment, true); // true: là của mình
+        await nextTick();
+        scrollToBottom();
+    } catch (e: any) {
+        showError(e?.message || 'Failed to send comment');
+    }
+}
+
+// Xác định user đang ở gần cuối (dưới 150px)
+function isUserAtBottom(threshold = 150) {
+    if (!commentsListRef.value) return true;
+    const el = commentsListRef.value;
+    return Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+}
+
+// Xử lý khi nhận comment mới (realtime hoặc của chính mình)
+async function handleNewRealtimeComment(comment: any, isMine = false) {
+    if (!comments.value.find(c => c.id === comment.id)) {
+        comments.value.push(comment);
+        await nextTick();
+        if (isMine || isUserAtBottom(150)) {
+            scrollToBottom();
+            showNewMsgBtn.value = false;
+        } else {
+            showNewMsgBtn.value = true;
+        }
+    }
+}
+
+// Khi user bấm nút 'New message'
+function goToBottom() {
+    scrollToBottom();
+    showNewMsgBtn.value = false;
+}
+
+// Helper cho UI
 function getStatusText(status: number) {
     if (status === 0) return 'Not Started';
     if (status === 1) return 'Pending';
     if (status === 2) return 'Completed';
     return '';
 }
-watch(() => props.task, () => { comments.value = []; }); // reset comment khi đổi task
-
 function getMemberName(member: any) {
     return member?.user?.name || member?.members?.name || member?.member?.name || member?.name || '';
 }
 function getMemberAvatar(member: any) {
     return member?.avatar || member?.user?.avatar || member?.members?.avatar || member?.member?.avatar || '';
+}
+function formatTime(dateStr: string) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const now = new Date();
+    const isToday =
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate();
+    if (isToday) {
+        return d.toLocaleTimeString();
+    }
+    return d.toLocaleString();
 }
 </script>
 
@@ -42,16 +178,43 @@ function getMemberAvatar(member: any) {
                     </div>
                 </div>
                 <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
+                <div class="task-content">
+                    <b>Content:</b>
+                    <div>{{ task?.content || task?.description || 'No content' }}</div>
+                </div>
             </div>
             <div class="task-chat-col">
                 <div class="comments-section">
                     <h4>Discussion</h4>
-                    <div class="comments-list">
+                    <hr class="divider" />
+                    <div class="comments-list" ref="commentsListRef" @scroll="onCommentsScroll">
+                        <template v-if="comments.length === 0">
+                            <div class="comments-placeholder">This is a chat for task discussion.</div>
+                        </template>
                         <div v-for="c in comments" :key="c.id"
-                            :class="['comment-item', c.user === 'You' ? 'my-message' : 'other-message']">
-                            <span class="comment-user">{{ c.user }}</span>
-                            <span class="comment-text">{{ c.text }}</span>
+                            :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
+                            <div class="comment-bubble-wrap">
+                                <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
+                                    <div class="comment-bubble">
+                                        <div class="comment-text">{{ c.content }}</div>
+                                    </div>
+                                    <img v-if="c.user?.avatar" :src="getAvatarSrc(c.user.avatar, '')"
+                                        class="comment-avatar" />
+                                </template>
+                                <template v-else>
+                                    <img v-if="c.user?.avatar" :src="getAvatarSrc(c.user.avatar, '')"
+                                        class="comment-avatar" />
+                                    <div class="comment-bubble">
+                                        <div class="comment-text">{{ c.content }}</div>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="comment-time">{{ formatTime(c.created_at) }}</div>
                         </div>
+                    </div>
+                    <!-- Nút thông báo tin nhắn mới -->
+                    <div v-if="showNewMsgBtn" class="new-msg-alert">
+                        <button @click="goToBottom">New message</button>
                     </div>
                     <div class="comment-input">
                         <input v-model="newComment" @keyup.enter="sendComment" placeholder="Type a message..." />
@@ -101,14 +264,17 @@ function getMemberAvatar(member: any) {
     display: flex;
     flex-direction: column;
     gap: 18px;
+    max-height: 550px;
+    overflow-y: auto;
 }
 
 .task-chat-col {
-    flex: 1.2;
+    flex: 1.1;
     padding-left: 28px;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    gap: 18px;
+    height: 550px;
 }
 
 .close-btn {
@@ -182,92 +348,212 @@ function getMemberAvatar(member: any) {
     color: #888;
 }
 
+.task-content {
+    font-size: 1.05rem;
+    color: #333;
+    margin-bottom: 8px;
+    white-space: pre-line;
+}
+
 .comments-section {
-    margin-top: 10px;
+    flex: 1;
     display: flex;
     flex-direction: column;
     height: 100%;
 }
 
 .comments-list {
-    max-height: 220px;
+    flex: 1;
     overflow-y: auto;
-    margin-bottom: 8px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    flex: 1;
-    padding-right: 2px;
+    gap: 18px;
+    padding: 12px;
+    width: 100%;
 }
 
 .comment-item {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    max-width: 80%;
-    padding: 7px 14px;
-    border-radius: 16px;
-    font-size: 1rem;
-    background: #f3f4f6;
-    color: #22223b;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
-    word-break: break-word;
+    width: 100%;
+    /* Đảm bảo chiếm hết chiều ngang */
 }
 
 .my-message {
-    align-self: flex-end;
+    align-items: flex-end;
+}
+
+.my-message .comment-bubble-wrap {
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.my-message .comment-time {
+    justify-content: flex-end;
+}
+
+.my-message .comment-bubble {
     background: #2563eb;
     color: #fff;
+    border-radius: 18px 18px 6px 18px;
 }
 
 .other-message {
-    align-self: flex-start;
-    background: #f3f4f6;
-    color: #22223b;
+    align-items: flex-start;
 }
 
-.comment-user {
-    font-weight: 600;
-    font-size: 0.93rem;
-    margin-bottom: 2px;
+.other-message .comment-bubble-wrap {
+    flex-direction: row;
+    justify-content: flex-start;
+}
+
+.other-message .comment-time {
+    justify-content: flex-start;
+}
+
+.other-message .comment-bubble {
+    background: #e6edf6;
+    color: #22223b;
+    border-radius: 18px 18px 18px 6px;
+}
+
+.divider {
+    border: none;
+    border-top: 1.5px solid #e5e7eb;
+    margin: 6px 0 0px 0;
+    box-shadow:
+        0 2px 8px 0 #2563eb33,
+        0 4px 16px 0 #b0b0b066,
+        0 1.5px 0 #2563eb44;
+}
+
+.comment-bubble-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.my-message .comment-bubble-wrap {
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.other-message .comment-bubble-wrap {
+    flex-direction: row;
+    justify-content: flex-start;
+}
+
+.comment-bubble {
+    background: #f3f6fa;
+    color: #22223b;
+    border-radius: 18px 18px 6px 18px;
+    padding: 12px 18px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    max-width: 340px;
+    min-width: 60px;
+    word-break: break-word;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.my-message .comment-bubble {
+    background: #2563eb;
+    color: #fff;
+    border-radius: 18px 18px 6px 18px;
 }
 
 .comment-text {
-    font-size: 1rem;
+    font-size: 1.08rem;
+}
+
+.comment-time {
+    font-size: 0.80rem;
+    color: #b0b0b0;
+    margin-top: 4px;
+    margin-bottom: 2px;
+    width: 100%;
+    display: flex;
+}
+
+.comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1.5px solid #e0e7ef;
+    background: #e0e7ef;
+    margin-bottom: 2px;
+    margin-top: 8px;
 }
 
 .comment-input {
     display: flex;
-    gap: 8px;
-    margin-top: 8px;
+    gap: 10px;
+    margin-top: 0;
+    margin-bottom: 0;
     background: #f8fafc;
-    border-radius: 12px;
-    padding: 7px 10px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    border-radius: 16px;
+    padding: 10px 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .comment-input input {
     flex: 1;
-    border-radius: 8px;
-    border: 1px solid #e0e7ef;
-    padding: 7px 12px;
-    font-size: 1rem;
+    border-radius: 10px;
+    border: 1.5px solid #e0e7ef;
+    padding: 10px 16px;
+    font-size: 1.05rem;
     background: transparent;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
 .comment-input button {
     background: #2563eb;
     color: #fff;
     border: none;
-    border-radius: 8px;
-    padding: 7px 18px;
-    font-size: 1rem;
+    border-radius: 10px;
+    padding: 10px 22px;
+    font-size: 1.05rem;
     cursor: pointer;
     transition: background 0.18s;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .comment-input button:hover {
     background: #1d4ed8;
+}
+
+.new-msg-alert {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 6px;
+}
+
+.new-msg-alert button {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 18px;
+    padding: 6px 18px;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px #2563eb33;
+    cursor: pointer;
+    transition: background 0.18s;
+}
+
+.new-msg-alert button:hover {
+    background: #1d4ed8;
+}
+
+.comments-placeholder {
+    color: #b0b0b0;
+    font-size: 1.08rem;
+    text-align: center;
+    margin-top: 32px;
+    font-style: italic;
+    opacity: 0.85;
 }
 
 @media (max-width: 900px) {

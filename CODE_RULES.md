@@ -39,5 +39,6 @@
 
 - Tất cả các API call phải sử dụng hàm `makeHttpReq.ts` (không dùng fetch, axios trực tiếp).
 - Tất cả các thông báo (thành công, lỗi, xác nhận, cảnh báo,...) phải sử dụng các hàm trong `alert.ts`.
+- Tất cả các hàm tiện ích (utility) phía FE phải được đặt trong `utils.ts` và import từ đó.
 
 ---

@@ -9,6 +9,7 @@ export type CreateTaskInput = {
   name: string;
   memberIds: Array<number>;
   projectId: number;
+  content?: string;
 };
 
 export function useCreateTask() {

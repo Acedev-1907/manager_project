@@ -9,85 +9,97 @@ use  App\Events\TrackCompletedAndPending;
 
 class Task extends Model
 {
-  use HasFactory;
+    use HasFactory;
 
-  const NOT_STARTED = 0;
-  const PENDING = 1;
-  const COMPLETED = 2;
+    const NOT_STARTED = 0;
+    const PENDING = 1;
+    const COMPLETED = 2;
 
-  protected $guarded = [];
+    protected $fillable = [
+        'projectId',
+        'name',
+        'content',
+        'status'
+    ];
 
-  public function task_members()
-  {
-    return $this->hasMany(TaskMember::class, 'taskId');
-  }
+    public function task_members()
+    {
+        return $this->hasMany(TaskMember::class, 'taskId');
+    }
 
-  public static function countCompletedTask($projectId)
-  {
-      $count = Task::where('projectId', $projectId)
-          ->where('status', Task::COMPLETED)
-          ->count();
-      return $count;
-  }
+    /**
+     * Get the task comments list
+     */
+    public function comments()
+    {
+        return $this->hasMany(TaskComment::class, 'task_id');
+    }
 
-  public static function countCompletedAndPendingTask($projectId)
-  {
+    public static function countCompletedTask($projectId)
+    {
+        $count = Task::where('projectId', $projectId)
+            ->where('status', Task::COMPLETED)
+            ->count();
+        return $count;
+    }
 
-      $task = Task::where('projectId', $projectId)->get();
+    public static function countCompletedAndPendingTask($projectId)
+    {
 
-      $pending = 0;
-      $completed = 0;
-      foreach ($task as $row) {
+        $task = Task::where('projectId', $projectId)->get();
 
-          if (intval($row->status) === Task::PENDING) {
-              $pending++;
-          }
+        $pending = 0;
+        $completed = 0;
+        foreach ($task as $row) {
 
-          if (intval($row->status) === Task::COMPLETED) {
-              $completed++;
-          }
-      }
+            if (intval($row->status) === Task::PENDING) {
+                $pending++;
+            }
 
-      return [$pending, $completed];
-  }
+            if (intval($row->status) === Task::COMPLETED) {
+                $completed++;
+            }
+        }
 
-  public static  function countProjectTask($projectId)
-  {
-      $count = Task::where('projectId', $projectId)->count();
-      return $count;
-  }
-  public static function handleProjectProgress($projectId)
-  {
-      $totalTask = Task::countProjectTask($projectId);
-      $totalCompletedTask = Task::countCompletedTask($projectId);
+        return [$pending, $completed];
+    }
 
-      $progress = Task::aroundNumber(($totalCompletedTask * 100) / $totalTask);
+    public static  function countProjectTask($projectId)
+    {
+        $count = Task::where('projectId', $projectId)->count();
+        return $count;
+    }
+    public static function handleProjectProgress($projectId)
+    {
+        $totalTask = Task::countProjectTask($projectId);
+        $totalCompletedTask = Task::countCompletedTask($projectId);
 
-      $taskProgress = TaskProgress::where('projectId', $projectId)->first();
-      if (!is_null($taskProgress)) {
+        $progress = Task::aroundNumber(($totalCompletedTask * 100) / $totalTask);
 
-          $taskProgress->where('projectId', $projectId)
-              ->update(['progress' => $progress]);
+        $taskProgress = TaskProgress::where('projectId', $projectId)->first();
+        if (!is_null($taskProgress)) {
 
-          Task::countCompletedAndPendingTask($projectId);
+            $taskProgress->where('projectId', $projectId)
+                ->update(['progress' => $progress]);
 
-          $tasks = Task::countCompletedAndPendingTask($projectId);
+            Task::countCompletedAndPendingTask($projectId);
 
-          TrackCompletedAndPending::dispatch($tasks);
-          TrackProjectProgress::dispatch($progress);
+            $tasks = Task::countCompletedAndPendingTask($projectId);
 
-          return $progress;
-      }
-  }
+            TrackCompletedAndPending::dispatch($tasks);
+            TrackProjectProgress::dispatch($progress);
 
+            return $progress;
+        }
+    }
 
-  public static function aroundNumber($number)
-  {
-      if (strpos($number, '.')) {
-          $position = strpos($number, '.') + 1;
-          return substr($number, 0, $position + 1);
-      } else {
-          return $number;
-      }
-  }
+    public static function aroundNumber($number)
+    {
+        if (strpos($number, '.')) {
+            $position = strpos($number, '.') + 1;
+            return substr($number, 0, $position + 1);
+        } else {
+            return $number;
+        }
+    }
 }
