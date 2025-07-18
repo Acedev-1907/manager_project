@@ -55,4 +55,16 @@ class TaskService
 
         return $updated;
     }
+
+    public function deleteTask($taskId)
+    {
+        $task = $this->taskRepository->find($taskId);
+        if (!$task) {
+            return ['errors' => ['Task does not exist'], 'status' => 404];
+        }
+        // Delete all task members related to this task
+        $this->taskMemberRepository->deleteByTaskId($taskId);
+        $this->taskRepository->delete($taskId);
+        return ['message' => 'Task deleted successfully', 'status' => 200];
+    }
 }

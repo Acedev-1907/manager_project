@@ -44,4 +44,13 @@ class TaskController extends Controller
 
         return response(['error' => 'Failed to update task status'], 500);
     }
+
+    public function destroy($id)
+    {
+        $result = $this->taskService->deleteTask($id);
+        if (isset($result['errors'])) {
+            return response($result['errors'], $result['status']);
+        }
+        return response(['message' => $result['message']], $result['status']);
+    }
 }

@@ -15,6 +15,10 @@ import { useDragTask } from './actions/dragTask';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import { useGetProjectMembers } from '../project/actions/getProjectMembers';
 import { showErrorResponse } from '../../../helper/utils';
+import TaskDetailModal from './components/TaskDetailModal.vue';
+import KabanColumnBase from './components/KabanColumnBase.vue';
+import { makeHttpReq } from '../../../helper/makeHttpReq';
+import { showSuccess, showError, showConfirm } from '../../../helper/alert';
 
 const route = useRoute();
 const router = useRouter();
@@ -25,6 +29,12 @@ const { getProjectMembers, members: projectMembers } = useGetProjectMembers();
 
 const slug = route.query?.query as string;
 const modalVisible = ref(false);
+const showTaskDetail = ref(false);
+const selectedTask = ref<any>(null);
+const menuState = ref<{ column: string, taskId: number } | null>(null);
+function setMenuState(val: { column: string, taskId: number } | null) {
+    menuState.value = val;
+}
 
 onMounted(async () => {
     await getProjectDetail(slug);
@@ -74,6 +84,16 @@ function formatDate(dateString: string | undefined): string {
     });
 }
 
+function openTaskDetail(taskId: number) {
+    const allTasks = ProjectData.value?.data?.tasks || [];
+    selectedTask.value = allTasks.find((t: any) => t.id === taskId);
+    showTaskDetail.value = true;
+}
+function closeTaskDetail() {
+    showTaskDetail.value = false;
+    selectedTask.value = null;
+}
+
 const { setupAllDropListeners, setupTaskCardDragListeners } = useDragTask(getProjectDetail, slug, ProjectData);
 
 watch(() => ProjectData.value?.data?.tasks, () => {
@@ -84,6 +104,18 @@ watch(() => ProjectData.value?.data?.tasks, () => {
 
 async function handleRefreshKabanBoard() {
     await getProjectDetail(slug);
+}
+
+async function handleDeleteTask(taskId: number) {
+    const confirmed = await showConfirm('Are you sure you want to delete this task?', 'Delete Task');
+    if (!confirmed) return;
+    try {
+        await makeHttpReq<undefined, { message: string }>(`tasks/${taskId}`, 'DELETE');
+        showSuccess('Task deleted successfully!');
+        await getProjectDetail(slug, false); // refresh board
+    } catch (err: any) {
+        showError(err?.message || 'Delete task failed!');
+    }
 }
 </script>
 
@@ -165,11 +197,14 @@ async function handleRefreshKabanBoard() {
             <!-- Kanban Board Section -->
             <div class="kanban-board">
                 <div class="kanban-columns">
-                    <NotStartedColumn :projectData="ProjectData" @openTaskModal="openTaskModal"
+                    <NotStartedColumn :projectData="ProjectData" :menuState="menuState" :setMenuState="setMenuState"
+                        @openTaskModal="openTaskModal" @viewTask="openTaskDetail" @deleteTask="handleDeleteTask"
                         class="kanban-column not-started-column" />
-                    <PendingColumn :projectData="ProjectData" @openTaskModal="openTaskModal"
+                    <PendingColumn :projectData="ProjectData" :menuState="menuState" :setMenuState="setMenuState"
+                        @viewTask="openTaskDetail" @deleteTask="handleDeleteTask"
                         class="kanban-column pending-column" />
-                    <CompletedColumn :projectData="ProjectData" @openTaskModal="openTaskModal"
+                    <CompletedColumn :projectData="ProjectData" :menuState="menuState" :setMenuState="setMenuState"
+                        @viewTask="openTaskDetail" @deleteTask="handleDeleteTask"
                         class="kanban-column completed-column" />
                 </div>
             </div>
@@ -178,6 +213,8 @@ async function handleRefreshKabanBoard() {
         <!-- Add Task Modal -->
         <AddTaskModal :members="projectMembers" :visible="modalVisible" @getMembers="getMembers"
             @closeModal="closeTaskModal" @refreshKabanBoard="handleRefreshKabanBoard" />
+        <!-- Task Detail Modal -->
+        <TaskDetailModal :visible="showTaskDetail" :task="selectedTask" @close="closeTaskDetail" />
     </div>
 </template>
 

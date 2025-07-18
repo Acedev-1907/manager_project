@@ -10,4 +10,9 @@ class TaskMemberRepository extends BaseRepository
     {
         return \App\Models\TaskMember::class;
     }
+
+    public function deleteByTaskId($taskId)
+    {
+        return $this->model->where('taskId', $taskId)->delete();
+    }
 }

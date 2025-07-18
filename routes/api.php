@@ -57,5 +57,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::controller(TaskController::class)->group(function () {
         Route::post('/tasks', 'createTask')->name('tasks.create');
         Route::post('/task/{transition}', 'transition')->name('tasks.transition');
+        Route::delete('/tasks/{id}', 'destroy')->name('tasks.destroy');
     });
 });

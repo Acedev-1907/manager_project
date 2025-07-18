@@ -1,90 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { SingleProjectResponseType, TaskStatus } from '../actions/getProjectDetail.type';
-import MemberAvatar from './MemberAvatar.vue';
+import KabanColumnBase from './KabanColumnBase.vue';
 
-const props = defineProps<{
-    projectData: SingleProjectResponseType
-}>();
-
+const props = defineProps<{ projectData: SingleProjectResponseType, menuState: any, setMenuState: any }>();
 const emit = defineEmits<{
     (e: "openTaskModal"): void;
+    (e: "viewTask", taskId: number): void;
+    (e: "deleteTask", taskId: number): void;
 }>();
 
 const completedTasks = computed(() => {
     return props.projectData?.data?.tasks?.filter(task => task.status === TaskStatus.COMPLETED) || [];
 });
-
-function openTaskModal() {
-    emit('openTaskModal');
-}
 </script>
-
 <template>
-    <div class="kanban-column">
-        <div class="column-header">
-            <div class="column-title">
-                <div class="title-icon">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="title-content">
-                    <h3>Completed</h3>
-                    <span class="task-count">{{ completedTasks.length }} tasks</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="column-content">
-            <div class="tasks-container">
-                <div v-if="completedTasks.length === 0" class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-trophy"></i>
-                    </div>
-                    <p>No completed tasks</p>
-                </div>
-
-                <div v-else class="task-list">
-                    <div v-for="task in completedTasks" :key="task.id" class="task-card completed" draggable="true"
-                        :data-task-id="task.id" :data-project-id="projectData?.data?.id">
-                        <div class="task-header">
-                            <h4 class="task-title">{{ task.name }}</h4>
-                            <div class="task-actions">
-                                <div class="completed-badge">
-                                    <i class="fas fa-check"></i>
-                                </div>
-                                <button class="task-action-btn">
-                                    <i class="fas fa-ellipsis-h"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="task-members">
-                            <div v-if="task.task_members && task.task_members.length > 0" class="assignees">
-                                <div v-for="(member, index) in task.task_members.slice(0, 3)" :key="member.id"
-                                    class="member-avatar" :class="`member-${index + 1}`">
-                                    <MemberAvatar :member="member" />
-                                </div>
-                                <div v-if="task.task_members.length > 3" class="more-members">
-                                    +{{ task.task_members.length - 3 }}
-                                </div>
-                            </div>
-                            <div v-else class="no-assignees">
-                                <i class="fas fa-user-plus"></i>
-                                <span>Unassigned</span>
-                            </div>
-                        </div>
-
-                        <div class="task-footer">
-                            <div class="task-date">
-                                <i class="fas fa-calendar"></i>
-                                <span>{{ new Date(task.created_at).toLocaleDateString() }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <KabanColumnBase title="Completed" icon="fas fa-check-circle"
+        :iconBg="'linear-gradient(135deg, #10b981 0%, #34d399 100%)'" :tasks="completedTasks"
+        :projectId="props.projectData?.data?.id" emptyIcon="fas fa-trophy" emptyText="No completed tasks"
+        :showAddTask="false" @viewTask="$emit('viewTask', $event)" @deleteTask="$emit('deleteTask', $event)"
+        :menuState="props.menuState" :setMenuState="(val: any) => props.setMenuState(val)" columnKey="completed" />
 </template>
 
 <style scoped>
@@ -182,6 +117,24 @@ function openTaskModal() {
     flex-direction: column;
     gap: 12px;
     min-height: 200px;
+}
+
+.tasks-container,
+.task-list {
+    overflow: visible !important;
+}
+
+.task-card {
+    position: relative;
+    z-index: 0;
+}
+
+.task-card:hover {
+    z-index: 0;
+}
+
+.task-menu {
+    z-index: 2000 !important;
 }
 
 .empty-state {
@@ -396,6 +349,66 @@ function openTaskModal() {
 
 .task-date i {
     font-size: 9px;
+}
+
+.task-menu {
+    position: absolute;
+    right: 0;
+    top: 36px;
+    background: #fff;
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    min-width: 140px;
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: fadeInMenu 0.18s;
+}
+
+@keyframes fadeInMenu {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.task-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px 12px 20px;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #22223b;
+    background: none;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+}
+
+.task-menu-item i {
+    font-size: 1.15rem;
+    min-width: 22px;
+    text-align: center;
+}
+
+.task-menu-item:hover {
+    background: #e0f2fe;
+    color: #0284c7;
+}
+
+.task-menu-item:last-child:hover {
+    background: #fee2e2;
+    color: #dc2626;
 }
 
 /* Responsive Design */
