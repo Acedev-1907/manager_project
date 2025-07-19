@@ -1,7 +1,6 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
-import { showError, showSuccess } from "../../../helper/alert";
-import { showErrorResponse } from "../../../helper/utils";
+import { showError } from "../../../helper/alert";
 import router from "../../../router";
 import { useUserStore } from "../../../state/userStore";
 
@@ -35,11 +34,6 @@ export function useLoginUser() {
         loginInput.value
       );
 
-      // loading.value = false;
-      // loginInput.value = {
-      //   email: "",
-      //   password: "",
-      // };
       if (data && data.token && data.user) {
         localStorage.setItem("userData", JSON.stringify(data));
         // Gọi API lấy user mới nhất
@@ -49,13 +43,10 @@ export function useLoginUser() {
           avatar: userRes.data.avatar || "",
         });
         router.push("/dashboard");
-      } else {
-        showError("Login failed!");
       }
     } catch (error: any) {
       loading.value = false;
-      const message =
-        error?.response?.data?.message || error?.message || "Login failed!";
+      const message = error?.message || "Login failed!";
       showError(message);
     }
   }
