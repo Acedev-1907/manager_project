@@ -30,6 +30,10 @@ class AuthService
             return false;
         }
         $user = Auth::user();
+
+        if ($user->isValidEmail != User::IS_VALID_EMAIL) {
+            return ['error' => 'Please verify your email before logging in.'];
+        }
         $token = $user->createToken('api_token')->plainTextToken;
         return [
             'user' => [
