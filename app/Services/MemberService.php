@@ -48,7 +48,10 @@ class MemberService
         return $this->addMember($user, $memberUser->id);
     }
 
-    public function addByNameOrEmail($user, $input)
+    /**
+     * Add member by id (format #id) or email. Name is not supported.
+     */
+    public function addByIdOrEmail($user, $input)
     {
         $memberUser = $this->memberRepo->findUserByNameOrEmail($input);
         if (!$memberUser) {

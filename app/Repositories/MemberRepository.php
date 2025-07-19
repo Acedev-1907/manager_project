@@ -16,7 +16,8 @@ class MemberRepository extends BaseRepository
     {
         $contacts = $this->model->with('member')
             ->where('user_id', $userId)
-            ->where('member_id', '!=', $userId);
+            ->where('member_id', '!=', $userId)
+            ->orderByDesc('id'); // Order by newest added member first
         if (!empty($query)) {
             $contacts = $contacts->whereHas('member', function ($q) use ($query) {
                 $q->where('name', 'like', "%$query%")
@@ -24,7 +25,7 @@ class MemberRepository extends BaseRepository
             });
         }
         $paginated = $contacts->paginate(6);
-        // Map lại dữ liệu để mỗi phần tử có avatar, name, email, id
+        // Map data so each item has avatar, name, email, id
         $paginated->getCollection()->transform(function ($item) {
             return [
                 'id' => $item->member->id ?? null,
@@ -68,8 +69,11 @@ class MemberRepository extends BaseRepository
 
     public function findUserByNameOrEmail($input)
     {
-        return User::where('email', $input)
-            ->orWhere('name', $input)
-            ->first();
+        // If input starts with # and followed by number, find by id
+        if (preg_match('/^#(\\d+)$/', $input, $matches)) {
+            return User::where('id', $matches[1])->first();
+        }
+        // Otherwise, find by email
+        return User::where('email', $input)->first();
     }
 }

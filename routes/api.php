@@ -38,7 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/members', 'index')->name('members.index');
         Route::delete('/members/{id}', 'destroy')->name('members.destroy');
         Route::post('/members/add-by-email', 'addByEmail')->name('members.addByEmail');
-        Route::post('/members/add-by-name-or-email', 'addByNameOrEmail')->name('members.addByNameOrEmail');
+        Route::post('/members/add-by-name-or-email', 'addByIdOrEmail')->name('members.addByIdOrEmail');
     });
 
     Route::controller(ProjectController::class)->group(function () {

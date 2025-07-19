@@ -63,7 +63,7 @@ class MemberController extends Controller
         return response(['message' => $result['message']], 200);
     }
 
-    public function addByNameOrEmail(Request $request)
+    public function addByIdOrEmail(Request $request)
     {
         $user = $request->user();
         $fields = $request->all();
@@ -71,7 +71,7 @@ class MemberController extends Controller
             'input' => 'required',
         ]);
         if ($errs->fails()) return response(['error' => $errs->errors()->first()], 422);
-        $result = $this->memberService->addByNameOrEmail($user, $fields['input']);
+        $result = $this->memberService->addByIdOrEmail($user, $fields['input']);
         if (isset($result['error'])) {
             return response(['error' => $result['error']], 404);
         }

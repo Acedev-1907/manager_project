@@ -8,7 +8,14 @@ const errorMsg = ref('');
 function submit() {
     errorMsg.value = '';
     if (!input.value) {
-        errorMsg.value = 'Please enter member name or email';
+        errorMsg.value = 'Please enter member id (e.g. #1) or email';
+        return;
+    }
+    // Kiểm tra input hợp lệ: id dạng #<số> hoặc email
+    const isId = /^#\d+$/.test(input.value);
+    const isEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.value);
+    if (!isId && !isEmail) {
+        errorMsg.value = 'Input must be in the form #<id> or a valid email';
         return;
     }
     emit('add', input.value, (err: string | null) => {
@@ -24,7 +31,7 @@ function submit() {
     <div class="modal-backdrop">
         <div class="modal-content">
             <h5>Add Member</h5>
-            <input v-model="input" placeholder="Enter member name or email" class="form-control mb-2" />
+            <input v-model="input" placeholder="Enter member id (e.g. #1) or email" class="form-control mb-2" />
             <div v-if="errorMsg" class="text-danger mb-2">{{ errorMsg }}</div>
             <div class="d-flex gap-2 justify-content-end">
                 <button class="btn btn-secondary" @click="$emit('close')">Cancel</button>
