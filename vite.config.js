@@ -15,7 +15,4 @@ export default defineConfig({
         outDir: 'public/build',
         chunkSizeWarningLimit: 1600,
     },
-    define: {
-        'import.meta.env.VITE_APP_URL': JSON.stringify(process.env.VITE_APP_URL || 'https://taskmgrv2-latest.onrender.com'),
-    },
 });

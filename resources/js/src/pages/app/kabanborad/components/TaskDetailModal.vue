@@ -202,7 +202,10 @@ function formatTime(dateStr: string) {
                                         class="comment-avatar" />
                                 </template>
                                 <template v-else>
-                                    <img v-if="c.user?.avatar" :src="getAvatarSrc(c.user.avatar, '')"
+                                    <img v-if="c.user?.avatar"
+                                        :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
+                                        class="comment-avatar" />
+                                    <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
                                         class="comment-avatar" />
                                     <div class="comment-bubble">
                                         <div class="comment-text">{{ c.content }}</div>
