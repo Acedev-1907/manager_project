@@ -229,7 +229,7 @@ function onAddTask() {
 
 .column-content {
     flex: 1;
-    overflow-y: auto;
+    overflow-y: auto !important;
     padding: 16px;
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
@@ -642,6 +642,6 @@ function onAddTask() {
 .column-content,
 .kanban-column,
 .kanban-board {
-    overflow: visible !important;
+    overflow: visible;
 }
 </style>

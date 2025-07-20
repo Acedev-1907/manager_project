@@ -4,11 +4,6 @@ import { SingleProjectResponseType, TaskStatus } from '../actions/getProjectDeta
 import KabanColumnBase from './KabanColumnBase.vue';
 
 const props = defineProps<{ projectData: SingleProjectResponseType, menuState: any, setMenuState: any }>();
-const emit = defineEmits<{
-    (e: "openTaskModal"): void;
-    (e: "viewTask", taskId: number): void;
-    (e: "deleteTask", taskId: number): void;
-}>();
 
 const pendingTasks = computed(() => {
     return props.projectData?.data?.tasks?.filter(task => task.status === TaskStatus.PENDING) || [];
