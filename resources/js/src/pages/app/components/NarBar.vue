@@ -215,7 +215,7 @@ const notifications = ref([
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 0.75rem;
+    padding: 0 1.25rem;
     min-height: 64px;
     border-radius: 0 0 1.2rem 1.2rem;
 }
@@ -340,7 +340,6 @@ const notifications = ref([
 .navbar-user {
     display: flex;
     align-items: center;
-    gap: 1.2rem;
 }
 
 .navbar-email {
