@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-// import BreadCrumb from './components/BreadCrumb.vue';
 import { useGetProjectDetail } from './actions/getProjectDetail';
-// import ProjectDetail from './components/ProjectData.vue';
 import ProjectProgress from './components/ProjectProgress.vue';
 import PendingColumn from './components/PendingColumn.vue';
 import CompletedColumn from './components/CompletedColumn.vue';
@@ -14,9 +12,7 @@ import NotStartedColumn from './components/NotStartedColumn.vue';
 import { useDragTask } from './actions/dragTask';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import { useGetProjectMembers } from '../project/actions/getProjectMembers';
-import { showErrorResponse } from '../../../helper/utils';
 import TaskDetailModal from './components/TaskDetailModal.vue';
-import KabanColumnBase from './components/KabanColumnBase.vue';
 import { makeHttpReq } from '../../../helper/makeHttpReq';
 import { showSuccess, showError, showConfirm } from '../../../helper/alert';
 import { useCacheFetch } from '../../../helper/useCacheFetch';
@@ -117,7 +113,7 @@ watch(() => ProjectData.value?.data?.tasks, () => {
 // Nếu có các chỗ khác gọi getProjectDetail để refresh, hãy nhớ lưu lại cache sau khi fetch
 async function handleRefreshKabanBoard() {
     await refetch(slug, async () => {
-        await getProjectDetail(slug);
+        await getProjectDetail(slug, false); // truyền false để không bật loading
         return ProjectData.value;
     }, (data) => {
         ProjectData.value = data;
@@ -554,7 +550,7 @@ async function handleDeleteTask(taskId: number) {
     left: auto;
 }
 
-.ghost-task {
+/* .ghost-task {
     background: #fbbf24 !important;
     border: 2px solid #f59e0b !important;
     opacity: 1 !important;
@@ -567,9 +563,9 @@ async function handleDeleteTask(taskId: number) {
     max-width: 300px;
     transition: none;
     will-change: transform, left, top;
-}
+} */
 
-.ghost-task .task-title {
+/* .ghost-task .task-title {
     font-size: 14px;
     font-weight: 600;
     color: #1e293b;
@@ -593,7 +589,7 @@ async function handleDeleteTask(taskId: number) {
     justify-content: center;
     font-size: 8px;
     font-weight: 600;
-}
+} */
 
 /* ----------- PROJECT DATES MOBILE OPTIMIZED ----------- */
 @media (max-width: 768px) {
