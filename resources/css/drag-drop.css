@@ -75,17 +75,3 @@
   -moz-user-select: none !important;
   -ms-user-select: none !important;
 }
-
-/* Ensure modal stays on top during drag */
-.modal {
-  z-index: 9999 !important;
-}
-
-.modal-backdrop {
-  z-index: 9998 !important;
-}
-
-/* Prevent ghost task from interfering with other elements */
-.ghost-task * {
-  pointer-events: none !important;
-}
