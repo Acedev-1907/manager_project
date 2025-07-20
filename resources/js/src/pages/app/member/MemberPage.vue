@@ -11,20 +11,39 @@ import MainCardLayout from '../../../components/MainCardLayout.vue';
 import AddMemberModal from './components/AddMemberModal.vue';
 import { addMemberByNameOrEmail } from './actions/createMember';
 import FabButton from '../../../components/FabButton.vue';
+import { useCacheFetch } from '../../../helper/useCacheFetch';
 
 const { getMembers, memberData, loading: tableLoading } = useGetMembers();
 const isLoading = ref(true);
 const router = useRouter();
 const showAddModal = ref(false);
+const memberCache = ref<Record<string, any>>({});
+
+const { getOrFetch, refetch } = useCacheFetch(
+    memberCache.value,
+    (key, data) => { memberCache.value[key] = data; },
+    (key) => { if (key) delete memberCache.value[key]; else memberCache.value = {}; }
+);
 
 async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
+    const cacheKey = `member_page_${page}_${query}`;
     if (showLoadingPage) {
         isLoading.value = true;
-        await getMembers(page, query);
+        await getOrFetch(cacheKey, async () => {
+            await getMembers(page, query);
+            return memberData.value;
+        }, (data) => {
+            memberData.value = data;
+        });
         isLoading.value = false;
     } else {
         tableLoading.value = true;
-        await getMembers(page, query);
+        await getOrFetch(cacheKey, async () => {
+            await getMembers(page, query);
+            return memberData.value;
+        }, (data) => {
+            memberData.value = data;
+        });
         tableLoading.value = false;
     }
 }
@@ -34,6 +53,7 @@ async function handleAddMember(input: string, cb: (err: string | null) => void) 
         await addMemberByNameOrEmail(input);
         cb(null);
         showAddModal.value = false;
+        memberCache.value = {}; // Xóa toàn bộ cache member
         await fetchMembers();
     } catch (e: any) {
         let errMsg = e?.error;
@@ -43,6 +63,7 @@ async function handleAddMember(input: string, cb: (err: string | null) => void) 
 
 async function handleRemoveMember(member: MemberType) {
     await removeMember(member.id);
+    memberCache.value = {}; // Xóa toàn bộ cache member
     await fetchMembers();
 }
 

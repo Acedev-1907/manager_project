@@ -1,5 +1,4 @@
 import { defineStore } from "pinia";
-import { ProjectInputType } from "../actions/createtProject";
 
 const userProjectStore = defineStore("project", {
   state: () => ({
@@ -11,7 +10,19 @@ const userProjectStore = defineStore("project", {
       members: [] as number[],
     },
     edit: false,
+    projectList: null as any, // cache project list
+    lastFetched: null as number | null, // thời gian fetch gần nhất
   }),
+  actions: {
+    setProjects(data: any) {
+      this.projectList = data;
+      this.lastFetched = Date.now();
+    },
+    clearProjects() {
+      this.projectList = null;
+      this.lastFetched = null;
+    },
+  },
 });
 
 export const projectStore = userProjectStore();

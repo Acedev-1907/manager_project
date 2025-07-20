@@ -19,6 +19,7 @@ import TaskDetailModal from './components/TaskDetailModal.vue';
 import KabanColumnBase from './components/KabanColumnBase.vue';
 import { makeHttpReq } from '../../../helper/makeHttpReq';
 import { showSuccess, showError, showConfirm } from '../../../helper/alert';
+import { useCacheFetch } from '../../../helper/useCacheFetch';
 
 const route = useRoute();
 const router = useRouter();
@@ -36,8 +37,19 @@ function setMenuState(val: { column: string, taskId: number } | null) {
     menuState.value = val;
 }
 
+const { getOrFetch, refetch } = useCacheFetch(
+    taskStore.projectDetailCache,
+    taskStore.setProjectDetailCache,
+    taskStore.clearProjectDetailCache
+);
+
 onMounted(async () => {
-    await getProjectDetail(slug);
+    await getOrFetch(slug, async () => {
+        await getProjectDetail(slug);
+        return ProjectData.value;
+    }, (data) => {
+        ProjectData.value = data;
+    });
     getMembers(1, '');
     setTimeout(() => {
         setupAllDropListeners();
@@ -102,17 +114,29 @@ watch(() => ProjectData.value?.data?.tasks, () => {
     }, 100);
 }, { deep: true });
 
+// Nếu có các chỗ khác gọi getProjectDetail để refresh, hãy nhớ lưu lại cache sau khi fetch
 async function handleRefreshKabanBoard() {
-    await getProjectDetail(slug);
+    await refetch(slug, async () => {
+        await getProjectDetail(slug);
+        return ProjectData.value;
+    }, (data) => {
+        ProjectData.value = data;
+    });
 }
 
+// Khi cần fetch lại project detail (ví dụ sau khi xóa task), luôn clear cache trước, sau đó fetch và lưu lại cache
 async function handleDeleteTask(taskId: number) {
     const confirmed = await showConfirm('Are you sure you want to delete this task?', 'Delete Task');
     if (!confirmed) return;
     try {
         await makeHttpReq<undefined, { message: string }>(`tasks/${taskId}`, 'DELETE');
         showSuccess('Task deleted successfully!');
-        await getProjectDetail(slug, false); // refresh board
+        await refetch(slug, async () => {
+            await getProjectDetail(slug, false);
+            return ProjectData.value;
+        }, (data) => {
+            ProjectData.value = data;
+        });
     } catch (err: any) {
         showError(err?.message || 'Delete task failed!');
     }

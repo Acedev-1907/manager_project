@@ -69,15 +69,13 @@ const userStore = useUserStore();
                 <span class="navbar-app-name">TaskMgr</span>
             </div>
             <div class="navbar-avatar-btn" @click="toggleMenu" style="position: relative; margin-left: auto;">
-                <template v-if="userStore.user.value && userStore.user.value.name">
-                    <span v-if="userStore.user.value.avatar && userStore.user.value.avatar.length > 0"
-                        class="avatar-circle">
-                        <img :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)" alt="avatar"
+                <template v-if="userStore.user && userStore.user.name">
+                    <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
+                        <img :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" alt="avatar"
                             style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
                     </span>
-                    <span v-else-if="userStore.user.value.name && userStore.user.value.name.length > 0"
-                        class="avatar-circle">
-                        {{ userStore.user.value.name.charAt(0).toUpperCase() }}
+                    <span v-else-if="userStore.user.name && userStore.user.name.length > 0" class="avatar-circle">
+                        {{ userStore.user.name.charAt(0).toUpperCase() }}
                     </span>
                     <span v-else class="avatar-circle">?</span>
                 </template>
@@ -104,14 +102,13 @@ const userStore = useUserStore();
                 <!-- Tài khoản -->
                 <div class="custom-user-list">
                     <div class="custom-user-item">
-                        <img v-if="userStore.user.value?.avatar"
-                            :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)"
-                            class="custom-avatar-img" />
-                        <span v-else-if="userStore.user.value?.name" class="avatar-circle">{{
-                            userStore.user.value.name.charAt(0).toUpperCase()
+                        <img v-if="userStore.user?.avatar"
+                            :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" class="custom-avatar-img" />
+                        <span v-else-if="userStore.user?.name" class="avatar-circle">{{
+                            userStore.user.name.charAt(0).toUpperCase()
                             }}</span>
                         <span v-else class="avatar-circle">?</span>
-                        <span v-if="userStore.user.value?.name" class="custom-user-name">{{ userStore.user.value.name
+                        <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name
                         }}</span>
                         <span v-else class="custom-user-name">Unknown</span>
                     </div>
@@ -149,15 +146,13 @@ const userStore = useUserStore();
         <!-- Avatar + dropdown desktop -->
         <div class="navbar-user d-none d-md-flex" style="position: relative;">
             <div class="navbar-avatar-btn" @click="menuOpen = !menuOpen" style="position: relative;">
-                <template v-if="userStore.user.value && userStore.user.value.name">
-                    <span v-if="userStore.user.value.avatar && userStore.user.value.avatar.length > 0"
-                        class="avatar-circle">
-                        <img :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)" alt="avatar"
+                <template v-if="userStore.user && userStore.user.name">
+                    <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
+                        <img :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" alt="avatar"
                             style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
                     </span>
-                    <span v-else-if="userStore.user.value.name && userStore.user.value.name.length > 0"
-                        class="avatar-circle">
-                        {{ userStore.user.value.name.charAt(0).toUpperCase() }}
+                    <span v-else-if="userStore.user.name && userStore.user.name.length > 0" class="avatar-circle">
+                        {{ userStore.user.name.charAt(0).toUpperCase() }}
                     </span>
                     <span v-else class="avatar-circle">?</span>
                 </template>
@@ -170,15 +165,15 @@ const userStore = useUserStore();
                     <!-- Tài khoản -->
                     <div class="custom-user-list">
                         <div class="custom-user-item">
-                            <img v-if="userStore.user.value?.avatar"
-                                :src="getAvatarSrc(userStore.user.value.avatar, userStore.user.value.name)"
+                            <img v-if="userStore.user?.avatar"
+                                :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)"
                                 class="custom-avatar-img" />
-                            <span v-else-if="userStore.user.value?.name" class="avatar-circle">{{
-                                userStore.user.value.name.charAt(0).toUpperCase()
+                            <span v-else-if="userStore.user?.name" class="avatar-circle">{{
+                                userStore.user.name.charAt(0).toUpperCase()
                                 }}</span>
                             <span v-else class="avatar-circle">?</span>
-                            <span v-if="userStore.user.value?.name" class="custom-user-name">{{
-                                userStore.user.value.name
+                            <span v-if="userStore.user?.name" class="custom-user-name">{{
+                                userStore.user.name
                             }}</span>
                             <span v-else class="custom-user-name">Unknown</span>
                         </div>
@@ -564,6 +559,10 @@ const userStore = useUserStore();
     color: #222;
     margin-left: 0.2rem;
     white-space: nowrap;
+    max-width: 160px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .custom-dropdown {

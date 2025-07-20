@@ -6,22 +6,40 @@ import ApexRadialBar from './components/ApexRadialBar.vue';
 import { useGetTotalProject } from './actions/countProject';
 import { useGetChartData } from './actions/getChartData';
 import LoadingPage from '../../../components/LoadingPage.vue';
+import { useDashboardStore } from '../dashboard/store/dashboardStore';
+import { useCacheFetch } from '../../../helper/useCacheFetch';
 
 const { project, getPinnedProject } = useGetPinnedProject()
 const { countProject, getTotalProject } = useGetTotalProject()
 const { chartData, getChartData } = useGetChartData();
 const isLoading = ref(true);
 
+const dashboardStore = useDashboardStore();
+const { getOrFetch: getPinned, refetch: refetchPinned } = useCacheFetch(
+    { pinned: dashboardStore.pinnedProject },
+    (key, data) => dashboardStore.setPinnedProject(data),
+    () => dashboardStore.clearPinnedProject()
+);
+const { getOrFetch: getCount, refetch: refetchCount } = useCacheFetch(
+    { count: dashboardStore.countProject },
+    (key, data) => dashboardStore.setCountProject(data),
+    () => dashboardStore.clearCountProject()
+);
+const { getOrFetch: getChart, refetch: refetchChart } = useCacheFetch(
+    { chart: dashboardStore.chartData },
+    (key, data) => dashboardStore.setChartData(data),
+    () => dashboardStore.clearChartData()
+);
+
 onMounted(async () => {
     isLoading.value = true;
-    await getPinnedProject();
-    getTotalProject();
+    await getPinned('pinned', async () => { await getPinnedProject(); return project.value; }, data => { project.value = data; });
+    await getCount('count', async () => { await getTotalProject(); return countProject.value; }, data => { countProject.value = data; });
     if (project.value && project.value.id) {
-        await getChartData(project.value.id);
+        await getChart('chart', async () => { await getChartData(project.value.id); return chartData.value; }, data => { chartData.value = data; });
     }
     isLoading.value = false;
-
-})
+});
 </script>
 
 <style scoped>

@@ -14,18 +14,19 @@ import FabButton from '../../../components/FabButton.vue';
 import { deleteProject } from './actions/deleteProject';
 import { showConfirm } from '../../../helper/alert';
 import SearchInput from '../../../components/SearchInput.vue';
+import { useCacheFetch } from '../../../helper/useCacheFetch';
 
 const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
 const tableLoading = ref(false);
 const router = useRouter();
 const { pinnendProject } = usepinnendProject();
-const showCreateModal = ref(false);
 const showProjectModal = ref(false);
 const isEdit = ref(false);
 const loading = ref(false);
 const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
+const projectCache = ref<Record<string, any>>({});
 
 // Get current user ID from localStorage
 const userDataRaw = localStorage.getItem('userData');
@@ -45,11 +46,21 @@ function setupEchoListener() {
 
     try {
         window.Echo.private(`user.${userId}`)
-            .listen('NewProjectForMembers', (e: any) => {
-                fetchProjects();
+            .listen('NewProjectForMembers', async (e: any) => {
+                await refetch('project', async () => {
+                    await getProjects(1, query.value);
+                    return projectData.value;
+                }, (data) => {
+                    projectData.value = data;
+                });
             })
-            .listen('UserRemovedFromProject', (e: any) => {
-                fetchProjects();
+            .listen('UserRemovedFromProject', async (e: any) => {
+                await refetch('project', async () => {
+                    await getProjects(1, query.value);
+                    return projectData.value;
+                }, (data) => {
+                    projectData.value = data;
+                });
             })
             .error((error: any) => {
                 console.error('Echo channel error:', error);
@@ -59,14 +70,31 @@ function setupEchoListener() {
     }
 }
 
-async function fetchProjects(page = 1, query = "", showLoadingPage = true) {
+const { getOrFetch, refetch } = useCacheFetch(
+    projectCache.value,
+    (key, data) => { projectCache.value[key] = data; },
+    (key) => { if (key) delete projectCache.value[key]; else projectCache.value = {}; }
+);
+
+async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true) {
+    const cacheKey = `project_page_${page}_${queryStr}`;
     if (showLoadingPage) {
         isLoading.value = true;
-        await getProjects(page, query);
+        await getOrFetch(cacheKey, async () => {
+            await getProjects(page, queryStr);
+            return projectData.value;
+        }, (data) => {
+            projectData.value = data;
+        });
         isLoading.value = false;
     } else {
         tableLoading.value = true;
-        await getProjects(page, query);
+        await getOrFetch(cacheKey, async () => {
+            await getProjects(page, queryStr);
+            return projectData.value;
+        }, (data) => {
+            projectData.value = data;
+        });
         tableLoading.value = false;
     }
 }
@@ -84,7 +112,13 @@ async function handleDeleteProject(projectId: number) {
     isLoading.value = true;
     try {
         await deleteProject(projectId);
-        await fetchProjects();
+        projectCache.value = {}; // Xóa toàn bộ cache project
+        await refetch(`project_page_1_${query.value}`, async () => {
+            await getProjects(1, query.value);
+            return projectData.value;
+        }, (data) => {
+            projectData.value = data;
+        });
     } catch (e: any) {
         alert(e?.message || 'Delete project failed!');
     }
@@ -119,9 +153,13 @@ async function handleSubmitProject(data: ProjectInputType) {
     await createOrUpdate();
     loading.value = false;
     showProjectModal.value = false;
-    fetchProjects();
-
-    // Setup Echo listener after project is created successfully
+    projectCache.value = {}; // Xóa toàn bộ cache project
+    await refetch(`project_page_1_${query.value}`, async () => {
+        await getProjects(1, query.value);
+        return projectData.value;
+    }, (data) => {
+        projectData.value = data;
+    });
     setupEchoListener();
 }
 
@@ -134,8 +172,7 @@ onMounted(async () => {
     await fetchProjects();
     projectStore.edit = false;
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
-
-    setupEchoListener(); // Đảm bảo gọi hàm này khi mount
+    setupEchoListener();
 });
 </script>
 

@@ -13,6 +13,8 @@ const useTaskStore = defineStore("task", {
     currentTaskId: 0 as number,
     draggedTaskId: null as number | null,
     draggedProjectId: null as number | null,
+    projectDetailCache: {} as Record<string, any>, // cache project detail theo slug
+    lastFetched: {} as Record<string, number>, // thời gian fetch theo slug
   }),
   actions: {
     setDraggedTask(taskId: number, projectId: number) {
@@ -22,6 +24,14 @@ const useTaskStore = defineStore("task", {
     clearDraggedTask() {
       this.draggedTaskId = null;
       this.draggedProjectId = null;
+    },
+    setProjectDetailCache(slug: string, data: any) {
+      this.projectDetailCache[slug] = data;
+      this.lastFetched[slug] = Date.now();
+    },
+    clearProjectDetailCache(slug: string) {
+      delete this.projectDetailCache[slug];
+      delete this.lastFetched[slug];
     },
   },
 });

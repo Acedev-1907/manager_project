@@ -10,6 +10,7 @@ import Cropper from 'cropperjs';
 import 'cropperjs/dist/cropper.css';
 import { showSuccess, showError, showConfirm } from '../../helper/alert';
 import { getAvatarSrc } from '../../helper/avatar';
+import { useCacheFetch } from '../../helper/useCacheFetch';
 
 const router = useRouter();
 const user = ref({ name: '', email: '', phone: '', avatar: '' });
@@ -29,6 +30,12 @@ const userStore = useUserStore();
 const zoomValue = ref(1);
 const minZoom = ref(1);
 const maxZoom = ref(2);
+
+const { getOrFetch, refetch } = useCacheFetch(
+    { user: userStore.userInfoCache },
+    (key, data) => userStore.setUserInfoCache(data),
+    () => userStore.clearUserInfoCache()
+);
 
 function onAvatarClick() {
     showViewAvatarModal.value = true;
@@ -76,14 +83,18 @@ async function fetchUser() {
     loading.value = true;
     errorMessage.value = '';
     try {
-        const res = await makeHttpReq<undefined, any>('user', 'GET');
-        user.value = {
-            name: res.data.name,
-            email: res.data.email,
-            phone: res.data.phone || '',
-            avatar: res.data.avatar || '',
-        };
-        userStore.setUser({ name: res.data.name, avatar: res.data.avatar || '' });
+        await getOrFetch('user', async () => {
+            const res = await makeHttpReq<undefined, any>('user', 'GET');
+            return {
+                name: res.data.name,
+                email: res.data.email,
+                phone: res.data.phone || '',
+                avatar: res.data.avatar || '',
+            };
+        }, (data) => {
+            user.value = data;
+            userStore.setUser({ name: data.name, avatar: data.avatar });
+        });
     } catch (err: any) {
         errorMessage.value = err?.message || 'Failed to load user info.';
     } finally {
@@ -158,6 +169,7 @@ async function saveCroppedAvatar() {
             } else {
                 user.value.avatar = data.link;
                 userStore.setAvatar(data.link);
+                userStore.setUser({ ...user.value }); // Đảm bảo Navbar cập nhật avatar mới
                 await nextTick();
                 closeCropModal();
                 showSuccess('Avatar updated successfully!');

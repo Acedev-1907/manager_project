@@ -9,7 +9,7 @@ import { makeHttpReq } from './helper/makeHttpReq';
 export default defineComponent({
     name: 'App',
     setup() {
-        const { setUser, initUserFromLocalStorage } = useUserStore();
+        const { setUser } = useUserStore();
         onMounted(async () => {
             const userDataStr = localStorage.getItem("userData");
             let token = null;
@@ -28,10 +28,8 @@ export default defineComponent({
                     userData.user = { ...userData.user, name: res.data.name, avatar: res.data.avatar || '' };
                     localStorage.setItem("userData", JSON.stringify(userData));
                 } catch {
-                    initUserFromLocalStorage();
+                    // Nếu lỗi, không làm gì thêm
                 }
-            } else {
-                initUserFromLocalStorage();
             }
         });
     }
