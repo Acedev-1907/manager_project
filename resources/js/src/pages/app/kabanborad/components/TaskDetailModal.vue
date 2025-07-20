@@ -99,14 +99,38 @@ function scrollToBottom() {
 // Gửi comment mới
 async function sendComment() {
     if (!newComment.value.trim() || sendingComment.value) return;
+    const tempId = 'temp-' + Date.now();
+    const userData = JSON.parse(localStorage.getItem("userData") || '{}');
+    const tempComment = {
+        id: tempId,
+        content: newComment.value,
+        user: {
+            id: currentUserId.value,
+            name: userData.user?.name || 'You',
+            avatar: userData.user?.avatar || ''
+        },
+        created_at: new Date().toISOString(),
+        pending: true
+    };
+    comments.value.push(tempComment);
+    const sendingText = newComment.value;
+    newComment.value = '';
     sendingComment.value = true;
     try {
-        const comment = await addTaskComment(props.task.id, newComment.value);
-        newComment.value = '';
-        handleNewRealtimeComment(comment, true); // true: là của mình
+        const comment = await addTaskComment(props.task.id, sendingText);
+        // Tìm và thay thế comment tạm bằng comment thật
+        const idx = comments.value.findIndex(c => c.id === tempId);
+        if (idx !== -1) {
+            comments.value[idx] = comment;
+        }
         await nextTick();
         scrollToBottom();
     } catch (e: any) {
+        // Nếu lỗi, xóa comment tạm
+        const idx = comments.value.findIndex(c => c.id === tempId);
+        if (idx !== -1) {
+            comments.value.splice(idx, 1);
+        }
         showError(e?.message || 'Failed to send comment');
     } finally {
         sendingComment.value = false;
