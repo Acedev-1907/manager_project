@@ -1,9 +1,8 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import MemberTable from './components/MemberTable.vue';
 import { MemberType, useGetMembers, removeMember } from './actions/getMember';
 import { memberStore } from './store/MemberStore';
-import { useRouter } from 'vue-router';
 import { MemberInputType } from './actions/createMember';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import CustomPagination from '../../../components/CustomPagination.vue';
@@ -15,9 +14,12 @@ import { useCacheFetch } from '../../../helper/useCacheFetch';
 
 const { getMembers, memberData, loading: tableLoading } = useGetMembers();
 const isLoading = ref(true);
-const router = useRouter();
 const showAddModal = ref(false);
-const memberCache = ref<Record<string, any>>({});
+const memberCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('memberCache') || '{}'));
+
+watch(memberCache, (val) => {
+    localStorage.setItem('memberCache', JSON.stringify(val));
+}, { deep: true });
 
 const { getOrFetch, refetch } = useCacheFetch(
     memberCache.value,
@@ -27,25 +29,22 @@ const { getOrFetch, refetch } = useCacheFetch(
 
 async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
     const cacheKey = `member_page_${page}_${query}`;
-    if (showLoadingPage) {
-        isLoading.value = true;
-        await getOrFetch(cacheKey, async () => {
-            await getMembers(page, query);
-            return memberData.value;
-        }, (data) => {
-            memberData.value = data;
-        });
+    if (memberCache.value[cacheKey]) {
+        memberData.value = memberCache.value[cacheKey];
         isLoading.value = false;
-    } else {
-        tableLoading.value = true;
-        await getOrFetch(cacheKey, async () => {
-            await getMembers(page, query);
-            return memberData.value;
-        }, (data) => {
-            memberData.value = data;
-        });
         tableLoading.value = false;
+        return;
     }
+    if (showLoadingPage) isLoading.value = true;
+    else tableLoading.value = true;
+    await getOrFetch(cacheKey, async () => {
+        await getMembers(page, query);
+        return memberData.value;
+    }, (data) => {
+        memberData.value = data;
+    });
+    isLoading.value = false;
+    tableLoading.value = false;
 }
 
 async function handleAddMember(input: string, cb: (err: string | null) => void) {

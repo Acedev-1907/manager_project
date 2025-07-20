@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { ProjectType, useGetProject } from './actions/GetProject';
 import ProjectCard from './components/ProjectCard.vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { projectStore } from './store/projectStore';
 import { ProjectInputType, useCreateOrUpdateProject } from './actions/createtProject';
 import { usepinnendProject } from './actions/pinnendProject';
@@ -26,7 +26,12 @@ const isEdit = ref(false);
 const loading = ref(false);
 const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
-const projectCache = ref<Record<string, any>>({});
+const projectCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('projectCache') || '{}'));
+const userId = ref(null);
+
+watch(projectCache, (val) => {
+    localStorage.setItem('projectCache', JSON.stringify(val));
+}, { deep: true });
 
 // Get current user ID from localStorage
 const userDataRaw = localStorage.getItem('userData');
@@ -34,20 +39,17 @@ const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
 const currentUserId = userData.id || (userData.user && userData.user.id) || null;
 
 // Add a function to setup Echo listener
-function setupEchoListener() {
-    const userDataRaw = localStorage.getItem('userData');
-    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
-    const userId = userData.id || (userData.user && userData.user.id);
-
-    if (!userId) {
-        console.error('No user ID found for Echo channel');
+function setupEchoListener(userIdVal: string | number | null) {
+    if (!userIdVal) return;
+    if (!window.Echo) {
+        setTimeout(() => setupEchoListener(userIdVal), 200);
         return;
     }
-
     try {
-        window.Echo.private(`user.${userId}`)
+        window.Echo.private(`user.${userIdVal}`)
             .listen('NewProjectForMembers', async (e: any) => {
-                await refetch('project', async () => {
+                projectCache.value = {}; // Xóa cache khi nhận event
+                await refetch('project_page_1_' + query.value, async () => {
                     await getProjects(1, query.value);
                     return projectData.value;
                 }, (data) => {
@@ -55,20 +57,27 @@ function setupEchoListener() {
                 });
             })
             .listen('UserRemovedFromProject', async (e: any) => {
-                await refetch('project', async () => {
+                projectCache.value = {}; // Xóa cache khi nhận event
+                await refetch('project_page_1_' + query.value, async () => {
                     await getProjects(1, query.value);
                     return projectData.value;
                 }, (data) => {
                     projectData.value = data;
                 });
-            })
-            .error((error: any) => {
-                console.error('Echo channel error:', error);
             });
     } catch (error) {
         console.error('Error setting up Echo listener:', error);
     }
 }
+
+watch(userId, (newId, oldId) => {
+    if (window.Echo && oldId) {
+        window.Echo.leave(`user.${oldId}`);
+    }
+    if (newId) {
+        setupEchoListener(newId);
+    }
+});
 
 const { getOrFetch, refetch } = useCacheFetch(
     projectCache.value,
@@ -78,25 +87,29 @@ const { getOrFetch, refetch } = useCacheFetch(
 
 async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true) {
     const cacheKey = `project_page_${page}_${queryStr}`;
-    if (showLoadingPage) {
-        isLoading.value = true;
-        await getOrFetch(cacheKey, async () => {
-            await getProjects(page, queryStr);
-            return projectData.value;
-        }, (data) => {
-            projectData.value = data;
-        });
+    if (projectCache.value[cacheKey]) {
+        projectData.value = projectCache.value[cacheKey];
         isLoading.value = false;
-    } else {
-        tableLoading.value = true;
+        tableLoading.value = false;
+        return;
+    }
+    if (showLoadingPage) isLoading.value = true;
+    else tableLoading.value = true;
+    try {
         await getOrFetch(cacheKey, async () => {
             await getProjects(page, queryStr);
             return projectData.value;
         }, (data) => {
             projectData.value = data;
         });
+    } catch (e) {
+        // Nếu có lỗi, vẫn phải reset loading
+        isLoading.value = false;
         tableLoading.value = false;
+        throw e;
     }
+    isLoading.value = false;
+    tableLoading.value = false;
 }
 
 async function handlePinProject(projectId: number) {
@@ -160,7 +173,7 @@ async function handleSubmitProject(data: ProjectInputType) {
     }, (data) => {
         projectData.value = data;
     });
-    setupEchoListener();
+    setupEchoListener(userId.value);
 }
 
 const handleSearch = async (searchQuery: string) => {
@@ -169,10 +182,13 @@ const handleSearch = async (searchQuery: string) => {
 };
 
 onMounted(async () => {
+    // Lấy userId từ localStorage hoặc API
+    const userDataRaw = localStorage.getItem('userData');
+    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
+    userId.value = userData.id || (userData.user && userData.user.id) || null;
     await fetchProjects();
     projectStore.edit = false;
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
-    setupEchoListener();
 });
 </script>
 

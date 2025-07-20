@@ -60,9 +60,9 @@ onMounted(async () => {
     const userId = userData.id || (userData.user && userData.user.id);
     if (userId) {
         window.Echo.private(`user.${userId}`)
-            .listen('UserRemovedFromProject', (e: { projectId: number, message: string }) => {
+            .listen('UserRemovedFromProject', (e: { projectId: number }) => {
                 if (e.projectId && ProjectData.value?.data?.id === e.projectId) {
-                    showErrorResponse(e.message);
+                    showError('You have been removed from the project!');
                     router.push('/projects');
                 }
             });

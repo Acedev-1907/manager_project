@@ -36,6 +36,9 @@ export function useLoginUser() {
 
       if (data && data.token && data.user) {
         localStorage.setItem("userData", JSON.stringify(data));
+        // Khởi tạo lại Echo với token mới
+        const { initEcho } = await import("../../../../echo");
+        initEcho();
         // Gọi API lấy user mới nhất
         const userRes = await makeHttpReq<undefined, any>("user", "GET");
         userStore.setUser({

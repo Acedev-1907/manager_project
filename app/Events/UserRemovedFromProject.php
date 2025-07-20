@@ -29,8 +29,7 @@ class UserRemovedFromProject implements ShouldBroadcastNow
     public function broadcastWith()
     {
         return [
-            'projectId' => $this->project->id,
-            'message' => 'You have been removed from the project!'
+            'projectId' => $this->project->id
         ];
     }
 }

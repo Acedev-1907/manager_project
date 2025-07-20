@@ -8,25 +8,33 @@ function getCurrentToken() {
     return userDataRaw ? JSON.parse(userDataRaw)?.token : '';
 }
 
-window.Echo = new Echo({
-    // broadcaster: 'reverb',
-    // key: import.meta.env.VITE_REVERB_APP_KEY,
-    // wsHost: import.meta.env.VITE_REVERB_HOST,
-    // wsPort: import.meta.env.VITE_REVERB_PORT ?? 80,
-    // wssPort: import.meta.env.VITE_REVERB_PORT ?? 443,
-    // forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
-    // enabledTransports: ['ws', 'wss'],
-
-    broadcaster: 'pusher',
-    key: import.meta.env.VITE_PUSHER_APP_KEY,
-    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
-    forceTLS: true,
-    encrypted: true,
-    authEndpoint: '/broadcasting/auth',
-    auth: {
-        headers: {
-            Authorization: `Bearer ${getCurrentToken()}`,
-            Accept: 'application/json'
-        }
+export function initEcho() {
+    if (window.Echo) {
+        window.Echo.disconnect();
+        window.Echo = null;
     }
-});
+    window.Echo = new Echo({
+        // broadcaster: 'reverb',
+        // key: import.meta.env.VITE_REVERB_APP_KEY,
+        // wsHost: import.meta.env.VITE_REVERB_HOST,
+        // wsPort: import.meta.env.VITE_REVERB_PORT ?? 80,
+        // wssPort: import.meta.env.VITE_REVERB_PORT ?? 443,
+        // forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
+        // enabledTransports: ['ws', 'wss'],
+        broadcaster: 'pusher',
+        key: import.meta.env.VITE_PUSHER_APP_KEY,
+        cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
+        forceTLS: true,
+        encrypted: true,
+        auth: {
+            headers: {
+                Authorization: `Bearer ${getCurrentToken()}`,
+                Accept: 'application/json'
+            }
+        }
+    });
+}
+
+initEcho();
+
+export default initEcho;
