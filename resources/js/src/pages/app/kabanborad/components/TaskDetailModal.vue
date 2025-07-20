@@ -46,11 +46,17 @@ watch([
     }
 });
 
-onUnmounted(() => {
-    if (channel) {
-        channel.stopListening('TaskCommentCreated');
-        channel = null;
+// Khóa cuộn body khi modal mở, khôi phục khi đóng
+watch(() => props.visible, (visible) => {
+    if (visible) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
     }
+});
+
+onUnmounted(() => {
+    document.body.style.overflow = '';
 });
 
 function close() { emit('close'); }
