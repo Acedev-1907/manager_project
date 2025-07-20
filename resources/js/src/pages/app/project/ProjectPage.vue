@@ -216,7 +216,7 @@ onMounted(async () => {
             </template>
             <div v-else class="no-data-center">No data</div>
         </div>
-        <div class="p-3 d-flex justify-content-center">
+        <div class="d-flex justify-content-center">
             <CustomPagination v-if="projectData?.data" :data="projectData.data" :loading="tableLoading"
                 @pagination-change-page="fetchProjects" />
         </div>
@@ -286,7 +286,7 @@ onMounted(async () => {
     display: grid;
     grid-template-columns: repeat(1, 1fr);
     gap: 1.2rem;
-    margin: 0 auto 1.5rem auto;
+    margin: 0 auto 0 auto;
     max-width: 1100px;
     padding: 0 0.5rem;
     min-height: 220px;

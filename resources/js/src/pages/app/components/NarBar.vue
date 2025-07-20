@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
 import { useUserStore } from '../../../state/userStore';
 import { getAvatarSrc } from '../../../helper/avatar';
+import BellNotification from './BellNotification.vue';
 
 const navigation = ref([
     { name: "Dashboard", link: "/dashboard", icon: "bi bi-speedometer2" },
@@ -59,32 +60,41 @@ function handleNavClick() {
 }
 
 const userStore = useUserStore();
+
+const notificationCount = ref(8); // Số thông báo mẫu
+const notifications = ref([
+    { id: 1, text: 'You have a new task assigned.' },
+    { id: 2, text: 'Project deadline is tomorrow.' },
+    { id: 3, text: 'A comment was added to your task.' },
+]);
 </script>
 <template>
     <nav class="top-navbar">
-        <!-- Hàng trên: logo + avatar (mobile) -->
         <div class="navbar-top-row d-flex d-md-none">
             <div class="navbar-left">
                 <img :src="`${APP.baseURL}/others/logo.png`" class="navbar-logo" alt="TaskMgr Logo">
                 <span class="navbar-app-name">TaskMgr</span>
             </div>
-            <div class="navbar-avatar-btn" @click="toggleMenu" style="position: relative; margin-left: auto;">
-                <template v-if="userStore.user && userStore.user.name">
-                    <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
-                        <img :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" alt="avatar"
-                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
+            <div
+                style="display: flex; align-items: center; margin-left: auto; position: relative; gap: 0.4rem; padding-right: 0.5rem;">
+                <BellNotification :notificationCount="notificationCount" :notifications="notifications" />
+                <div class="navbar-avatar-btn" @click="toggleMenu" style="position: relative;">
+                    <template v-if="userStore.user && userStore.user.name">
+                        <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
+                            <img :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" alt="avatar"
+                                style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
+                        </span>
+                        <span v-else-if="userStore.user.name && userStore.user.name.length > 0" class="avatar-circle">
+                            {{ userStore.user.name.charAt(0).toUpperCase() }}
+                        </span>
+                        <span v-else class="avatar-circle">?</span>
+                    </template>
+                    <span class="avatar-caret">
+                        <i class="bi bi-caret-down-fill"></i>
                     </span>
-                    <span v-else-if="userStore.user.name && userStore.user.name.length > 0" class="avatar-circle">
-                        {{ userStore.user.name.charAt(0).toUpperCase() }}
-                    </span>
-                    <span v-else class="avatar-circle">?</span>
-                </template>
-                <span class="avatar-caret">
-                    <i class="bi bi-caret-down-fill"></i>
-                </span>
+                </div>
             </div>
         </div>
-        <!-- Hàng dưới: các icon -->
         <ul class="navbar-menu d-flex d-md-none">
             <li v-for="(nav, idx) in navigation" :key="nav.name" class="navbar-icon-item">
                 <RouterLink :to="nav.link" class="navbar-link" :class="{ active: isActive(nav.link) }"
@@ -106,10 +116,10 @@ const userStore = useUserStore();
                             :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" class="custom-avatar-img" />
                         <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                             userStore.user.name.charAt(0).toUpperCase()
-                            }}</span>
+                        }}</span>
                         <span v-else class="avatar-circle">?</span>
                         <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name
-                        }}</span>
+                            }}</span>
                         <span v-else class="custom-user-name">Unknown</span>
                     </div>
                 </div>
@@ -143,8 +153,9 @@ const userStore = useUserStore();
                 </RouterLink>
             </li>
         </ul>
-        <!-- Avatar + dropdown desktop -->
+        <!-- Avatar + bell + dropdown desktop -->
         <div class="navbar-user d-none d-md-flex" style="position: relative;">
+            <BellNotification :notificationCount="notificationCount" :notifications="notifications" />
             <div class="navbar-avatar-btn" @click="menuOpen = !menuOpen" style="position: relative;">
                 <template v-if="userStore.user && userStore.user.name">
                     <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
@@ -170,11 +181,11 @@ const userStore = useUserStore();
                                 class="custom-avatar-img" />
                             <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                                 userStore.user.name.charAt(0).toUpperCase()
-                                }}</span>
+                            }}</span>
                             <span v-else class="avatar-circle">?</span>
                             <span v-if="userStore.user?.name" class="custom-user-name">{{
                                 userStore.user.name
-                            }}</span>
+                                }}</span>
                             <span v-else class="custom-user-name">Unknown</span>
                         </div>
                     </div>
@@ -261,7 +272,7 @@ const userStore = useUserStore();
     background: none;
     border: none;
     border-radius: 12px;
-    padding: 0.5rem 0;
+    padding-top: 0.5rem;
     text-decoration: none;
     transition: color 0.18s;
     min-width: 48px;
@@ -627,14 +638,18 @@ const userStore = useUserStore();
 }
 
 .navbar-avatar-btn {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    max-width: 44px;
+    max-height: 44px;
     border-radius: 50%;
     background: #e0e7ef;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: #2563eb;
     box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
@@ -827,31 +842,23 @@ const userStore = useUserStore();
         display: flex;
         flex-direction: row;
         width: 100%;
-        justify-content: space-between;
         align-items: center;
-        padding: 0.5rem 0.7rem;
-        min-height: 56px;
-        box-shadow: none;
+        justify-content: space-between;
+        padding: 0.8rem 0.5rem 0 0.5rem;
+        min-height: 40px;
     }
 
     .navbar-menu {
         display: flex;
         flex-direction: row;
         width: 100%;
-        justify-content: center;
-        padding: 0.2rem 0.2rem 0.3rem 0.2rem;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.2rem 0 0.2rem;
         background: none;
         box-shadow: none;
         gap: 0;
-    }
-
-    .navbar-app-name {
-        font-size: 1.1rem;
-    }
-
-    .navbar-logo {
-        width: 34px;
-        height: 34px;
+        clear: both;
     }
 
     .navbar-icon-item {
@@ -862,37 +869,34 @@ const userStore = useUserStore();
         min-width: 0;
     }
 
-    .navbar-link {
-        width: 48px;
-        height: 48px;
-        min-width: 48px;
-        min-height: 48px;
-        border-radius: 12px;
-        background: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto;
-        padding: 0;
-        font-size: 1.5rem;
-        transition: background 0.18s, color 0.18s;
-        box-shadow: none;
-        position: relative;
+    .navbar-avatar-btn {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        max-width: 44px;
+        max-height: 44px;
+    }
+
+    .avatar-circle {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        max-width: 44px;
+        max-height: 44px;
+        font-size: 1.45rem;
+    }
+
+    .navbar-top-row>div:last-child {
+        padding-right: 0.5rem;
     }
 
     .navbar-link.active,
     .navbar-link:focus,
     .navbar-link:hover {
-        background: #f0f4ff;
+        background: none !important;
         color: #2563eb;
-    }
-
-    .navbar-label {
-        display: none !important;
-    }
-
-    .navbar-underline {
-        margin-top: 4px;
     }
 }
 </style>
