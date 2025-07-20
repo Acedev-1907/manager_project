@@ -11,6 +11,7 @@ const newComment = ref('');
 const loadingComments = ref(false);
 const commentsListRef = ref<HTMLElement | null>(null);
 const showNewMsgBtn = ref(false);
+const sendingComment = ref(false); // Thêm biến chống spam gửi comment
 
 // Lấy userId hiện tại
 const currentUserId = computed(() => {
@@ -97,7 +98,8 @@ function scrollToBottom() {
 
 // Gửi comment mới
 async function sendComment() {
-    if (!newComment.value.trim()) return;
+    if (!newComment.value.trim() || sendingComment.value) return;
+    sendingComment.value = true;
     try {
         const comment = await addTaskComment(props.task.id, newComment.value);
         newComment.value = '';
@@ -106,6 +108,8 @@ async function sendComment() {
         scrollToBottom();
     } catch (e: any) {
         showError(e?.message || 'Failed to send comment');
+    } finally {
+        sendingComment.value = false;
     }
 }
 
@@ -220,8 +224,9 @@ function formatTime(dateStr: string) {
                         <button @click="goToBottom">New message</button>
                     </div>
                     <div class="comment-input">
-                        <input v-model="newComment" @keyup.enter="sendComment" placeholder="Type a message..." />
-                        <button @click="sendComment">Send</button>
+                        <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
+                            placeholder="Type a message..." />
+                        <button @click="sendComment" :disabled="sendingComment">Send</button>
                     </div>
                 </div>
             </div>
