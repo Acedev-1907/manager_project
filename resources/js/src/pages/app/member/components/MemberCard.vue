@@ -66,6 +66,12 @@ defineEmits(['remove']);
     font-weight: 600;
     color: #1e293b;
     margin: 0;
+    max-width: 160px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
 }
 
 .member-email {
