@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch, onUnmounted } from 'vue';
 import { ProjectType, useGetProject } from './actions/GetProject';
 import ProjectCard from './components/ProjectCard.vue';
 import { useRouter } from 'vue-router';
@@ -28,6 +28,7 @@ const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
 const projectCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('projectCache') || '{}'));
 const userId = ref(null);
+let joinedUserChannel: string | number | null = null;
 
 watch(projectCache, (val) => {
     localStorage.setItem('projectCache', JSON.stringify(val));
@@ -41,6 +42,8 @@ const currentUserId = userData.id || (userData.user && userData.user.id) || null
 // Add a function to setup Echo listener
 function setupEchoListener(userIdVal: string | number | null) {
     if (!userIdVal) return;
+    if (joinedUserChannel === userIdVal) return; // Đã join rồi, không join lại
+    joinedUserChannel = userIdVal;
     if (!window.Echo) {
         setTimeout(() => setupEchoListener(userIdVal), 200);
         return;
@@ -77,6 +80,7 @@ function setupEchoListener(userIdVal: string | number | null) {
 watch(userId, (newId, oldId) => {
     if (window.Echo && oldId) {
         window.Echo.leave(`user.${oldId}`);
+        joinedUserChannel = null; // Reset flag khi userId đổi
     }
     if (newId) {
         setupEchoListener(newId);
@@ -200,6 +204,14 @@ onMounted(async () => {
             );
         }
     }, { immediate: true, deep: true });
+});
+
+// Thêm leave kênh khi component bị unmount để tránh nhận event trùng
+onUnmounted(() => {
+    if (window.Echo && userId.value) {
+        window.Echo.leave(`user.${userId.value}`);
+        joinedUserChannel = null; // Reset flag khi unmount
+    }
 });
 </script>
 
