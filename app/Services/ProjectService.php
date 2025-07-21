@@ -50,6 +50,12 @@ class ProjectService
             $allMembers = array_unique(array_merge($members, [$user->id]));
             foreach ($allMembers as $memberId) {
                 broadcast(new NewProjectForMembers($project, $memberId));
+
+                // Gửi notification cho member khi được thêm vào project
+                $member = \App\Models\User::find($memberId);
+                if ($member) {
+                    $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
+                }
             }
 
             TaskProgress::create([
@@ -85,6 +91,9 @@ class ProjectService
             // Xác định user bị remove
             $removedMembers = array_diff($oldMembers, $allMembers);
 
+            // Xác định user mới được thêm vào
+            $newMembers = array_diff($allMembers, $oldMembers);
+
             // Broadcast cho user bị remove
             foreach ($removedMembers as $removedId) {
                 broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
@@ -92,6 +101,15 @@ class ProjectService
 
             foreach ($allMembers as $memberId) {
                 broadcast(new NewProjectForMembers($project, $memberId));
+            }
+
+            // Chỉ gửi notification cho thành viên mới (không gửi cho creator)
+            foreach ($newMembers as $memberId) {
+                if ($memberId == $project->creator_id) continue;
+                $member = \App\Models\User::find($memberId);
+                if ($member) {
+                    $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
+                }
             }
 
             return ['message' => 'Project updated', 'status' => 200];

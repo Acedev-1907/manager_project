@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { ProjectType, useGetProject } from './actions/GetProject';
 import ProjectCard from './components/ProjectCard.vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { projectStore } from './store/projectStore';
 import { ProjectInputType, useCreateOrUpdateProject } from './actions/createtProject';
 import { usepinnendProject } from './actions/pinnendProject';
@@ -103,7 +103,6 @@ async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true) {
             projectData.value = data;
         });
     } catch (e) {
-        // Nếu có lỗi, vẫn phải reset loading
         isLoading.value = false;
         tableLoading.value = false;
         throw e;
@@ -189,6 +188,14 @@ onMounted(async () => {
     await fetchProjects();
     projectStore.edit = false;
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
+    watch(() => projectData.value, (val) => {
+        if (val && val.current_page) {
+            localStorage.setItem(
+                `project_page_${val.current_page}`,
+                JSON.stringify(val)
+            );
+        }
+    }, { immediate: true, deep: true });
 });
 </script>
 

@@ -62,4 +62,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/tasks/{id}/comments', 'getTaskComments');
         Route::post('/tasks/{id}/comments', 'addTaskComment');
     });
+
+    // API notification cho user
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index']);
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
+    Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
 });
