@@ -51,20 +51,18 @@ function setupEchoListener(userIdVal: string | number | null) {
     try {
         window.Echo.private(`user.${userIdVal}`)
             .listen('NewProjectForMembers', async (e: any) => {
-                Object.keys(projectCache.value).forEach(key => delete projectCache.value[key]);
+                projectCache.value = {};
                 setTimeout(async () => {
                     await refetch('project_page_1_' + query.value, async () => {
                         await getProjects(1, query.value);
-                        console.log('NewProjectForMembers');
                         return projectData.value;
                     }, (data) => {
                         projectData.value = data;
-                        console.log('projectCache 2' + JSON.stringify(projectCache.value));
                     });
                 }, 500); // delay 500ms
             })
             .listen('UserRemovedFromProject', async (e: any) => {
-                Object.keys(projectCache.value).forEach(key => delete projectCache.value[key]); // Xóa cache khi nhận event (giữ reference)
+                projectCache.value = {}; // Xóa cache khi nhận event (giữ reference)
                 await refetch('project_page_1_' + query.value, async () => {
                     await getProjects(1, query.value);
                     return projectData.value;
