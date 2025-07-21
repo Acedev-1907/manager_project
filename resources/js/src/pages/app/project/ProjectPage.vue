@@ -51,6 +51,7 @@ function setupEchoListener(userIdVal: string | number | null) {
                 projectCache.value = {}; // Xóa cache khi nhận event
                 await refetch('project_page_1_' + query.value, async () => {
                     await getProjects(1, query.value);
+                    console.log('NewProjectForMembers');
                     return projectData.value;
                 }, (data) => {
                     projectData.value = data;
