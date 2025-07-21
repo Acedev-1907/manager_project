@@ -49,12 +49,16 @@ function setupEchoListener(userIdVal: string | number | null) {
         window.Echo.private(`user.${userIdVal}`)
             .listen('NewProjectForMembers', async (e: any) => {
                 projectCache.value = {}; // Xóa cache khi nhận event
+                console.log('projectCache' + projectCache.value);
+
                 await refetch('project_page_1_' + query.value, async () => {
                     await getProjects(1, query.value);
                     console.log('NewProjectForMembers');
                     return projectData.value;
                 }, (data) => {
                     projectData.value = data;
+                    console.log('projectCache 2' + projectCache.value);
+
                 });
             })
             .listen('UserRemovedFromProject', async (e: any) => {
