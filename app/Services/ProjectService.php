@@ -48,15 +48,7 @@ class ProjectService
             }
 
             $allMembers = array_unique(array_merge($members, [$user->id]));
-            foreach ($allMembers as $memberId) {
-                broadcast(new NewProjectForMembers($project, $memberId));
-
-                // Gửi notification cho member khi được thêm vào project
-                $member = \App\Models\User::find($memberId);
-                if ($member) {
-                    $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
-                }
-            }
+            $broadcastMembers = $allMembers;
 
             TaskProgress::create([
                 'projectId' => $project->id,
@@ -65,6 +57,18 @@ class ProjectService
             ]);
 
             NewProjectCreated::dispatch(\App\Models\Project::count());
+
+            // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
+            DB::afterCommit(function () use ($project, $broadcastMembers) {
+                foreach ($broadcastMembers as $memberId) {
+                    broadcast(new NewProjectForMembers($project, $memberId));
+                    // Gửi notification cho member khi được thêm vào project
+                    $member = \App\Models\User::find($memberId);
+                    if ($member) {
+                        $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
+                    }
+                }
+            });
 
             return ['message' => 'Project created', 'status' => 200];
         });
