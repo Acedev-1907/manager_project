@@ -24,7 +24,7 @@ const { ProjectData, getProjectDetail, loading: projectLoading } = useGetProject
 const { getMembers } = useGetMembers();
 const { getProjectMembers, members: projectMembers } = useGetProjectMembers();
 
-const slug = route.query?.query as string; // Lấy slug từ query param
+const slug = route.query?.query as string;
 const modalVisible = ref(false);
 const showTaskDetail = ref(false);
 const selectedTask = ref<any>(null);
