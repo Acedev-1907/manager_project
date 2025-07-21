@@ -40,12 +40,8 @@ const { getOrFetch, refetch } = useCacheFetch(
 );
 
 onMounted(async () => {
-    await getOrFetch(slug, async () => {
-        await getProjectDetail(slug);
-        return ProjectData.value;
-    }, (data) => {
-        ProjectData.value = data;
-    });
+    // Luôn fetch lại project detail từ API, không lấy từ cache để tránh trường hợp project đã bị xóa
+    await getProjectDetail(slug);
     getMembers(1, '');
     setTimeout(() => {
         setupAllDropListeners();

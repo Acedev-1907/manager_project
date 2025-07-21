@@ -359,15 +359,16 @@ onUnmounted(() => {
 
 .calendar-dropdown {
     position: absolute;
-    left: 100%;
-    top: 0;
+    left: 0;
+    top: 100%;
     right: auto;
     background: white;
     border: 2px solid #e5e7eb;
     border-radius: 0.75rem;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
     z-index: 3000;
-    margin-left: 0.5rem;
+    margin-left: 0;
+    margin-top: 0.5rem;
     padding: 1rem;
     min-width: 210px;
     padding-top: 0.3rem;

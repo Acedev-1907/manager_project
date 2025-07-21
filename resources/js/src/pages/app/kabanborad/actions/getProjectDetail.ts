@@ -1,9 +1,9 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { SingleProjectResponseType } from "./getProjectDetail.type";
-import { showErrorResponse } from "../../../../helper/utils";
 import { eventBus } from "../../../../helper/eventBus";
 import { useRouter } from "vue-router";
+import { showError } from "../../../../helper/alert";
 
 export function useGetProjectDetail() {
   const loading = ref(false);
@@ -24,7 +24,7 @@ export function useGetProjectDetail() {
       loading.value = false;
       ProjectData.value = data;
     } catch (error: any) {
-      showErrorResponse(error);
+      showError("Project does not exist!");
       router.push("/projects");
     }
   }
