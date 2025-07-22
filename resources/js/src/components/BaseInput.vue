@@ -86,7 +86,8 @@ function handleBlur(event: FocusEvent) {
     transition: all 0.3s ease;
     background: #f9fafb;
     color: #374151;
-    width: 100%;
+    height: 44px;
+    width: 350px;
 }
 
 .base-input-custom:focus {
@@ -166,6 +167,10 @@ function handleBlur(event: FocusEvent) {
     .date-icon {
         right: 0.875rem;
         font-size: 1rem;
+    }
+
+    .base-input-custom {
+        width: 100%;
     }
 }
 </style>
