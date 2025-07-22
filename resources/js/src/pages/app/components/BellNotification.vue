@@ -296,7 +296,7 @@ function formatTime(dateStr: string) {
         z-index: 2000;
         background: #f4f8ff;
         margin: 0;
-        padding: 0.8rem 0.2rem 1.2rem 0.2rem;
+        padding: 0.8rem 0.2rem 4.2rem 0.2rem;
         overflow-y: auto;
         border-top: 4px solid #2563eb;
         /* Custom scrollbar for mobile */

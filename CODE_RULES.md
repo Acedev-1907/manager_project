@@ -41,4 +41,18 @@
 - Tất cả các thông báo (thành công, lỗi, xác nhận, cảnh báo,...) phải sử dụng các hàm trong `alert.ts`.
 - Tất cả các hàm tiện ích (utility) phía FE phải được đặt trong `utils.ts` và import từ đó.
 
+## 9. Giao diện nút Add/Create và Search trên mobile
+
+- Nút Add/Create (thêm mới) phải luôn hiển thị rõ ràng trên desktop.
+- Trên mobile, nút Add/Create có thể ẩn khỏi action bar và chuyển thành nút nổi (fab) ở góc màn hình.
+- Ô search trong action bar luôn phải hiển thị rõ ràng trên cả mobile và desktop, không được ẩn.
+- Ưu tiên đặt ô search ở action bar, nút Add/Create chỉ hiện ở action bar trên desktop.
+
+## Quy ước CSS cho component Vue
+
+- Ưu tiên sử dụng class utility (Bootstrap/app.css) cho layout, flex, display, align, margin, padding, v.v.
+- Chỉ viết CSS mới cho các style thực sự custom: màu sắc, shadow, border-radius, padding/margin đặc biệt, hiệu ứng riêng, v.v.
+- Không lặp lại các class utility đã có sẵn trong app.css/Bootstrap.
+- Nếu cần override, chỉ override khi thực sự cần thiết và phải ghi chú rõ lý do.
+
 ---

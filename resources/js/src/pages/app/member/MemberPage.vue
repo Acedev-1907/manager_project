@@ -11,11 +11,13 @@ import AddMemberModal from './components/AddMemberModal.vue';
 import { addMemberByNameOrEmail } from './actions/createMember';
 import FabButton from '../../../components/FabButton.vue';
 import { useCacheFetch } from '../../../helper/useCacheFetch';
+import SearchInput from '../../../components/SearchInput.vue';
 
 const { getMembers, memberData, loading: tableLoading } = useGetMembers();
 const isLoading = ref(true);
 const showAddModal = ref(false);
 const memberCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('memberCache') || '{}'));
+const query = ref("");
 
 watch(memberCache, (val) => {
     localStorage.setItem('memberCache', JSON.stringify(val));
@@ -27,8 +29,8 @@ const { getOrFetch, refetch } = useCacheFetch(
     (key) => { if (key) delete memberCache.value[key]; else memberCache.value = {}; }
 );
 
-async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
-    const cacheKey = `member_page_${page}_${query}`;
+async function fetchMembers(page = 1, searchQuery = '', showLoadingPage = true) {
+    const cacheKey = `member_page_${page}_${searchQuery}`;
     if (memberCache.value[cacheKey]) {
         memberData.value = memberCache.value[cacheKey];
         isLoading.value = false;
@@ -38,7 +40,7 @@ async function fetchMembers(page = 1, query = '', showLoadingPage = true) {
     if (showLoadingPage) isLoading.value = true;
     else tableLoading.value = true;
     await getOrFetch(cacheKey, async () => {
-        await getMembers(page, query);
+        await getMembers(page, searchQuery);
         return memberData.value;
     }, (data) => {
         memberData.value = data;
@@ -76,9 +78,13 @@ onMounted(async () => {
     <MainCardLayout title="Member Management" iconClass="bi bi-people-fill"
         containerStyle="padding:1rem 0 1rem 0; position:relative;">
         <template #action>
-            <button class="btn btn-primary create-btn" @click="showAddModal = true">
-                <i class="bi bi-plus-circle me-1"></i> Add Member
-            </button>
+            <div class="main-action-bar">
+                <SearchInput v-model="query" placeholder="Search member..." :loading="tableLoading"
+                    @search="(q) => fetchMembers(1, q, false)" />
+                <button class="btn btn-primary create-btn d-none d-md-block" @click="showAddModal = true">
+                    <i class="bi bi-plus-circle me-1"></i> Add Member
+                </button>
+            </div>
         </template>
         <AddMemberModal v-if="showAddModal" @close="showAddModal = false" @add="handleAddMember" />
         <LoadingPage v-if="isLoading" />
@@ -96,54 +102,3 @@ onMounted(async () => {
         </template>
     </MainCardLayout>
 </template>
-
-<style scoped>
-.fab-add-project {
-    position: fixed;
-    right: 1rem;
-    bottom: 4.5rem;
-    z-index: 1002;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.8rem;
-    color: #fff;
-    background: linear-gradient(135deg, #2563eb 60%, #60a5fa 100%);
-    width: 3.2rem;
-    height: 3.2rem;
-    border-radius: 50%;
-    box-shadow: 0 4px 18px rgba(34, 34, 59, 0.18);
-    transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
-    border: none;
-    outline: none;
-    cursor: pointer;
-    padding: 0;
-    margin: 0;
-    text-align: center;
-    text-decoration: none;
-}
-
-.fab-add-project:focus {
-    outline: 2px solid #2563eb;
-    outline-offset: 2px;
-}
-
-.fab-add-project:hover {
-    background: linear-gradient(135deg, #1d4ed8 60%, #2563eb 100%);
-    box-shadow: 0 8px 24px rgba(34, 34, 59, 0.22);
-    transform: scale(1.09);
-    color: #fff;
-    text-decoration: none;
-}
-
-.fab-add-project svg {
-    display: block;
-    margin: 0 auto;
-}
-
-@media (min-width: 769px) {
-    .fab-add-project {
-        display: none !important;
-    }
-}
-</style>

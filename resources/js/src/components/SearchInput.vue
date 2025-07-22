@@ -61,9 +61,6 @@ const clearSearch = () => {
 .search-bar-card {
     background: #fff;
     border-radius: 1rem;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
-    padding: 1rem 1.5rem 1rem 1rem;
-    margin-bottom: 1.5rem;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -130,14 +127,15 @@ const clearSearch = () => {
     transform: translateY(-50%);
 }
 
-@media (max-width: 768px) {
-    .search-bar-card {
-        padding: 0.7rem;
-    }
+/* Dropdown suggestion cho search project */
+.search-suggestion-dropdown {
+    margin-top: 2px !important;
+    padding-top: 0 !important;
+}
 
+@media (max-width: 768px) {
     .search-input-beauty {
         font-size: 0.93rem;
-        padding: 0.25rem 0.4rem 0.25rem 1.3rem;
     }
 
     .search-input-wrapper {
@@ -152,6 +150,11 @@ const clearSearch = () => {
     .clear-icon {
         right: 1.1rem;
         font-size: 0.95rem;
+    }
+
+    .search-suggestion-dropdown {
+        margin-top: 1px !important;
+        padding-top: 0 !important;
     }
 }
 </style>

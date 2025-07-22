@@ -95,7 +95,7 @@ const notificationsForBell = computed(() => notifications.value.map(n => ({
             </div>
             <div
                 style="display: flex; align-items: center; margin-left: auto; position: relative; gap: 0.4rem; padding-right: 0.5rem;">
-                <BellNotification :notificationCount="notificationCount" :notifications="notificationsForBell" />
+                <BellNotification />
                 <div class="navbar-avatar-btn" @click="toggleMenu($event)" style="position: relative;">
                     <template v-if="userStore.user && userStore.user.name">
                         <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
@@ -134,10 +134,10 @@ const notificationsForBell = computed(() => notifications.value.map(n => ({
                             :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" class="custom-avatar-img" />
                         <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                             userStore.user.name.charAt(0).toUpperCase()
-                            }}</span>
+                        }}</span>
                         <span v-else class="avatar-circle">?</span>
                         <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name
-                        }}</span>
+                            }}</span>
                         <span v-else class="custom-user-name">Unknown</span>
                     </div>
                 </div>
@@ -173,7 +173,7 @@ const notificationsForBell = computed(() => notifications.value.map(n => ({
         </ul>
         <!-- Avatar + bell + dropdown desktop -->
         <div class="navbar-user d-none d-md-flex" style="position: relative;">
-            <BellNotification :notificationCount="notificationCount" :notifications="notificationsForBell" />
+            <BellNotification />
             <div class="navbar-avatar-btn" @click="toggleMenu($event)" style="position: relative;">
                 <template v-if="userStore.user && userStore.user.name">
                     <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
@@ -199,11 +199,11 @@ const notificationsForBell = computed(() => notifications.value.map(n => ({
                                 class="custom-avatar-img" />
                             <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                                 userStore.user.name.charAt(0).toUpperCase()
-                                }}</span>
+                            }}</span>
                             <span v-else class="avatar-circle">?</span>
                             <span v-if="userStore.user?.name" class="custom-user-name">{{
                                 userStore.user.name
-                            }}</span>
+                                }}</span>
                             <span v-else class="custom-user-name">Unknown</span>
                         </div>
                     </div>

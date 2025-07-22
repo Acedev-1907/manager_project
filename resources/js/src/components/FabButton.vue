@@ -17,9 +17,9 @@ defineProps<{ customStyle?: string }>();
 <style scoped>
 .fab-add-project {
     position: fixed;
-    right: 1rem;
-    bottom: 4.5rem;
-    z-index: 1002;
+    left: 1rem;
+    bottom: 6.5rem;
+    z-index: 9;
     display: flex;
     align-items: center;
     justify-content: center;
