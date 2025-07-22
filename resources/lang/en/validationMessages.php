@@ -13,4 +13,9 @@ return [
     'password_min' => 'Password must be at least 6 characters.',
     'password_confirmed' => 'Password confirmation does not match.',
     'password_confirmation_required_with' => 'Please confirm your password.',
+
+    'receiver_id' => [
+        'required' => 'Please select invitation recipient.',
+        'exists' => 'Recipient does not exist.',
+    ],
 ];

@@ -59,4 +59,9 @@ class MemberService
         }
         return $this->addMember($user, $memberUser->id);
     }
+
+    public function addMemberCustome($userId, $memberId)
+    {
+        $this->memberRepo->createMember($userId, $memberId);
+    }
 }

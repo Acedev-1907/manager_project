@@ -1,13 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\{
-    AuthController,
+use App\Http\Controllers\{AuthController,
     UserController,
     MemberController,
     ProjectController,
-    TaskController
-};
+    TaskController};
+use App\Http\Controllers\Api\v1\MemberRequestController;
 
 Route::controller(AuthController::class)->group(function () {
     Route::post('/register', 'register')->name('auth.register');
@@ -61,5 +60,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // API comment cho task
         Route::get('/tasks/{id}/comments', 'getTaskComments');
         Route::post('/tasks/{id}/comments', 'addTaskComment');
+    });
+
+    Route::controller(MemberRequestController::class)->group(function () {
+        Route::post('/member-request/send', 'sendRequest')->name('member-request.send');
+        Route::get('/member-request/received', 'receivedRequests')->name('member-request.received');
+        Route::post('/member-request/respond/{id}', 'respond')->name('member-request.respond');
     });
 });
