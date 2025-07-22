@@ -42,7 +42,7 @@ class ProjectRepository extends BaseRepository
         if ($query) {
             $projects->where('name', 'like', '%' . $query . '%');
         }
-        return $projects->orderBy('created_at', 'desc')->paginate(6);
+        return $projects->orderBy('created_at', 'desc')->paginate(9);
     }
 
     public function countProjectsForUser($userId)
