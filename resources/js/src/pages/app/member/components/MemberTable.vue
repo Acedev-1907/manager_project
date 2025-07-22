@@ -33,7 +33,7 @@ const handleSearch = async (searchQuery: string) => {
             <MemberCard v-for="member in members?.data?.data" :key="member.id" :member="member"
                 @remove="$emit('removeMember', member)" />
         </div>
-        <div class="p-3 d-flex justify-content-center">
+        <div class="d-flex justify-content-center">
             <slot name="pagination"></slot>
         </div>
     </div>

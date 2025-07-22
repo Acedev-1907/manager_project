@@ -137,7 +137,7 @@ const handleSearch = async (searchQuery: string) => {
                 </div>
             </div>
         </div>
-        <div class="p-3 d-flex justify-content-center">
+        <div class="d-flex justify-content-center">
             <slot name="pagination"></slot>
         </div>
     </div>

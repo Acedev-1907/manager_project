@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch, onUnmounted } from 'vue';
 import { ProjectType, useGetProject } from './actions/GetProject';
 import ProjectCard from './components/ProjectCard.vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 import { projectStore } from './store/projectStore';
 import { ProjectInputType, useCreateOrUpdateProject } from './actions/createtProject';
 import { usepinnendProject } from './actions/pinnendProject';
@@ -28,6 +28,7 @@ const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
 const projectCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('projectCache') || '{}'));
 const userId = ref(null);
+let joinedUserChannel: string | number | null = null;
 
 watch(projectCache, (val) => {
     localStorage.setItem('projectCache', JSON.stringify(val));
@@ -41,6 +42,8 @@ const currentUserId = userData.id || (userData.user && userData.user.id) || null
 // Add a function to setup Echo listener
 function setupEchoListener(userIdVal: string | number | null) {
     if (!userIdVal) return;
+    if (joinedUserChannel === userIdVal) return; // Đã join rồi, không join lại
+    joinedUserChannel = userIdVal;
     if (!window.Echo) {
         setTimeout(() => setupEchoListener(userIdVal), 200);
         return;
@@ -48,7 +51,7 @@ function setupEchoListener(userIdVal: string | number | null) {
     try {
         window.Echo.private(`user.${userIdVal}`)
             .listen('NewProjectForMembers', async (e: any) => {
-                projectCache.value = {}; // Xóa cache khi nhận event
+                projectCache.value = {};
                 await refetch('project_page_1_' + query.value, async () => {
                     await getProjects(1, query.value);
                     return projectData.value;
@@ -57,7 +60,7 @@ function setupEchoListener(userIdVal: string | number | null) {
                 });
             })
             .listen('UserRemovedFromProject', async (e: any) => {
-                projectCache.value = {}; // Xóa cache khi nhận event
+                projectCache.value = {}; // Xóa cache khi nhận event (giữ reference)
                 await refetch('project_page_1_' + query.value, async () => {
                     await getProjects(1, query.value);
                     return projectData.value;
@@ -73,6 +76,7 @@ function setupEchoListener(userIdVal: string | number | null) {
 watch(userId, (newId, oldId) => {
     if (window.Echo && oldId) {
         window.Echo.leave(`user.${oldId}`);
+        joinedUserChannel = null; // Reset flag khi userId đổi
     }
     if (newId) {
         setupEchoListener(newId);
@@ -103,7 +107,6 @@ async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true) {
             projectData.value = data;
         });
     } catch (e) {
-        // Nếu có lỗi, vẫn phải reset loading
         isLoading.value = false;
         tableLoading.value = false;
         throw e;
@@ -189,6 +192,22 @@ onMounted(async () => {
     await fetchProjects();
     projectStore.edit = false;
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
+    watch(() => projectData.value, (val) => {
+        if (val && val.current_page) {
+            localStorage.setItem(
+                `project_page_${val.current_page}`,
+                JSON.stringify(val)
+            );
+        }
+    }, { immediate: true, deep: true });
+});
+
+// Thêm leave kênh khi component bị unmount để tránh nhận event trùng
+onUnmounted(() => {
+    if (window.Echo && userId.value) {
+        window.Echo.leave(`user.${userId.value}`);
+        joinedUserChannel = null; // Reset flag khi unmount
+    }
 });
 </script>
 
@@ -216,7 +235,7 @@ onMounted(async () => {
             </template>
             <div v-else class="no-data-center">No data</div>
         </div>
-        <div class="p-3 d-flex justify-content-center">
+        <div class="d-flex justify-content-center">
             <CustomPagination v-if="projectData?.data" :data="projectData.data" :loading="tableLoading"
                 @pagination-change-page="fetchProjects" />
         </div>
@@ -286,7 +305,7 @@ onMounted(async () => {
     display: grid;
     grid-template-columns: repeat(1, 1fr);
     gap: 1.2rem;
-    margin: 0 auto 1.5rem auto;
+    margin: 0 auto 0 auto;
     max-width: 1100px;
     padding: 0 0.5rem;
     min-height: 220px;

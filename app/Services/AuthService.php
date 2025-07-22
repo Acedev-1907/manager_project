@@ -45,11 +45,15 @@ class AuthService
         ];
     }
 
-    public function logoutUser($userId)
+    public function logoutUser($req)
     {
-        DB::table('personal_access_tokens')
-            ->where('tokenable_id', $userId)
-            ->delete();
-        return ['message' => 'logout user'];
+        $user = $req->user();
+        $token = $user->currentAccessToken();
+
+        if ($token) {
+            $token->delete();
+        }
+
+        return ['message' => 'logout current device'];
     }
 }

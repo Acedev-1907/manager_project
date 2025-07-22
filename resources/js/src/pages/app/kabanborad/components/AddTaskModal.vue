@@ -25,7 +25,7 @@ const rules = {
 
 const v$ = useVuelidate(rules, taskStore.taskInput);
 const selectedMembers = ref<number[]>([]);
-const { loading, createTask } = useCreateTask();
+const { /* loading, */ createTask } = useCreateTask();
 const currentUser = ref<{ id: number; name: string; email: string } | null>(null);
 
 // Compute project members, always include current user
@@ -127,12 +127,9 @@ watch(() => props.visible, (newVal) => {
                             <p class="modal-subtitle">Create a task for your project</p>
                         </div>
                         <div class="header-actions">
-                            <button type="submit" class="btn btn-primary btn-create" :disabled="loading"
-                                @click="submitTask">
-                                <i v-if="loading" class="fas fa-spinner fa-spin"></i>
-                                <i v-else class="fas fa-plus"></i>
-                                <span v-if="!loading"> Create</span>
-                                <span v-else>Creating...</span>
+                            <button type="submit" class="btn btn-primary btn-create" @click="submitTask">
+                                <i class="fas fa-plus"></i>
+                                <span> Create</span>
                             </button>
                             <button type="button" class="btn btn-secondary btn-cancel" @click="closeModal">
                                 Cancel

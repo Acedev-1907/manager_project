@@ -22,6 +22,10 @@ Broadcast::channel('user.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
+Broadcast::channel('user-notification.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});
+
 Broadcast::channel('task.{taskId}', function ($user, $taskId) {
     return true;
 });

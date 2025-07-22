@@ -48,9 +48,7 @@ class ProjectService
             }
 
             $allMembers = array_unique(array_merge($members, [$user->id]));
-            foreach ($allMembers as $memberId) {
-                broadcast(new NewProjectForMembers($project, $memberId));
-            }
+            $broadcastMembers = $allMembers;
 
             TaskProgress::create([
                 'projectId' => $project->id,
@@ -59,6 +57,18 @@ class ProjectService
             ]);
 
             NewProjectCreated::dispatch(\App\Models\Project::count());
+
+            // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
+            DB::afterCommit(function () use ($project, $broadcastMembers) {
+                foreach ($broadcastMembers as $memberId) {
+                    broadcast(new NewProjectForMembers($project, $memberId));
+                    // Gửi notification cho member khi được thêm vào project
+                    $member = \App\Models\User::find($memberId);
+                    if ($member) {
+                        $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
+                    }
+                }
+            });
 
             return ['message' => 'Project created', 'status' => 200];
         });
@@ -85,14 +95,29 @@ class ProjectService
             // Xác định user bị remove
             $removedMembers = array_diff($oldMembers, $allMembers);
 
-            // Broadcast cho user bị remove
-            foreach ($removedMembers as $removedId) {
-                broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
-            }
+            // Xác định user mới được thêm vào
+            $newMembers = array_diff($allMembers, $oldMembers);
 
-            foreach ($allMembers as $memberId) {
-                broadcast(new NewProjectForMembers($project, $memberId));
-            }
+            // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
+            \DB::afterCommit(function () use ($project, $removedMembers, $allMembers, $newMembers) {
+                // Broadcast cho user bị remove
+                foreach ($removedMembers as $removedId) {
+                    broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
+                }
+
+                foreach ($allMembers as $memberId) {
+                    broadcast(new NewProjectForMembers($project, $memberId));
+                }
+
+                // Chỉ gửi notification cho thành viên mới (không gửi cho creator)
+                foreach ($newMembers as $memberId) {
+                    if ($memberId == $project->creator_id) continue;
+                    $member = \App\Models\User::find($memberId);
+                    if ($member) {
+                        $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
+                    }
+                }
+            });
 
             return ['message' => 'Project updated', 'status' => 200];
         });

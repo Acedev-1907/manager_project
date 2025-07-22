@@ -67,4 +67,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/member-request/received', 'receivedRequests')->name('member-request.received');
         Route::post('/member-request/respond/{id}', 'respond')->name('member-request.respond');
     });
+
+    // API notification cho user
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index']);
+    Route::get('/notifications/all', [\App\Http\Controllers\NotificationController::class, 'all']);
+    Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']); //not implemented
+    Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
+    Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+
 });
