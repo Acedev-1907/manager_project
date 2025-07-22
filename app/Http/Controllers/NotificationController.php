@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 class NotificationController extends Controller
 {
     /**
-     * Lấy danh sách notification của user hiện tại
+     * Get the current user's notification in the list
      */
     public function index(Request $request)
     {
@@ -48,5 +48,32 @@ class NotificationController extends Controller
             return response()->json(['message' => 'Notification deleted']);
         }
         return response()->json(['message' => 'Notification not found'], 404);
+    }
+
+    /**
+     * Get all notifications for the current user (no limit)
+     */
+    public function all(Request $request)
+    {
+        $user = $request->user();
+        $notifications = $user->notifications()->latest()->get();
+        $unreadCount = $user->unreadNotifications()->count();
+        return response()->json([
+            'notifications' => $notifications,
+            'unread_count' => $unreadCount
+        ]);
+    }
+
+    /**
+     * Mark all notifications as read for the current user
+     */
+    public function markAllAsRead(Request $request)
+    {
+        $user = $request->user();
+        $user->unreadNotifications->markAsRead();
+        return response()->json([
+            'message' => 'All notifications marked as read',
+            'unread_count' => 0
+        ]);
     }
 }

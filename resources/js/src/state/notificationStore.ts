@@ -2,11 +2,14 @@ import { ref, watch } from "vue";
 import { useUserStore } from "./userStore";
 import { makeHttpReq } from "../helper/makeHttpReq";
 
+// State: Danh sách thông báo và số lượng chưa đọc
 export const notifications = ref<any[]>([]);
 export const notificationCount = ref(0);
 
 let currentChannel = "";
 let userInteracted = false;
+
+// Lắng nghe click đầu tiên để bật âm thanh notification
 if (typeof window !== "undefined") {
   window.addEventListener(
     "click",
@@ -17,6 +20,7 @@ if (typeof window !== "undefined") {
   );
 }
 
+// Lắng nghe realtime notification qua Echo
 function setupNotificationListener(userId: string | number | null) {
   if (!userId) return;
   if (!window.Echo) {
@@ -28,8 +32,8 @@ function setupNotificationListener(userId: string | number | null) {
     window.Echo.leave(currentChannel);
   }
   currentChannel = channelName;
-  window.Echo.private(channelName).notification((notification: any) => {
-    // Nếu thiếu project_id hoặc slug, lấy từ notification.project nếu có
+  window.Echo.private(channelName).notification(async (notification: any) => {
+    // Bổ sung project_id, slug nếu thiếu
     if (
       (!notification.project_id || !notification.slug) &&
       notification.project
@@ -41,87 +45,118 @@ function setupNotificationListener(userId: string | number | null) {
         notification.slug = notification.project.slug;
       }
     }
-    notifications.value.unshift(notification);
-    if (typeof notification.unread_count === "number") {
-      notificationCount.value = notification.unread_count;
-    } else {
-      notificationCount.value++;
-    }
-    // Play sound when receive new notification (chỉ khi user đã tương tác)
+    // Luôn fetch lại notification từ API để đồng bộ
+    await fetchNotifications();
+    // Phát âm thanh nếu user đã từng tương tác
     if (userInteracted) {
       try {
-        const audio = new Audio("/sounds/new-notification.mp3");
-        audio.play();
-      } catch (e) {
-        /* ignore */
-      }
+        new Audio("/sounds/new-notification.mp3").play();
+      } catch (e) {}
     }
   });
 }
 
+// Khởi tạo lắng nghe realtime khi user đăng nhập
 export function listenRealtime() {
   const userStore = useUserStore();
-  // Lấy userId từ localStorage nếu userStore chưa có
-  let userId = userStore.user?.id;
+  let userId: string | number | null = userStore.user?.id;
   if (!userId) {
     const userDataRaw = localStorage.getItem("userData");
     const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
     userId = userData.id || (userData.user && userData.user.id) || null;
-    if (userId) {
-      setupNotificationListener(userId);
-    }
+    if (userId) setupNotificationListener(userId);
   }
   watch(
     () => userStore.user?.id,
     (newId) => {
-      if (newId) {
-        setupNotificationListener(newId);
-      }
+      if (newId) setupNotificationListener(newId);
     },
     { immediate: true }
   );
 }
 
+// Kiểu dữ liệu trả về từ API notification
+interface NotificationApiResponse {
+  notifications: any[];
+  unread_count: number;
+}
+
+// Lấy 10 thông báo mới nhất
 export async function fetchNotifications() {
-  const res = await makeHttpReq<any, any>("notifications", "GET");
-  // Nếu response là object có notifications và unread_count
+  const res = await makeHttpReq<unknown, NotificationApiResponse>(
+    "notifications",
+    "GET"
+  );
   if (
     res &&
-    Array.isArray(res.notifications) &&
-    typeof res.unread_count === "number"
+    typeof res === "object" &&
+    Array.isArray((res as NotificationApiResponse).notifications) &&
+    typeof (res as NotificationApiResponse).unread_count === "number"
   ) {
-    // Map lại dữ liệu cho đúng định dạng BellNotification.vue cần
-    notifications.value = res.notifications.map((n: any) => ({
-      id: n.id,
-      message: n.data?.message || "",
-      avatar: n.data?.avatar || "",
-      created_at: n.created_at || "",
-      slug: n.data?.slug || "",
-      project_id: n.data?.project_id || "",
-    }));
-    notificationCount.value = res.unread_count;
+    const data = res as NotificationApiResponse;
+    notifications.value = data.notifications.map(mapNotificationData);
+    notificationCount.value = data.unread_count;
   } else {
-    // fallback cũ
-    notifications.value = res;
+    notifications.value = Array.isArray(res) ? (res as any[]) : [];
     notificationCount.value = notifications.value.filter(
-      (n: any) => !n.read_at
+      (n) => !n.read_at
     ).length;
   }
 }
 
-export async function markAsRead(id: string) {
-  await makeHttpReq<any, any>(`notifications/${id}/read`, "POST");
-  const noti = notifications.value.find((n: any) => n.id === id);
-  if (noti) noti.read_at = new Date();
-  notificationCount.value = notifications.value.filter(
-    (n: any) => !n.read_at
-  ).length;
+// Lấy toàn bộ thông báo
+export async function fetchAllNotifications() {
+  const res = await makeHttpReq<unknown, NotificationApiResponse>(
+    "notifications/all",
+    "GET"
+  );
+  if (
+    res &&
+    typeof res === "object" &&
+    Array.isArray((res as NotificationApiResponse).notifications) &&
+    typeof (res as NotificationApiResponse).unread_count === "number"
+  ) {
+    const data = res as NotificationApiResponse;
+    notifications.value = data.notifications.map(mapNotificationData);
+    notificationCount.value = data.unread_count;
+  } else {
+    notifications.value = Array.isArray(res) ? (res as any[]) : [];
+    notificationCount.value = notifications.value.filter(
+      (n) => !n.read_at
+    ).length;
+  }
 }
 
+// Đánh dấu 1 thông báo là đã đọc
+export async function markAsRead(id: string) {
+  await makeHttpReq<any, any>(`notifications/${id}/read`, "POST");
+  const noti = notifications.value.find((n) => n.id === id);
+  if (noti) noti.read_at = new Date();
+  await fetchNotifications();
+}
+
+// Đánh dấu tất cả thông báo là đã đọc
+export async function markAllAsRead() {
+  await makeHttpReq<any, any>(`notifications/read-all`, "POST");
+  await fetchNotifications();
+}
+
+// Xóa 1 thông báo
 export async function removeNotification(id: string) {
   await makeHttpReq<any, any>(`notifications/${id}`, "DELETE");
-  notifications.value = notifications.value.filter((n: any) => n.id !== id);
-  notificationCount.value = notifications.value.filter(
-    (n: any) => !n.read_at
-  ).length;
+  notifications.value = notifications.value.filter((n) => n.id !== id);
+  await fetchNotifications();
+}
+
+// Helper: Chuẩn hóa dữ liệu notification cho FE
+function mapNotificationData(n: any) {
+  return {
+    id: n.id,
+    message: n.data?.message || "",
+    avatar: n.data?.avatar || "",
+    created_at: n.created_at || "",
+    slug: n.data?.slug || "",
+    project_id: n.data?.project_id || "",
+    read_at: n.read_at || null,
+  };
 }

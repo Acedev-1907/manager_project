@@ -669,10 +669,7 @@ async function handleDeleteTask(taskId: number) {
     }
 
     .kanban-header {
-        padding: 10px 12px;
-        margin-bottom: 12px;
-        border-radius: 10px;
-        overflow: hidden;
+        top: 126px;
     }
 
     .header-content {

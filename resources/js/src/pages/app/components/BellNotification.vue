@@ -1,103 +1,71 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { markAsRead, notifications, removeNotification } from '../../../state/notificationStore';
+import { notifications, notificationCount, markAllAsRead, fetchAllNotifications, removeNotification } from '../../../state/notificationStore';
 import { eventBus } from '../../../helper/eventBus';
 import { getAvatarSrc } from '../../../helper/avatar';
-const props = defineProps<{
-    notificationCount: number,
-    notifications: Array<{
-        id: number | string,
-        avatar?: string,
-        creator_name?: string,
-        message: string,
-        created_at: string,
-        project_id?: string | number
-    }>
-}>()
-const emit = defineEmits(['toggle'])
 
-const bellOpen = ref(false)
-const bellDropdownRef = ref<HTMLElement | null>(null)
+const bellOpen = ref(false);
+const bellDropdownRef = ref<HTMLElement | null>(null);
 const router = useRouter();
-const localBadgeCount = ref(props.notificationCount)
-let badgeFrozen = false;
+const loadingAll = ref(false);
+const allLoaded = ref(false);
 
-// Luôn đồng bộ localBadgeCount với props.notificationCount nếu không bị freeze
-watch(() => props.notificationCount, (val) => {
-    if (!badgeFrozen || !bellOpen.value) localBadgeCount.value = val;
-});
-
+// Xử lý cuộn ngoài khi mở dropdown trên mobile
 watch(bellOpen, (open) => {
-    if (!open) {
-        badgeFrozen = false;
-        localBadgeCount.value = props.notificationCount;
-    }
-    // Ẩn thanh cuộn ngoài khi mở dropdown ở mobile
-    if (window.innerWidth <= 767 && open) {
-        document.body.style.overflow = 'hidden';
-    } else if (window.innerWidth <= 767 && !open) {
-        document.body.style.overflow = '';
+    if (window.innerWidth <= 767) {
+        document.body.style.overflow = open ? 'hidden' : '';
     }
 });
 
-function toggleBell(event?: MouseEvent) {
-    if (event) event.stopPropagation();
-    // Đóng dropdown avatar nếu đang mở
-    eventBus.emit('close-avatar-dropdown');
-    // Toggle luôn trạng thái bellOpen
-    if (bellOpen.value) {
-        closeBell();
-    } else {
-        bellOpen.value = true;
-        emit('toggle', true);
-        if (localBadgeCount.value > 0) {
-            badgeFrozen = true;
-            localBadgeCount.value = 0;
-            const unread = notifications.value.filter(n => !n.read_at);
-            unread.forEach(n => markAsRead(n.id));
-        }
-    }
-}
-
-function closeBell() {
-    bellOpen.value = false;
-    moreMenuOpen.value = null; // Reset menu 3 chấm khi đóng dropdown
-    emit('toggle', false);
-}
+// Đóng dropdown khi click ra ngoài
 function handleBellClickOutside(event: MouseEvent) {
     if (!bellOpen.value) return;
     const dropdown = bellDropdownRef.value;
     const bellBtn = document.querySelector('.custom-bell-btn');
-    if (
-        dropdown &&
-        bellBtn &&
-        !dropdown.contains(event.target as Node) &&
-        !bellBtn.contains(event.target as Node)
-    ) {
+    if (dropdown && bellBtn && !dropdown.contains(event.target as Node) && !bellBtn.contains(event.target as Node)) {
         closeBell();
     }
-    // Đóng menu 3 chấm nếu click ra ngoài
-    if (moreMenuOpen.value) {
-        const moreMenu = document.querySelector('.bell-dropdown [style*="z-index:999"]');
-        if (moreMenu && !moreMenu.contains(event.target as Node)) {
-            moreMenuOpen.value = null;
-        }
-    }
 }
+
 onMounted(() => {
-    document.addEventListener('click', handleBellClickOutside, false); // bubbling phase
+    document.addEventListener('click', handleBellClickOutside, false);
     eventBus.on('close-bell-notification', closeBell);
 });
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleBellClickOutside, false);
     eventBus.off('close-bell-notification', closeBell);
-    // Đảm bảo khôi phục cuộn khi component bị hủy
     if (window.innerWidth <= 767) document.body.style.overflow = '';
 });
 
+function toggleBell(event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    eventBus.emit('close-avatar-dropdown');
+    if (bellOpen.value) {
+        closeBell();
+    } else {
+        bellOpen.value = true;
+        // Đánh dấu tất cả thông báo là đã đọc (badge biến mất ngay)
+        markAllAsRead();
+    }
+}
+
+function closeBell() {
+    bellOpen.value = false;
+    moreMenuOpen.value = null;
+}
+
+// Xem chi tiết notification
+function handleNotificationClick(item: any) {
+    let slug = item.slug;
+    if (!slug && item.project_id) slug = getSlugByProjectId(item.project_id);
+    if (slug) {
+        router.push(`/kaban?query=${slug}`);
+        closeBell();
+    }
+}
+
 function getSlugByProjectId(projectId: number | string) {
-    // Duyệt qua tất cả các key project_page_* trong localStorage
     for (const key in localStorage) {
         if (key.startsWith('project_page_')) {
             try {
@@ -105,44 +73,32 @@ function getSlugByProjectId(projectId: number | string) {
                 const projects = pageData.data?.data || [];
                 const project = projects.find((p: any) => p.id == projectId);
                 if (project && project.slug) return project.slug;
-            } catch (e) { /* ignore parse error */ }
+            } catch (e) { /* ignore */ }
         }
     }
     return undefined;
 }
 
-// Hàm xử lý khi click vào notification
-function handleNotificationClick(item: any) {
-
-    let slug = item.slug;
-    if (!slug && item.project_id) {
-        slug = getSlugByProjectId(item.project_id);
-    }
-    if (slug) {
-        router.push(`/kaban?query=${slug}`);
-        closeBell();
-    }
+// Xem thêm thông báo cũ
+async function handleSeePrevious() {
+    loadingAll.value = true;
+    await fetchAllNotifications();
+    loadingAll.value = false;
+    allLoaded.value = true;
+    setTimeout(() => {
+        const list = bellDropdownRef.value?.querySelector('.bell-dropdown-list');
+        if (list) list.scrollTop = list.scrollHeight;
+    }, 100);
 }
 
-const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = (now.getTime() - date.getTime()) / 1000; // seconds
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
-    return date.toLocaleDateString();
-}
-
+// Xử lý menu 3 chấm
 const moreMenuOpen = ref<string | number | null>(null);
-// Thêm biến trạng thái hover cho từng option
 const hoverMenu = ref<{ [key: string]: boolean }>({});
 function toggleMoreMenu(id: string | number, event: MouseEvent) {
     event.stopPropagation();
     moreMenuOpen.value = moreMenuOpen.value === id ? null : id;
 }
 function handleView(item: any) {
-    // Có thể emit hoặc xử lý view ở đây
     handleNotificationClick(item);
     moreMenuOpen.value = null;
 }
@@ -150,49 +106,54 @@ function handleRemove(item: any) {
     removeNotification(item.id);
     moreMenuOpen.value = null;
 }
+
+function formatTime(dateStr: string) {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = (now.getTime() - date.getTime()) / 1000;
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+    return date.toLocaleDateString();
+}
 </script>
 <template>
     <span class="custom-bell-btn" @click="toggleBell($event)">
         <i class="bi bi-bell-fill"></i>
-        <span class="custom-bell-badge" v-if="localBadgeCount > 0">{{ localBadgeCount }}</span>
+        <span class="custom-bell-badge" v-if="notificationCount > 0">{{ notificationCount }}</span>
     </span>
     <transition name="fade">
         <div v-if="bellOpen" class="bell-dropdown bell-dropdown-mobile" ref="bellDropdownRef">
             <div class="bell-dropdown-header">Notifications</div>
             <ul class="bell-dropdown-list">
-                <li v-if="!props.notifications.length" class="bell-dropdown-item">No notifications</li>
-                <li v-for="item in props.notifications" :key="item.id" class="bell-dropdown-item"
-                    @click="handleNotificationClick(item)"
-                    style="cursor:pointer; display: flex; align-items: center; gap: 10px; position: relative;">
-                    <img :src="getAvatarSrc(item.avatar)" alt="avatar"
-                        style="width:36px; height:36px; border-radius:50%; object-fit:cover; margin-right:10px;" />
-                    <div style="display: flex; flex-direction: column; align-items: flex-start; flex:1; min-width:0;">
-                        <div
-                            style="font-size:14px; white-space:normal; word-break:break-word; overflow:hidden; text-overflow:ellipsis; font-weight:500;">
-                            {{ item.message }}
-                        </div>
-                        <div style="font-size:12px; color:#888; margin-top:2px;">
-                            {{ formatTime(item.created_at) }}
-                        </div>
+                <li v-if="!notifications.length" class="bell-dropdown-item">No notifications</li>
+                <li v-for="item in notifications" :key="item.id" class="bell-dropdown-item notification-item"
+                    @click="handleNotificationClick(item)">
+                    <img :src="getAvatarSrc(item.avatar)" alt="avatar" class="notification-avatar" />
+                    <div class="notification-content">
+                        <div class="notification-message">{{ item.message }}</div>
+                        <div class="notification-time">{{ formatTime(item.created_at) }}</div>
                     </div>
-                    <span
-                        style="display:flex; align-items:center; height:100%; margin-left:8px; font-size:20px; color:#888; cursor:pointer; position:relative;"
-                        @click.stop="toggleMoreMenu(item.id, $event)">
+                    <span class="notification-more-btn" @click.stop="toggleMoreMenu(item.id, $event)">
                         ⋮
-                        <div v-if="moreMenuOpen === item.id" class="more-menu-mobile"
-                            style="position:absolute; right:0; top:36px; background:#fff; box-shadow:0 4px 16px rgba(36,112,220,0.13),0 1.5px 8px rgba(36,112,220,0.07); border-radius:10px; z-index:999; min-width:120px; overflow:hidden; border:1px solid #e0e3e8;">
-                            <div style="padding:7px 18px; font-size:13px; cursor:pointer; transition:background 0.15s; border-bottom:1px solid #f0f0f0;"
-                                :style="hoverMenu['view-' + item.id] ? 'background:#f4f8ff' : ''"
+                        <div v-if="moreMenuOpen === item.id" class="more-menu-mobile">
+                            <div class="more-menu-view" :class="{ 'hovered': hoverMenu['view-' + item.id] }"
                                 @click.stop="handleView(item)" @mouseenter="hoverMenu['view-' + item.id] = true"
                                 @mouseleave="hoverMenu['view-' + item.id] = false">View</div>
-                            <div style="padding:7px 18px; font-size:13px; cursor:pointer; color:#e53935; transition:background 0.15s;"
-                                :style="hoverMenu['remove-' + item.id] ? 'background:#fbe9e7' : ''"
+                            <div class="more-menu-remove" :class="{ 'hovered': hoverMenu['remove-' + item.id] }"
                                 @click.stop="handleRemove(item)" @mouseenter="hoverMenu['remove-' + item.id] = true"
                                 @mouseleave="hoverMenu['remove-' + item.id] = false">Remove</div>
                         </div>
                     </span>
                 </li>
             </ul>
+            <div v-if="notifications.length === 10 && !allLoaded" class="see-previous-wrapper">
+                <button @mousedown.stop="" @click.stop="handleSeePrevious" :disabled="loadingAll"
+                    class="see-previous-btn">
+                    <span v-if="!loadingAll">See previous notifications</span>
+                    <span v-else>Loading...</span>
+                </button>
+            </div>
         </div>
     </transition>
 </template>
@@ -391,5 +352,112 @@ function handleRemove(item: any) {
         right: 21px !important;
         top: -21px !important;
     }
+}
+
+.notification-item {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+
+.notification-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+
+.notification-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-message {
+    font-size: 14px;
+    white-space: normal;
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.notification-time {
+    font-size: 12px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.notification-more-btn {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    margin-left: 8px;
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+    position: relative;
+}
+
+.more-menu-mobile {
+    position: absolute;
+    right: 0;
+    top: 36px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(36, 112, 220, 0.13), 0 1.5px 8px rgba(36, 112, 220, 0.07);
+    border-radius: 10px;
+    z-index: 999;
+    min-width: 120px;
+    overflow: hidden;
+    border: 1px solid #e0e3e8;
+}
+
+.more-menu-view {
+    padding: 7px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.more-menu-view.hovered {
+    background: #f4f8ff;
+}
+
+.more-menu-remove {
+    padding: 7px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #e53935;
+    transition: background 0.15s;
+}
+
+.more-menu-remove.hovered {
+    background: #fbe9e7;
+}
+
+.see-previous-wrapper {
+    text-align: center;
+    margin-top: 8px;
+}
+
+.see-previous-btn {
+    padding: 6px 18px;
+    border-radius: 8px;
+    background: #e3edfa;
+    color: #2563eb;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.see-previous-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 </style>

@@ -54,7 +54,7 @@ class AuthController extends Controller
 
     public function logoutUser(Request $req, AuthService $authService)
     {
-        $result = $authService->logoutUser($req->userId);
+        $result = $authService->logoutUser($req);
         return response($result, 200);
     }
 
