@@ -27,6 +27,7 @@ class User extends Authenticatable
         'password',
         'isValidEmail',
         'remember_token',
+        'friend_code',
     ];
 
     /**
@@ -50,6 +51,27 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Remove Vietnamese accents from a string
+     */
+    public static function remove_accents($str)
+    {
+        $accents = [
+            'a' => ['á', 'à', 'ả', 'ã', 'ạ', 'ă', 'ắ', 'ằ', 'ẳ', 'ẵ', 'ặ', 'â', 'ấ', 'ầ', 'ẩ', 'ẫ', 'ậ'],
+            'e' => ['é', 'è', 'ẻ', 'ẽ', 'ẹ', 'ê', 'ế', 'ề', 'ể', 'ễ', 'ệ'],
+            'i' => ['í', 'ì', 'ỉ', 'ĩ', 'ị'],
+            'o' => ['ó', 'ò', 'ỏ', 'õ', 'ọ', 'ô', 'ố', 'ồ', 'ổ', 'ỗ', 'ộ', 'ơ', 'ớ', 'ờ', 'ở', 'ỡ', 'ợ'],
+            'u' => ['ú', 'ù', 'ủ', 'ũ', 'ụ', 'ư', 'ứ', 'ừ', 'ử', 'ữ', 'ự'],
+            'y' => ['ý', 'ỳ', 'ỷ', 'ỹ', 'ỵ'],
+            'd' => ['đ'],
+        ];
+        foreach ($accents as $nonAccent => $accentChars) {
+            $str = str_replace($accentChars, $nonAccent, $str);
+            $str = str_replace(array_map('mb_strtoupper', $accentChars), strtoupper($nonAccent), $str);
+        }
+        return $str;
     }
 
     public function projects()

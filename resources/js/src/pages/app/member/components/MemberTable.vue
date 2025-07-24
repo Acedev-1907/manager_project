@@ -1,34 +1,24 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
-import { GetMemberType, MemberType } from '../actions/getMember';
-import SearchInput from '../../../../components/SearchInput.vue';
 import MemberCard from './MemberCard.vue';
 
 defineProps<{
-    members: GetMemberType;
+    items: any[];
     loading: boolean;
-}>()
-
-const emit = defineEmits<{
-    (e: "removeMember", member: MemberType): void;
-    (e: "getMember", page: number, query: string, showGlobalLoading: boolean): Promise<void>;
 }>();
-
-const query = ref("");
-
-const handleSearch = async (searchQuery: string) => {
-    query.value = searchQuery;
-    await emit("getMember", 1, searchQuery, false);
-};
+const emit = defineEmits(['removeMember']);
 </script>
 <template>
     <div class="member-table-container" style="position:relative;">
-        <div v-if="!members?.data?.data || members?.data?.data.length === 0" class="text-center text-muted py-4">
+        <div v-if="!items || items.length === 0" class="text-center text-muted py-4">
             No data
         </div>
         <div v-else class="member-card-grid">
-            <MemberCard v-for="member in members?.data?.data" :key="member.id" :member="member"
-                @remove="$emit('removeMember', member)" />
+            <template v-for="item in items" :key="item.id">
+                <slot name="card" :item="item">
+                    <!-- Default: MemberCard -->
+                    <MemberCard :member="item" @remove="() => emit('removeMember', item)" />
+                </slot>
+            </template>
         </div>
         <div class="d-flex justify-content-center">
             <slot name="pagination"></slot>

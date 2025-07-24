@@ -12,6 +12,9 @@ class MemberRepository extends BaseRepository
         return Member::class;
     }
 
+    /**
+     * Get all accepted members (friendship) of a user. Only members with accepted invitation are in this table.
+     */
     public function getContacts($userId, $query = null)
     {
         $contacts = $this->model->with('member')
@@ -54,12 +57,12 @@ class MemberRepository extends BaseRepository
 
     public function deleteMember($member_id, $userId)
     {
-        $member = $this->model->where('user_id', $userId)->where('member_id', $member_id)->first();
-        if ($member) {
-            $member->delete();
-            return true;
-        }
-        return false;
+        $deleted = $this->model->where(function ($q) use ($userId, $member_id) {
+            $q->where('user_id', $userId)->where('member_id', $member_id);
+        })->orWhere(function ($q) use ($userId, $member_id) {
+            $q->where('user_id', $member_id)->where('member_id', $userId);
+        })->delete();
+        return $deleted > 0;
     }
 
     public function findUserByEmail($email)

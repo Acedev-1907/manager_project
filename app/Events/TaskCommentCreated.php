@@ -23,7 +23,7 @@ class TaskCommentCreated implements ShouldBroadcastNow
 
     public function broadcastOn()
     {
-        Log::info('Broadcasting TaskCommentCreated event for task', ['taskId' => $this->taskId, 'comment_id' => $this->comment->id ?? null]);
+        // Log::info('Broadcasting TaskCommentCreated event for task', ['taskId' => $this->taskId, 'comment_id' => $this->comment->id ?? null]);
         return [new PrivateChannel('task.' . $this->taskId)];
     }
 

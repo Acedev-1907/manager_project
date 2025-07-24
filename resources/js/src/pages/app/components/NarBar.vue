@@ -76,15 +76,6 @@ function handleNavClick() {
 
 const userStore = useUserStore();
 
-// Map notifications sang dạng có trường message, avatar cho BellNotification
-const notificationsForBell = computed(() => notifications.value.map(n => ({
-    id: n.id,
-    message: n.message || 'New notification',
-    avatar: n.avatar || '',
-    created_at: n.created_at || '',
-    slug: n.slug || '',
-    project_id: n.project_id || '',
-})));
 </script>
 <template>
     <nav class="top-navbar">
@@ -134,11 +125,14 @@ const notificationsForBell = computed(() => notifications.value.map(n => ({
                             :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" class="custom-avatar-img" />
                         <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                             userStore.user.name.charAt(0).toUpperCase()
-                        }}</span>
-                        <span v-else class="avatar-circle">?</span>
-                        <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name
                             }}</span>
-                        <span v-else class="custom-user-name">Unknown</span>
+                        <span v-else class="avatar-circle">?</span>
+                        <div class="user-info-block">
+                            <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name }}</span>
+                            <span v-if="userStore.user.friend_code" class="friend-code-text">
+                                Friend code: {{ userStore.user.friend_code }}
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <hr class="custom-divider" />
@@ -199,12 +193,19 @@ const notificationsForBell = computed(() => notifications.value.map(n => ({
                                 class="custom-avatar-img" />
                             <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                                 userStore.user.name.charAt(0).toUpperCase()
-                            }}</span>
-                            <span v-else class="avatar-circle">?</span>
-                            <span v-if="userStore.user?.name" class="custom-user-name">{{
-                                userStore.user.name
                                 }}</span>
-                            <span v-else class="custom-user-name">Unknown</span>
+                            <span v-else class="avatar-circle">?</span>
+                            <div class="user-info-block"
+                                style="display: flex; flex-direction: column; align-items: flex-start;">
+                                <span v-if="userStore.user?.name" class="custom-user-name">{{
+                                    userStore.user.name
+                                }}</span>
+                                <span v-if="userStore.user.friend_code"
+                                    style="color: #2563eb; font-size: 0.95em; display: block; line-height: 1.2; margin-left: 0; margin-top: 2px;">
+                                    Friend code: {{ userStore.user.friend_code }}
+                                </span>
+                                <span v-else class="custom-user-name">Unknown</span>
+                            </div>
                         </div>
                     </div>
                     <hr class="custom-divider" />
@@ -860,6 +861,21 @@ const notificationsForBell = computed(() => notifications.value.map(n => ({
 
 .custom-menu-item:hover {
     background: #f0f2f5;
+}
+
+.user-info-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.friend-code-text {
+    color: #2563eb;
+    font-size: 0.95em;
+    display: block;
+    line-height: 1.2;
+    margin-left: 0;
+    margin-top: 2px;
 }
 
 @media (max-width: 767.98px) {

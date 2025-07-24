@@ -87,7 +87,6 @@ function handleBlur(event: FocusEvent) {
     background: #f9fafb;
     color: #374151;
     height: 44px;
-    width: 350px;
 }
 
 .base-input-custom:focus {

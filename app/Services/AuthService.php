@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;
 use App\Events\NewUserCreated;
 
 class AuthService
@@ -38,6 +37,7 @@ class AuthService
         return [
             'user' => [
                 'id' => $user->id,
+                'friend_code' => $user->friend_code,
                 'email' => $user->email,
                 'name' => $user->name,
             ],

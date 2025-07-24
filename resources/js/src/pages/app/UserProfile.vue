@@ -90,10 +90,11 @@ async function fetchUser() {
                 email: res.data.email,
                 phone: res.data.phone || '',
                 avatar: res.data.avatar || '',
+                friend_code: res.data.friend_code || null,
             };
         }, (data) => {
             user.value = data;
-            userStore.setUser({ name: data.name, avatar: data.avatar });
+            userStore.setUser({ name: data.name, avatar: data.avatar, friend_code: data.friend_code });
         });
     } catch (err: any) {
         errorMessage.value = err?.message || 'Failed to load user info.';
@@ -164,15 +165,15 @@ async function saveCroppedAvatar() {
                 body: formData,
             });
             const data = await res.json();
-            if (!res.ok || !data.link) {
+            if (data.code !== 1000) {
                 showError(data.message || 'Upload failed.');
             } else {
-                user.value.avatar = data.link;
-                userStore.setAvatar(data.link);
+                user.value.avatar = data.data.link;
+                userStore.setAvatar(data.data.link);
                 userStore.setUser({ ...user.value }); // Đảm bảo Navbar cập nhật avatar mới
                 await nextTick();
                 closeCropModal();
-                showSuccess('Avatar updated successfully!');
+                showSuccess(data.message || 'Avatar updated successfully!');
             }
         } catch (err: any) {
             showError(err?.message || 'Upload failed.');
@@ -194,7 +195,7 @@ async function updateUser() {
         };
         const res = await makeHttpReq<typeof payload, any>('user', 'PUT', payload);
         successMessage.value = res.message || 'Profile updated successfully!';
-        userStore.setUser({ name: user.value.name, avatar: user.value.avatar });
+        userStore.setUser({ name: user.value.name, avatar: user.value.avatar, friend_code: res.data.friend_code || null });
     } catch (err: any) {
         errorMessage.value = err?.message || 'Update failed.';
     } finally {

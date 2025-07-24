@@ -30,6 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/user', 'update')->name('users.update');
         Route::post('/user/upload-avatar', 'uploadAvatar');
         Route::post('/proxy-image', 'proxyImage');
+        Route::get('/users/all', 'all');
     });
 
     Route::controller(MemberController::class)->group(function () {
@@ -37,8 +38,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/members', 'update')->name('members.update');
         Route::get('/members', 'index')->name('members.index');
         Route::delete('/members/{id}', 'destroy')->name('members.destroy');
-        Route::post('/members/add-by-email', 'addByEmail')->name('members.addByEmail');
-        Route::post('/members/add-by-name-or-email', 'addByIdOrEmail')->name('members.addByIdOrEmail');
+        // Route::post('/members/add-by-email', 'addByEmail')->name('members.addByEmail');
+        // Route::post('/members/add-by-name-or-email', 'addByIdOrEmail')->name('members.addByIdOrEmail');
     });
 
     Route::controller(ProjectController::class)->group(function () {
@@ -52,6 +53,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/chart-data/projects', 'getProjectChartData')->name('projects.chartData');
         Route::get('/projects/{id}/members', 'getProjectMembers')->name('projects.members');
         Route::delete('/projects/{id}', 'destroy')->name('projects.destroy');
+    });
+
+    // Friend Request API
+    Route::controller(\App\Http\Controllers\MemberInvitationController::class)->group(function () {
+        Route::post('/member-invitations/send', 'send');
+        Route::get('/member-invitations/received', 'received');
+        Route::get('/member-invitations/sent', 'sent');
+        Route::post('/member-invitations/{id}/accept', 'accept');
+        Route::post('/member-invitations/{id}/decline', 'decline');
+        Route::delete('/member-invitations/{id}/cancel', 'cancel');
     });
 
     Route::controller(TaskController::class)->group(function () {

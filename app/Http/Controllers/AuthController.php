@@ -34,9 +34,14 @@ class AuthController extends Controller
 
     public function validEmail($token)
     {
-        User::where('remember_token', $token)
-            ->update(['isValidEmail' => User::IS_VALID_EMAIL]);
-
+        $user = User::where('remember_token', $token)->first();
+        if ($user) {
+            $user->isValidEmail = User::IS_VALID_EMAIL;
+            // Sinh friend_code
+            $name = preg_replace('/[^a-zA-Z0-9]/', '', strtolower(\App\Models\User::remove_accents($user->name)));
+            $user->friend_code = $name . '-' . $user->id;
+            $user->save();
+        }
         return redirect('/app/login');
     }
 

@@ -44,8 +44,23 @@ export function useLoginUser() {
         userStore.setUser({
           name: userRes.data.name,
           avatar: userRes.data.avatar || "",
+          friend_code: userRes.data.friend_code || null,
         });
         router.push("/dashboard");
+
+        // Sau khi login thành công:
+        localStorage.removeItem("projectCache");
+        localStorage.removeItem("memberCache");
+
+        // Nếu dùng cache theo page:
+        Object.keys(localStorage).forEach((key) => {
+          if (
+            key.startsWith("project_page_") ||
+            key.startsWith("member_page_")
+          ) {
+            localStorage.removeItem(key);
+          }
+        });
       }
     } catch (error: any) {
       loading.value = false;

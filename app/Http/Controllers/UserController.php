@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\User\UpdateUserRequest;
-use App\Services\GoogleDriveService;
 use App\Services\UserService;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Api\ApiController;
+use App\Services\ImageKitService;
 
-class UserController extends Controller
+class UserController extends ApiController
 {
     protected $userService;
 
@@ -22,18 +23,20 @@ class UserController extends Controller
     public function show(Request $request)
     {
         $user = $request->user();
+        $data = $user->only([
+            'id',
+            'name',
+            'email',
+            'phone',
+            'avatar',
+            'email_verified_at',
+            'created_at',
+            'updated_at'
+        ]);
+        $data['friend_code'] = ($user->isValidEmail == \App\Models\User::IS_VALID_EMAIL) ? $user->friend_code : null;
         return response()->json([
             'success' => true,
-            'data' => $user->only([
-                'id',
-                'name',
-                'email',
-                'phone',
-                'avatar',
-                'email_verified_at',
-                'created_at',
-                'updated_at'
-            ])
+            'data' => $data
         ]);
     }
 
@@ -54,6 +57,7 @@ class UserController extends Controller
                 'email',
                 'phone',
                 'avatar',
+                'friend_code',
                 'email_verified_at',
                 'updated_at'
             ])
@@ -61,33 +65,22 @@ class UserController extends Controller
     }
 
     /**
-     * Upload user avatar to Google Drive
+     * Upload user avatar to ImageKit
      */
-    public function uploadAvatar(Request $request, GoogleDriveService $driveService)
+    public function uploadAvatar(Request $request, ImageKitService $imageKit)
     {
-        $request->validate([
-            'avatar' => 'required|file|mimes:jpg,jpeg,png|max:20480'
-        ]);
-        $file = $request->file('avatar');
-        if ($file->getSize() > 2 * 1024 * 1024) {
-            return response()->json([
-                'message' => 'File too large. Please compress image to under 2MB before uploading.'
-            ], 422);
-        }
         try {
             $user = $request->user();
-            $result = $driveService->upload($file, $user->id);
-            $user->avatar = $result['link'];
-            $user->save();
-            return response()->json([
+            $file = $request->file('avatar');
+            $result = $this->userService->uploadAvatar($user, $file, $imageKit);
+            return $this->respondWithData([
                 'message' => 'Upload successful!',
                 'file_id' => $result['file_id'],
-                'link' => $result['link']
+                'link' => $result['url'],
+                'thumbnail' => $result['thumbnail']
             ]);
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Upload failed: ' . $e->getMessage()
-            ], 500);
+            return $this->respondWithError($e->getMessage(), null, 422);
         }
     }
 
@@ -123,5 +116,16 @@ class UserController extends Controller
         } catch (\Exception $e) {
             return response('Image not found', 404);
         }
+    }
+
+    /**
+     * Get all users for autocomplete (not friends, not invited, not self)
+     */
+    public function all(Request $request)
+    {
+        $query = $request->get('query');
+        $user = $request->user();
+        $users = $this->userService->getAvailableForInvitation($user, $query);
+        return $this->respondWithData($users);
     }
 }

@@ -4,6 +4,10 @@ namespace App\Services;
 
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use App\Services\ImageKitService;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Validator;
 
 class UserService
 {
@@ -53,5 +57,73 @@ class UserService
         }
         $user->update($data);
         return $user;
+    }
+
+    /**
+     * Upload user avatar, validate, upload to ImageKit, update user avatar field
+     * @param $user
+     * @param UploadedFile $file
+     * @param ImageKitService $imageKit
+     * @return array
+     * @throws \Exception
+     */
+    public function uploadAvatar($user, UploadedFile $file, ImageKitService $imageKit)
+    {
+        // Validate file
+        $validator = Validator::make(['avatar' => $file], [
+            'avatar' => 'required|file|mimes:jpg,jpeg,png|max:20480'
+        ]);
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first('avatar'));
+        }
+        if ($file->getSize() > 2 * 1024 * 1024) {
+            throw new \Exception('File too large. Please compress image to under 2MB before uploading.');
+        }
+        $folder = env('IMAGEKIT_AVATAR_FOLDER', 'app-manager-project') . '/avatars/' . $user->id;
+        $result = $imageKit->upload($file, $folder);
+        $user->avatar = $result['url'];
+        $user->save();
+        return $result;
+    }
+
+    /**
+     * Get users for autocomplete: status = friend, invited, available
+     */
+    public function getAvailableForInvitation($user, $query = null)
+    {
+        // Lấy id bạn bè
+        $friendIds = DB::table('members')->where('user_id', $user->id)->pluck('member_id')->toArray();
+        // Lấy id đã gửi lời mời
+        $invitedIds = DB::table('member_invitations')
+            ->where('sender_id', $user->id)
+            ->where('status', 'pending')
+            ->pluck('receiver_id')->toArray();
+        // Lấy tất cả user phù hợp
+        $users = \App\Models\User::query()
+            ->where('id', '!=', $user->id)
+            ->where(function ($q) use ($query, $user) {
+                if ($query) {
+                    $q->where(function ($q2) use ($query) {
+                        $q2->where('name', 'like', "%$query%")
+                            ->orWhere('friend_code', 'like', "%$query%");
+                    });
+                }
+                // Không bao giờ trả về user chính mình
+                $q->where('id', '!=', $user->id);
+            })
+            ->select('id', 'name', 'friend_code', 'avatar')
+            ->limit(10)
+            ->get();
+        // Gán status
+        foreach ($users as $u) {
+            if (in_array($u->id, $friendIds)) {
+                $u->status = 'friend';
+            } elseif (in_array($u->id, $invitedIds)) {
+                $u->status = 'invited';
+            } else {
+                $u->status = 'available';
+            }
+        }
+        return $users;
     }
 }

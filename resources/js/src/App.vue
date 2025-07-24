@@ -22,10 +22,10 @@ export default defineComponent({
             if (token) {
                 try {
                     const res = await makeHttpReq<undefined, any>('user', 'GET');
-                    setUser({ name: res.data.name, avatar: res.data.avatar || '' });
+                    setUser({ name: res.data.name, avatar: res.data.avatar || '', friend_code: res.data.friend_code || null });
                     // Cập nhật lại localStorage
                     const userData = userDataStr ? JSON.parse(userDataStr) : {};
-                    userData.user = { ...userData.user, name: res.data.name, avatar: res.data.avatar || '' };
+                    userData.user = { ...userData.user, name: res.data.name, avatar: res.data.avatar || '', friend_code: res.data.friend_code || null };
                     localStorage.setItem("userData", JSON.stringify(userData));
                 } catch {
                     // Nếu lỗi, không làm gì thêm

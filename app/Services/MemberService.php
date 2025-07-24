@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\MemberRepository;
+use App\Events\MemberEvent;
 
 class MemberService
 {
@@ -33,8 +34,12 @@ class MemberService
     public function removeMember($user, $member_id)
     {
         $deleted = $this->memberRepo->deleteMember($member_id, $user->id);
+        if ($deleted) {
+            // Broadcast tới user bị xóa
+            broadcast(new MemberEvent($member_id, $user->id, 'removed'));
+        }
         if (!$deleted) {
-            return ['error' => 'Not found or no permission'];
+            throw new \Exception('Remove failed');
         }
         return ['message' => 'Removed from contact list'];
     }

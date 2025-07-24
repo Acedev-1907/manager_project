@@ -11,7 +11,7 @@
                         <slot name="action"></slot>
                     </div>
                 </div>
-                <div class="d-none d-md-flex align-items-center justify-content-between">
+                <div class="d-none d-md-flex align-items-center justify-content-between" style="padding: 1.2rem">
                     <h4 class="main-title mb-0">
                         <i :class="iconClass + ' me-2'"></i>{{ title }}
                     </h4>
