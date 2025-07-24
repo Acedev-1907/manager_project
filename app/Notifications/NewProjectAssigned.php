@@ -53,8 +53,9 @@ class NewProjectAssigned extends Notification implements ShouldBroadcastNow
     public function toDatabase(): array
     {
         return [
-            'message' => $this->message,
+            'type' => $this->memberId === $this->project->creator_id ? 'project_created_self' : 'project_assigned',
             'project_id' => $this->project->id,
+            'project_name' => $this->project->name,
             'slug' => $this->project->slug,
             'avatar' => $this->creatorAvatar,
             'creator_name' => $this->creatorName,
@@ -74,8 +75,9 @@ class NewProjectAssigned extends Notification implements ShouldBroadcastNow
             }
         }
         return [
-            'message' => $this->message,
+            'type' => $this->memberId === $this->project->creator_id ? 'project_created_self' : 'project_assigned',
             'project_id' => $this->project->id,
+            'project_name' => $this->project->name,
             'slug' => $this->project->slug,
             'unread_count' => $unreadCount,
             'avatar' => $this->creatorAvatar,

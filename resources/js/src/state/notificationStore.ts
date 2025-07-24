@@ -1,6 +1,7 @@
 import { ref, watch } from "vue";
 import { useUserStore } from "./userStore";
 import { makeHttpReq } from "../helper/makeHttpReq";
+import { tNotification } from "../constants/i18n";
 
 // State: Danh sách thông báo và số lượng chưa đọc
 export const notifications = ref<any[]>([]);
@@ -150,13 +151,48 @@ export async function removeNotification(id: string) {
 
 // Helper: Chuẩn hóa dữ liệu notification cho FE
 function mapNotificationData(n: any) {
+  const userId = JSON.parse(localStorage.getItem("userData") || "{}").id;
+  const lang = localStorage.getItem("lang") || "en";
+  let message = "";
+  if (n.data?.type === "sent") {
+    message = tNotification("sent", lang as "en" | "vi", {
+      name: n.data?.sender_name || "",
+    });
+  } else if (n.data?.type === "accepted" && n.notifiable_id === userId) {
+    message = tNotification("accepted_self", lang as "en" | "vi");
+  } else if (n.data?.type === "declined" && n.notifiable_id === userId) {
+    message = tNotification("declined_self", lang as "en" | "vi");
+  } else if (n.data?.type === "accepted") {
+    message = tNotification("accepted", lang as "en" | "vi", {
+      name: n.data?.sender_name || "",
+    });
+  } else if (n.data?.type === "declined") {
+    message = tNotification("declined", lang as "en" | "vi", {
+      name: n.data?.sender_name || "",
+    });
+  } else if (n.data?.type === "project_created_self") {
+    message = tNotification("project_created_self", lang as "en" | "vi", {
+      project: n.data?.project_name || "",
+    });
+  } else if (n.data?.type === "project_assigned") {
+    message = tNotification("project_assigned", lang as "en" | "vi", {
+      creator: n.data?.creator_name || "",
+      project: n.data?.project_name || "",
+    });
+  } else {
+    message = n.data?.message || "";
+  }
   return {
     id: n.id,
-    message: n.data?.message || "",
-    avatar: n.data?.avatar || "",
+    message,
+    avatar: n.data?.avatar || n.data?.sender_avatar || "",
     created_at: n.created_at || "",
     slug: n.data?.slug || "",
     project_id: n.data?.project_id || "",
     read_at: n.read_at || null,
+    invitation_id: n.data?.invitation_id || null,
+    sender_name: n.data?.sender_name || null,
+    sender_avatar: n.data?.sender_avatar || null,
+    type: n.data?.type || null,
   };
 }

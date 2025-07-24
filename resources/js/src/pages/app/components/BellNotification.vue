@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router';
 import { notifications, notificationCount, markAllAsRead, fetchAllNotifications, removeNotification } from '../../../state/notificationStore';
 import { eventBus } from '../../../helper/eventBus';
 import { getAvatarSrc } from '../../../helper/avatar';
+import { makeHttpReq } from '../../../helper/makeHttpReq';
+import { showSuccess, showError } from '../../../helper/alert';
 
 const bellOpen = ref(false);
 const bellDropdownRef = ref<HTMLElement | null>(null);
@@ -107,6 +109,28 @@ function handleRemove(item: any) {
     moreMenuOpen.value = null;
 }
 
+async function handleAcceptInvitation(item: any) {
+    if (!item.invitation_id) return;
+    try {
+        await makeHttpReq<any, any>(`member-invitations/${item.invitation_id}/accept`, 'POST');
+        showSuccess('Invitation accepted!');
+        await fetchAllNotifications();
+    } catch (e) {
+        showError('Failed to accept invitation');
+    }
+}
+
+async function handleDeclineInvitation(item: any) {
+    if (!item.invitation_id) return;
+    try {
+        await makeHttpReq<any, any>(`member-invitations/${item.invitation_id}/decline`, 'POST');
+        showSuccess('Invitation declined!');
+        await fetchAllNotifications();
+    } catch (e) {
+        showError('Failed to decline invitation');
+    }
+}
+
 function formatTime(dateStr: string) {
     const date = new Date(dateStr);
     const now = new Date();
@@ -133,13 +157,22 @@ function formatTime(dateStr: string) {
                     <div class="notification-content">
                         <div class="notification-message">{{ item.message }}</div>
                         <div class="notification-time">{{ formatTime(item.created_at) }}</div>
+                        <template v-if="item.type === 'sent' && item.invitation_id">
+                            <div class="notification-action-btns fb-btns">
+                                <button class="btn btn-confirm-fb"
+                                    @click.stop="handleAcceptInvitation(item)">Accept</button>
+                                <button class="btn btn-delete-fb"
+                                    @click.stop="handleDeclineInvitation(item)">Decline</button>
+                            </div>
+                        </template>
                     </div>
                     <span class="notification-more-btn" @click.stop="toggleMoreMenu(item.id, $event)">
                         ⋮
                         <div v-if="moreMenuOpen === item.id" class="more-menu-mobile">
                             <div class="more-menu-view" :class="{ 'hovered': hoverMenu['view-' + item.id] }"
                                 @click.stop="handleView(item)" @mouseenter="hoverMenu['view-' + item.id] = true"
-                                @mouseleave="hoverMenu['view-' + item.id] = false">View</div>
+                                @mouseleave="hoverMenu['view-' + item.id] = false">View
+                            </div>
                             <div class="more-menu-remove" :class="{ 'hovered': hoverMenu['remove-' + item.id] }"
                                 @click.stop="handleRemove(item)" @mouseenter="hoverMenu['remove-' + item.id] = true"
                                 @mouseleave="hoverMenu['remove-' + item.id] = false">Remove</div>
@@ -147,13 +180,10 @@ function formatTime(dateStr: string) {
                     </span>
                 </li>
             </ul>
-            <div v-if="notifications.length === 10 && !allLoaded" class="see-previous-wrapper">
-                <button @mousedown.stop="" @click.stop="handleSeePrevious" :disabled="loadingAll"
-                    class="see-previous-btn">
-                    <span v-if="!loadingAll">See previous notifications</span>
-                    <span v-else>Loading...</span>
-                </button>
-            </div>
+            <button @mousedown.stop="" @click.stop="handleSeePrevious" :disabled="loadingAll" class="see-previous-btn">
+                <span v-if="!loadingAll">See previous notifications</span>
+                <span v-else>Loading...</span>
+            </button>
         </div>
     </transition>
 </template>
@@ -459,5 +489,163 @@ function formatTime(dateStr: string) {
 .see-previous-btn:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+}
+.notification-action-btns {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+.btn-accept {
+    background: #fff;
+    color: #16a34a;
+    border: 1px solid #16a34a;
+    border-radius: 6px;
+    padding: 2px 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.15s, color 0.15s, border 0.15s;
+    cursor: pointer;
+}
+
+.btn-accept:hover {
+    background: #dcfce7;
+    color: #15803d;
+    border-color: #15803d;
+}
+
+.btn-decline {
+    background: #fff;
+    color: #ef4444;
+    border: 1px solid #ef4444;
+    border-radius: 6px;
+    padding: 2px 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.15s, color 0.15s, border 0.15s;
+    cursor: pointer;
+}
+
+.btn-decline:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #b91c1c;
+}
+
+.invitation-noti {
+    display: flex;
+    align-items: flex-start;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(34, 34, 59, 0.08);
+    padding: 1rem 1.2rem 1rem 1.2rem;
+    margin-bottom: 0.7rem;
+    min-height: 70px;
+    position: relative;
+    transition: box-shadow 0.2s;
+}
+
+.large-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 14px;
+    border: 2px solid #e0e7ff;
+}
+
+.sender-name {
+    font-weight: 700;
+    color: #222;
+}
+
+.notification-action-btns.inline-btns {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+.btn-accept-en {
+    background: #e3f6e8;
+    color: #15803d;
+    border: 1px solid #b6e4c7;
+    border-radius: 5px;
+    padding: 2px 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border 0.15s;
+}
+
+.btn-accept-en:hover {
+    background: #b6e4c7;
+    color: #166534;
+}
+
+.btn-decline-en {
+    background: #f3f4f6;
+    color: #555;
+    border: 1px solid #e5e7eb;
+    border-radius: 5px;
+    padding: 2px 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border 0.15s;
+}
+
+.btn-decline-en:hover {
+    background: #e5e7eb;
+    color: #222;
+}
+
+.notification-action-btns.fb-btns {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+}
+
+.btn-confirm-fb {
+    background: #1877f2;
+    color: #fff;
+    border: 1.2px solid #1877f2;
+    border-radius: 20px;
+    padding: 3px 16px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: background 0.16s, border 0.16s, box-shadow 0.16s;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(24, 119, 242, 0.08);
+    outline: none;
+    letter-spacing: 0.01em;
+}
+
+.btn-confirm-fb:hover,
+.btn-confirm-fb:focus {
+    background: #1657b7;
+    border-color: #1657b7;
+    box-shadow: 0 2px 8px rgba(24, 119, 242, 0.10);
+    color: #fff;
+}
+
+.btn-delete-fb {
+    background: #fff;
+    color: #222;
+    border: 1.2px solid #ccd0d5;
+    border-radius: 20px;
+    padding: 3px 16px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: background 0.16s, border 0.16s;
+    cursor: pointer;
+    outline: none;
+    letter-spacing: 0.01em;
+}
+
+.btn-delete-fb:hover,
+.btn-delete-fb:focus {
+    background: #ececec;
+    border-color: #b0b3b8;
+    color: #222;
 }
 </style>

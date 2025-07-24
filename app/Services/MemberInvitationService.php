@@ -28,6 +28,16 @@ class MemberInvitationService
             'receiver_id' => $receiver->id,
             'status' => 'pending',
         ]);
+        // Trước khi gửi notification, kiểm tra đã có notification 'sent' chưa đọc chưa
+        $oldNoti = $receiver->notifications()
+            ->whereRaw("data->>'invitation_id' = ?", [$invitation->id])
+            ->whereRaw("data->>'type' = 'sent'")
+            ->whereNull('read_at')
+            ->first();
+        if (!$oldNoti) {
+            // Gửi notification cho receiver
+            $receiver->notify(new \App\Notifications\MemberInvitationNotification($invitation));
+        }
         // Broadcast event tới receiver
         broadcast(new MemberEvent($receiver->id, $sender->id, 'invitation_sent', [
             'invitation_id' => $invitation->id,
@@ -89,6 +99,23 @@ class MemberInvitationService
         Member::create(['user_id' => $user->id, 'member_id' => $invitation->sender_id]);
         $receiverUser = User::find($user->id);
         $senderUser = User::find($invitation->sender_id);
+        // Update notification cũ cho receiver
+        $oldNoti = $receiverUser->notifications()
+            ->whereRaw("data->>'invitation_id' = ?", [$invitation->id])
+            ->whereRaw("data->>'type' = 'sent'")
+            ->first();
+        if ($oldNoti) {
+            $data = $oldNoti->data;
+            $data['type'] = 'accepted';
+            // KHÔNG set message tĩnh
+            if (!isset($data['sender_name'])) $data['sender_name'] = $receiverUser->name;
+            if (!isset($data['invitation_id'])) $data['invitation_id'] = $invitation->id;
+            $oldNoti->data = $data;
+            $oldNoti->save();
+        }
+        // Gửi notification cho sender (người gửi) - thông báo đã được accept
+        $senderUser->notify(\App\Notifications\MemberInvitationNotification::createAcceptedNotification($invitation, $receiverUser));
+        // Không gửi notification mới cho receiver nữa
         // Broadcast event tới sender (người gửi)
         broadcast(new MemberEvent($invitation->sender_id, $user->id, 'invitation_accepted', [
             'invitation_id' => $invitation->id,
@@ -118,8 +145,26 @@ class MemberInvitationService
         if (!$invitation) return ['error' => 'Invitation not found'];
         $invitation->status = 'declined';
         $invitation->save();
-        // Broadcast event tới sender
         $receiverUser = User::find($user->id);
+        $senderUser = User::find($invitation->sender_id);
+        // Update notification cũ cho receiver
+        $oldNoti = $receiverUser->notifications()
+            ->whereRaw("data->>'invitation_id' = ?", [$invitation->id])
+            ->whereRaw("data->>'type' = 'sent'")
+            ->first();
+        if ($oldNoti) {
+            $data = $oldNoti->data;
+            $data['type'] = 'declined';
+            // KHÔNG set message tĩnh
+            if (!isset($data['sender_name'])) $data['sender_name'] = $receiverUser->name;
+            if (!isset($data['invitation_id'])) $data['invitation_id'] = $invitation->id;
+            $oldNoti->data = $data;
+            $oldNoti->save();
+        }
+        // Gửi notification cho sender (người gửi) - thông báo đã bị decline
+        $senderUser->notify(\App\Notifications\MemberInvitationNotification::createDeclinedNotification($invitation, $receiverUser));
+        // Không gửi notification mới cho receiver nữa
+        // Broadcast event tới sender
         broadcast(new MemberEvent($invitation->sender_id, $user->id, 'invitation_declined', [
             'invitation_id' => $invitation->id,
             'receiver' => [
