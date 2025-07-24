@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Events\NewProjectForMembers;
 
+
 class ProjectService
 {
     protected $repo;
@@ -52,6 +53,7 @@ class ProjectService
 
             TaskProgress::create([
                 'projectId' => $project->id,
+                'user_id' => $user->id,
                 'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
                 'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
             ]);
@@ -76,7 +78,7 @@ class ProjectService
 
     public function updateProject($fields, $user)
     {
-        return \DB::transaction(function () use ($fields, $user) {
+        return DB::transaction(function () use ($fields, $user) {
             $project = $this->repo->find($fields['id']);
 
             // Lấy danh sách user cũ trước khi update
@@ -99,7 +101,7 @@ class ProjectService
             $newMembers = array_diff($allMembers, $oldMembers);
 
             // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
-            \DB::afterCommit(function () use ($project, $removedMembers, $allMembers, $newMembers) {
+            DB::afterCommit(function () use ($project, $removedMembers, $allMembers, $newMembers) {
                 // Broadcast cho user bị remove
                 foreach ($removedMembers as $removedId) {
                     broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
@@ -161,5 +163,56 @@ class ProjectService
     public function countProjectsForUser($userId)
     {
         return $this->repo->countProjectsForUser($userId);
+    }
+
+    /**
+     * Pin a project for the current user
+     * @param \App\Models\User $user
+     * @param array $fields
+     * @return array
+     */
+    public function pinProjectForUser($user, $fields)
+    {
+        $validator = Validator::make($fields, [
+            'projectId' => 'required|numeric|exists:projects,id',
+        ]);
+        if ($validator->fails()) {
+            return [
+                'error' => $validator->errors()->first(),
+                'code' => 422
+            ];
+        }
+        DB::transaction(function () use ($user, $fields) {
+            // Unpin all projects for this user
+            \App\Models\TaskProgress::where('user_id', $user->id)
+                ->update(['pinned_on_dashboard' => \App\Models\TaskProgress::NOT_PINNED_ON_DASHBOARD]);
+            // Pin the selected project for this user
+            \App\Models\TaskProgress::where('projectId', $fields['projectId'])
+                ->where('user_id', $user->id)
+                ->update(['pinned_on_dashboard' => \App\Models\TaskProgress::PINNED_ON_DASHBOARD]);
+        });
+        return [
+            'data' => null,
+            'message' => 'Project pinned successfully'
+        ];
+    }
+
+    /**
+     * Get the pinned project for the current user
+     * @param \App\Models\User $user
+     * @return array
+     */
+    public function getPinnedProjectForUser($user)
+    {
+        $project = DB::table('task_progress')
+            ->join('projects', 'task_progress.projectId', '=', 'projects.id')
+            ->select('projects.id', 'projects.name')
+            ->where('task_progress.pinned_on_dashboard', \App\Models\TaskProgress::PINNED_ON_DASHBOARD)
+            ->where('task_progress.user_id', $user->id)
+            ->first();
+        return [
+            'data' => $project,
+            'message' => 'Get pinned project successfully'
+        ];
     }
 }

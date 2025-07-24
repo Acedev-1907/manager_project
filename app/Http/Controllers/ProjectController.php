@@ -6,12 +6,11 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskProgress;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use App\Services\ProjectService;
 use App\Http\Requests\Project\UpdateProjectRequest;
+use App\Http\Controllers\Api\ApiController;
 
-class ProjectController extends Controller
+class ProjectController extends ApiController
 {
     protected $service;
 
@@ -73,30 +72,13 @@ class ProjectController extends Controller
         return response(['message' => $result['message']], $result['status']);
     }
 
-    public function pinnedProject(Request $req)
+    public function pinnedProject(Request $request)
     {
-        return DB::transaction(function () use ($req) {
-            $fields = $req->all();
-
-            $errs = Validator::make($fields, [
-                'projectId' => 'required',
-            ]);
-
-            if ($errs->fails()) {
-                return response($errs->errors()->all(), 422);
-            }
-            TaskProgress::where('pinned_on_dashboard', TaskProgress::PINNED_ON_DASHBOARD)
-                ->update([
-                    'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD
-                ]);
-
-            TaskProgress::where('projectId', $fields['projectId'])
-                ->update([
-                    'pinned_on_dashboard' => TaskProgress::PINNED_ON_DASHBOARD
-                ]);
-
-            return response(['message' => 'project pinned on dashboard']);
-        });
+        $result = $this->service->pinProjectForUser($request->user(), $request->all());
+        if (isset($result['error'])) {
+            return $this->respondWithError($result['error'], $result['code'] ?? 400);
+        }
+        return $this->respondWithData($result['data'], $result['message'] ?? 'Project pinned successfully');
     }
 
     public function countProject(Request $request)
@@ -106,19 +88,13 @@ class ProjectController extends Controller
         return response(['count' => $count]);
     }
 
-    public function getPinnedProject()
+    public function getPinnedProject(Request $request)
     {
-        $project = DB::table('task_progress')
-            ->join('projects', 'task_progress.projectId', '=', 'projects.id')
-            ->select('projects.id', 'projects.name')
-            ->where('task_progress.pinned_on_dashboard', TaskProgress::PINNED_ON_DASHBOARD)
-            ->first();
-
-        if (!is_null($project)) {
-            return response(['data' => $project]);
+        $result = $this->service->getPinnedProjectForUser($request->user());
+        if (isset($result['error'])) {
+            return $this->respondWithError($result['error'], $result['code'] ?? 404);
         }
-
-        return response(['data' => null]);
+        return $this->respondWithData($result['data'], $result['message'] ?? 'Get pinned project successfully');
     }
 
     public  function getProjectChartData(Request $req)
