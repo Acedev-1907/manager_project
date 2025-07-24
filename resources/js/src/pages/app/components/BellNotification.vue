@@ -84,9 +84,13 @@ function getSlugByProjectId(projectId: number | string) {
 // Xem thêm thông báo cũ
 async function handleSeePrevious() {
     loadingAll.value = true;
+    const beforeCount = notifications.value.length;
     await fetchAllNotifications();
     loadingAll.value = false;
-    allLoaded.value = true;
+    // Nếu không có thêm thông báo mới, coi như đã load hết
+    if (notifications.value.length === beforeCount) {
+        allLoaded.value = true;
+    }
     setTimeout(() => {
         const list = bellDropdownRef.value?.querySelector('.bell-dropdown-list');
         if (list) list.scrollTop = list.scrollHeight;
@@ -180,7 +184,8 @@ function formatTime(dateStr: string) {
                     </span>
                 </li>
             </ul>
-            <button @mousedown.stop="" @click.stop="handleSeePrevious" :disabled="loadingAll" class="see-previous-btn">
+            <button v-if="notifications.length >= 10 && !allLoaded" @mousedown.stop="" @click.stop="handleSeePrevious"
+                :disabled="loadingAll" class="see-previous-btn">
                 <span v-if="!loadingAll">See previous notifications</span>
                 <span v-else>Loading...</span>
             </button>
@@ -490,6 +495,7 @@ function formatTime(dateStr: string) {
     opacity: 0.7;
     cursor: not-allowed;
 }
+
 .notification-action-btns {
     display: flex;
     gap: 0.5rem;
