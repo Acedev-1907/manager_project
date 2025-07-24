@@ -1,8 +1,8 @@
 <template>
     <div class="member-card">
         <div class="row-main">
-            <img :src="invitation.receiver && invitation.receiver.avatar ? invitation.receiver.avatar : '/default-avatar.png'"
-                class="avatar" alt="avatar" />
+            <img :src="getAvatarSrc(invitation.receiver?.avatar, invitation.receiver?.name)" class="avatar"
+                alt="avatar" />
             <h5 class="member-name">{{ invitation.receiver ? invitation.receiver.name : '' }}</h5>
             <div class="action-btns">
                 <button class="btn btn-decline" @click="$emit('cancel', invitation.id)">
@@ -13,6 +13,7 @@
     </div>
 </template>
 <script setup lang="ts">
+import { getAvatarSrc } from '../../../../helper/avatar';
 defineProps<{ invitation: any }>();
 defineEmits(['cancel']);
 </script>

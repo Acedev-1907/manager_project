@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import Swal from 'sweetalert2';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
+import { getAvatarSrc } from '../../../../helper/avatar';
 type UserSuggestionType = { id: number; name: string; friend_code: string; avatar?: string; status: string };
 const emit = defineEmits(['close', 'add']);
 const input = ref('');
@@ -70,7 +71,7 @@ function submit() {
                     <li v-for="user in suggestions" :key="user.id"
                         :class="['suggestion-item', { disabled: user.status !== 'available' }]"
                         @click="user.status === 'available' && selectSuggestion(user)">
-                        <img :src="user.avatar || '/default-avatar.png'" class="avatar-suggestion" />
+                        <img :src="getAvatarSrc(user.avatar, user.name)" class="avatar-suggestion" />
                         <span>{{ user.name }}</span>
                         <span class="text-muted">({{ user.friend_code }})</span>
                         <span v-if="user.status !== 'available'" class="check-icon">
