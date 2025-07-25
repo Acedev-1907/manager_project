@@ -1,7 +1,7 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { SingleProjectResponseType } from "./getProjectDetail.type";
-import { eventBus } from "../../../../helper/eventBus";
+import eventBus from "../../../../helper/eventBus";
 import { useRouter } from "vue-router";
 import { showError } from "../../../../helper/alert";
 

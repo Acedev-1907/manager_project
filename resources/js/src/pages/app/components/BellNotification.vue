@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { notifications, notificationCount, markAllAsRead, fetchAllNotifications, removeNotification } from '../../../state/notificationStore';
-import { eventBus } from '../../../helper/eventBus';
+import eventBus from '../../../helper/eventBus';
 import { getAvatarSrc } from '../../../helper/avatar';
 import { makeHttpReq } from '../../../helper/makeHttpReq';
 import { showSuccess, showError } from '../../../helper/alert';

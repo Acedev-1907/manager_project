@@ -22,6 +22,15 @@ const userProjectStore = defineStore("project", {
       this.projectList = null;
       this.lastFetched = null;
     },
+    async fetchProjectsFromServer(
+      getProjects: (page?: number, query?: string) => Promise<void>,
+      page = 1,
+      query = ""
+    ) {
+      await getProjects(page, query);
+      this.projectList = null; // Để ProjectPage tự refetch lại nếu cần
+      this.lastFetched = Date.now();
+    },
   },
 });
 

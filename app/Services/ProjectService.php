@@ -62,6 +62,12 @@ class ProjectService
 
             // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
             DB::afterCommit(function () use ($project, $broadcastMembers) {
+                $project->load([
+                    'creator',
+                    'users' => function ($q) {
+                        $q->select('users.id', 'users.name', 'users.avatar');
+                    }
+                ]);
                 foreach ($broadcastMembers as $memberId) {
                     broadcast(new NewProjectForMembers($project, $memberId));
                     // Gửi notification cho member khi được thêm vào project
@@ -102,6 +108,12 @@ class ProjectService
 
             // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
             DB::afterCommit(function () use ($project, $removedMembers, $allMembers, $newMembers) {
+                $project->load([
+                    'creator',
+                    'users' => function ($q) {
+                        $q->select('users.id', 'users.name', 'users.avatar');
+                    }
+                ]);
                 // Broadcast cho user bị remove
                 foreach ($removedMembers as $removedId) {
                     broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
@@ -166,6 +178,41 @@ class ProjectService
     }
 
     /**
+     * Ensure the user has a task_progress record for the project.
+     */
+    protected function ensureTaskProgress($userId, $projectId)
+    {
+        return \App\Models\TaskProgress::firstOrCreate(
+            [
+                'projectId' => $projectId,
+                'user_id' => $userId
+            ],
+            [
+                'progress' => 0,
+                'pinned_on_dashboard' => \App\Models\TaskProgress::NOT_PINNED_ON_DASHBOARD
+            ]
+        );
+    }
+
+    /**
+     * Unpin all projects for the user.
+     */
+    protected function unpinAllProjects($userId)
+    {
+        \App\Models\TaskProgress::where('user_id', $userId)
+            ->update(['pinned_on_dashboard' => \App\Models\TaskProgress::NOT_PINNED_ON_DASHBOARD]);
+    }
+
+    /**
+     * Pin a specific project for the user.
+     */
+    protected function pinProject($taskProgress)
+    {
+        $taskProgress->pinned_on_dashboard = \App\Models\TaskProgress::PINNED_ON_DASHBOARD;
+        $taskProgress->save();
+    }
+
+    /**
      * Pin a project for the current user
      * @param \App\Models\User $user
      * @param array $fields
@@ -183,16 +230,40 @@ class ProjectService
             ];
         }
         DB::transaction(function () use ($user, $fields) {
-            // Unpin all projects for this user
-            \App\Models\TaskProgress::where('user_id', $user->id)
-                ->update(['pinned_on_dashboard' => \App\Models\TaskProgress::NOT_PINNED_ON_DASHBOARD]);
-            // Pin the selected project for this user
-            \App\Models\TaskProgress::where('projectId', $fields['projectId'])
-                ->where('user_id', $user->id)
-                ->update(['pinned_on_dashboard' => \App\Models\TaskProgress::PINNED_ON_DASHBOARD]);
+            $taskProgress = $this->ensureTaskProgress($user->id, $fields['projectId']);
+            $this->unpinAllProjects($user->id);
+            $this->pinProject($taskProgress);
         });
+
+        // Lấy thông tin project
+        $project = \App\Models\Project::find($fields['projectId']);
+        if (!$project) {
+            return [
+                'error' => 'Project not found',
+                'code' => 404
+            ];
+        }
+
+        // Lấy số lượng task theo trạng thái
+        $pending = \App\Models\Task::where('projectId', $project->id)
+            ->where('status', \App\Models\Task::PENDING)
+            ->count();
+        $completed = \App\Models\Task::where('projectId', $project->id)
+            ->where('status', \App\Models\Task::COMPLETED)
+            ->count();
+
+        // Lấy progress
+        $progress = \App\Models\TaskProgress::where('projectId', $project->id)
+            ->where('user_id', $user->id)
+            ->value('progress') ?? 0;
+
         return [
-            'data' => null,
+            'data' => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'tasks' => [$pending, $completed],
+                'progress' => intval($progress),
+            ],
             'message' => 'Project pinned successfully'
         ];
     }

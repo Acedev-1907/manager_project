@@ -42,6 +42,7 @@ export function useLoginUser() {
         // Gọi API lấy user mới nhất
         const userRes = await makeHttpReq<undefined, any>("user", "GET");
         userStore.setUser({
+          id: userRes.data.id,
           name: userRes.data.name,
           avatar: userRes.data.avatar || "",
           friend_code: userRes.data.friend_code || null,

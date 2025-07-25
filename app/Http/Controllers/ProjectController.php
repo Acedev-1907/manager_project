@@ -78,7 +78,7 @@ class ProjectController extends ApiController
         if (isset($result['error'])) {
             return $this->respondWithError($result['error'], $result['code'] ?? 400);
         }
-        return $this->respondWithData($result['data'], $result['message'] ?? 'Project pinned successfully');
+        return $this->respondWithData($result['data'], $result['message']);
     }
 
     public function countProject(Request $request)

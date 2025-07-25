@@ -1,6 +1,6 @@
 import { APP } from "../App/APP";
 import { getUserData } from "./getUserData";
-import { eventBus } from "./eventBus";
+import eventBus from "./eventBus";
 import {
   handleAuthError,
   isAuthError,

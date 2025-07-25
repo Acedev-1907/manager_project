@@ -1,7 +1,4 @@
 import mitt from "mitt";
 
-type Events = {
-  taskCreated: void;
-};
-
-export const eventBus = mitt();
+const eventBus = mitt();
+export default eventBus;

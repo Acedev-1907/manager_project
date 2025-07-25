@@ -51,7 +51,7 @@ export async function fetchSentInvitations(
       ...inv,
       id: inv.id || inv.invitation_id, // fallback nếu BE trả về invitation_id
     }));
-    console.log("Fetched sentInvitations:", sentInvitations.value.data.data);
+    // console.log("Fetched sentInvitations:", sentInvitations.value.data.data);
   } catch (e) {
     sentInvitations.value.data.data = [];
   }
@@ -79,10 +79,10 @@ export async function fetchReceivedInvitations(
       ...inv,
       id: inv.id || inv.invitation_id, // fallback nếu BE trả về invitation_id
     }));
-    console.log(
-      "Fetched receivedInvitations:",
-      receivedInvitations.value.data.data
-    );
+    // console.log(
+    //   "Fetched receivedInvitations:",
+    //   receivedInvitations.value.data.data
+    // );
   } catch (e) {
     receivedInvitations.value.data.data = [];
   }

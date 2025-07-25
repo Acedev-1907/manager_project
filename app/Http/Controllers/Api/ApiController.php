@@ -171,12 +171,14 @@ class ApiController extends Controller
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function respondWithData($data)
+    public function respondWithData($data, $message = 'Success', $code = self::RESPONSE_OK)
     {
         return $this->setStatusCode(IlluminateResponse::HTTP_OK)
-            ->setReturnCode(self::RESPONSE_OK)
+            ->setReturnCode($code)
             ->respond([
+                'code' => $code,
                 'data' => $data,
+                'message' => $message,
             ]);
     }
 

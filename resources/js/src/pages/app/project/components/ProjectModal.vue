@@ -67,7 +67,7 @@
                                             <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
                                                 class="avatar-tag" :alt="getMemberById(id)?.name" />
                                             <span class="member-name-short">{{ getMemberById(id)?.name }}</span>
-                                            <button class="remove-tag-btn-minimal"
+                                            <button v-if="id !== props.projectInput.creator?.id"
                                                 @mousedown.prevent.stop="toggleMember(id); showAll = true"
                                                 title="Remove">
                                                 <i class="bi bi-x"></i>
@@ -145,7 +145,7 @@ onMounted(async () => {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
     currentUserId.value = userData.id;
     if (props.projectInput.members) {
-        selectedMembers.value = [...props.projectInput.members];
+        selectedMembers.value = props.projectInput.members.filter((id: number) => id !== props.projectInput.creator?.id);
     }
 });
 
@@ -183,8 +183,9 @@ function submitProject() {
 
 const filteredMembers = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase();
+    // Lọc bỏ creator khỏi danh sách chọn member
     return (memberData.value?.data?.data || [])
-        .filter(m => m.id !== currentUserId.value)
+        .filter(m => m.id !== currentUserId.value && m.id !== props.projectInput.creator?.id)
         .filter(m =>
             m.name.toLowerCase().includes(keyword) ||
             m.email.toLowerCase().includes(keyword)

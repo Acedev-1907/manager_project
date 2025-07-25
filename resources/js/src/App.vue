@@ -2,14 +2,34 @@
     <RouterView />
 </template>
 <script lang="ts">
-import { defineComponent, onMounted } from 'vue';
+import { defineComponent, onMounted, ref } from 'vue';
 import { useUserStore } from './state/userStore';
 import { makeHttpReq } from './helper/makeHttpReq';
+import { useGlobalEchoListener } from './helper/useGlobalEchoListener';
+import { projectStore } from './pages/app/project/store/projectStore';
+import eventBus from './helper/eventBus';
+import { useProjectRealtimeCacheClear } from './helper/useProjectRealtimeCacheClear';
+import { useAppGlobalRealtime } from './helper/useAppGlobalRealtime';
 
 export default defineComponent({
     name: 'App',
     setup() {
+        useAppGlobalRealtime();
         const { setUser } = useUserStore();
+        // Lấy userId từ localStorage và dùng ref để reactive
+        const userId = ref<string | number | null>(null);
+        const userDataStr = localStorage.getItem("userData");
+        if (userDataStr) {
+            try {
+                const userData = JSON.parse(userDataStr);
+                userId.value = userData.id || (userData.user && userData.user.id) || null;
+            } catch { }
+        }
+        // Khởi tạo lắng nghe Echo toàn cục với userId là ref
+        useGlobalEchoListener(userId);
+        // Gọi composable clear cache project khi có event realtime
+        useProjectRealtimeCacheClear();
+
         onMounted(async () => {
             const userDataStr = localStorage.getItem("userData");
             let token = null;

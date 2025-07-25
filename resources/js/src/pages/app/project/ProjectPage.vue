@@ -15,6 +15,8 @@ import { deleteProject } from './actions/deleteProject';
 import { showConfirm } from '../../../helper/alert';
 import SearchInput from '../../../components/SearchInput.vue';
 import { useCacheFetch } from '../../../helper/useCacheFetch';
+import { useDashboardStore } from '../dashboard/store/dashboardStore';
+import eventBus from '../../../helper/eventBus';
 
 const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
@@ -28,7 +30,6 @@ const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
 const projectCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('projectCache') || '{}'));
 const userId = ref(null);
-let joinedUserChannel: string | number | null = null;
 
 watch(projectCache, (val) => {
     localStorage.setItem('projectCache', JSON.stringify(val));
@@ -39,48 +40,25 @@ const userDataRaw = localStorage.getItem('userData');
 const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
 const currentUserId = userData.id || (userData.user && userData.user.id) || null;
 
-// Add a function to setup Echo listener
-function setupEchoListener(userIdVal: string | number | null) {
-    if (!userIdVal) return;
-    if (joinedUserChannel === userIdVal) return; // Đã join rồi, không join lại
-    joinedUserChannel = userIdVal;
-    if (!window.Echo) {
-        setTimeout(() => setupEchoListener(userIdVal), 200);
-        return;
-    }
-    try {
-        window.Echo.private(`user.${userIdVal}`)
-            .listen('NewProjectForMembers', async (e: any) => {
-                projectCache.value = {};
-                await refetch('project_page_1_' + query.value, async () => {
-                    await getProjects(1, query.value);
-                    return projectData.value;
-                }, (data) => {
-                    projectData.value = data;
-                });
-            })
-            .listen('UserRemovedFromProject', async (e: any) => {
-                projectCache.value = {}; // Xóa cache khi nhận event (giữ reference)
-                await refetch('project_page_1_' + query.value, async () => {
-                    await getProjects(1, query.value);
-                    return projectData.value;
-                }, (data) => {
-                    projectData.value = data;
-                });
-            });
-    } catch (error) {
-        console.error('Error setting up Echo listener:', error);
-    }
-}
-
-watch(userId, (newId, oldId) => {
-    if (window.Echo && oldId) {
-        window.Echo.leave(`user.${oldId}`);
-        joinedUserChannel = null; // Reset flag khi userId đổi
-    }
-    if (newId) {
-        setupEchoListener(newId);
-    }
+// Lắng nghe eventBus để reload project khi có event real-time
+onMounted(() => {
+    eventBus.on('new-project-for-members', (eventProjectRaw) => {
+        const eventProject = (eventProjectRaw as any).project as ProjectType;
+        // Thêm project mới vào đầu danh sách nếu chưa có
+        if (projectData.value?.data?.data) {
+            const exists = projectData.value.data.data.some(p => p.id === eventProject.id);
+            if (!exists) {
+                projectData.value.data.data.unshift(eventProject);
+                if ('total' in projectData.value.data && typeof projectData.value.data.total === 'number') {
+                    (projectData.value.data as any).total += 1;
+                }
+            }
+        }
+    });
+    eventBus.on('user-removed-from-project', async () => {
+        Object.keys(projectCache.value).forEach(key => delete projectCache.value[key]);
+        await fetchProjects(1, query.value, true);
+    });
 });
 
 const { getOrFetch, refetch } = useCacheFetch(
@@ -119,6 +97,9 @@ async function handlePinProject(projectId: number) {
     isLoading.value = true;
     await pinnendProject(projectId);
     isLoading.value = false;
+    // Xóa cache pinned project để Dashboard tự động fetch lại khi chuyển trang
+    const dashboardStore = useDashboardStore();
+    dashboardStore.clearPinnedProject();
     router.push('/dashboard');
 }
 
@@ -176,7 +157,7 @@ async function handleSubmitProject(data: ProjectInputType) {
     }, (data) => {
         projectData.value = data;
     });
-    setupEchoListener(userId.value);
+    // setupEchoListener(userId.value); // Removed as per edit hint
 }
 
 const handleSearch = async (searchQuery: string) => {
@@ -204,10 +185,7 @@ onMounted(async () => {
 
 // Thêm leave kênh khi component bị unmount để tránh nhận event trùng
 onUnmounted(() => {
-    if (window.Echo && userId.value) {
-        window.Echo.leave(`user.${userId.value}`);
-        joinedUserChannel = null; // Reset flag khi unmount
-    }
+    // Removed as per edit hint
 });
 </script>
 

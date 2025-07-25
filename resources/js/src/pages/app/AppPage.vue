@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import NarBar from './components/NarBar.vue';
 import { useLogOutUser } from './actions/Logout';
 import { getUserData } from '../../helper/getUserData';
-import { eventBus } from '../../helper/eventBus';
+import eventBus from '../../helper/eventBus';
 
 const { logout, loading } = useLogOutUser()
 

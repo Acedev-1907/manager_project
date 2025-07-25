@@ -3,7 +3,7 @@ import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { taskStore } from "../store/kabanStore";
 import { showSuccess } from "../../../../helper/alert";
 import { showErrorResponse } from "../../../../helper/utils";
-import { eventBus } from "../../../../helper/eventBus";
+import eventBus from "../../../../helper/eventBus";
 
 export type CreateTaskInput = {
   name: string;
