@@ -100,6 +100,8 @@ async function handleSeePrevious() {
 // Xử lý menu 3 chấm
 const moreMenuOpen = ref<string | number | null>(null);
 const hoverMenu = ref<{ [key: string]: boolean }>({});
+// Thêm biến loadingInvitation để disable Accept/Decline theo từng invitation
+const loadingInvitation = ref<{ [key: string]: boolean }>({});
 function toggleMoreMenu(id: string | number, event: MouseEvent) {
     event.stopPropagation();
     moreMenuOpen.value = moreMenuOpen.value === id ? null : id;
@@ -115,23 +117,31 @@ function handleRemove(item: any) {
 
 async function handleAcceptInvitation(item: any) {
     if (!item.invitation_id) return;
+    if (loadingInvitation.value[item.invitation_id]) return;
+    loadingInvitation.value[item.invitation_id] = true;
     try {
         await makeHttpReq<any, any>(`member-invitations/${item.invitation_id}/accept`, 'POST');
         showSuccess('Invitation accepted!');
         await fetchAllNotifications();
     } catch (e) {
         showError('Failed to accept invitation');
+    } finally {
+        loadingInvitation.value[item.invitation_id] = false;
     }
 }
 
 async function handleDeclineInvitation(item: any) {
     if (!item.invitation_id) return;
+    if (loadingInvitation.value[item.invitation_id]) return;
+    loadingInvitation.value[item.invitation_id] = true;
     try {
         await makeHttpReq<any, any>(`member-invitations/${item.invitation_id}/decline`, 'POST');
         showSuccess('Invitation declined!');
         await fetchAllNotifications();
     } catch (e) {
         showError('Failed to decline invitation');
+    } finally {
+        loadingInvitation.value[item.invitation_id] = false;
     }
 }
 
@@ -163,10 +173,10 @@ function formatTime(dateStr: string) {
                         <div class="notification-time">{{ formatTime(item.created_at) }}</div>
                         <template v-if="item.type === 'sent' && item.invitation_id">
                             <div class="notification-action-btns fb-btns">
-                                <button class="btn btn-confirm-fb"
-                                    @click.stop="handleAcceptInvitation(item)">Accept</button>
-                                <button class="btn btn-delete-fb"
-                                    @click.stop="handleDeclineInvitation(item)">Decline</button>
+                                <button class="btn btn-confirm-fb" @click.stop="handleAcceptInvitation(item)"
+                                    :disabled="loadingInvitation[item.invitation_id]">Accept</button>
+                                <button class="btn btn-delete-fb" @click.stop="handleDeclineInvitation(item)"
+                                    :disabled="loadingInvitation[item.invitation_id]">Decline</button>
                             </div>
                         </template>
                     </div>

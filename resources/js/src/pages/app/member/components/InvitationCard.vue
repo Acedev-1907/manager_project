@@ -1,21 +1,36 @@
 <template>
     <div class="member-card">
         <div class="row-main">
-            <img :src="getAvatarSrc(invitation.sender?.avatar, invitation.sender?.name)" class="avatar" alt="avatar" />
-            <h5 class="member-name">{{ invitation.sender ? invitation.sender.name : '' }}</h5>
+            <img :src="getAvatarSrc(props.invitation.sender?.avatar, props.invitation.sender?.name)" class="avatar"
+                alt="avatar" />
+            <h5 class="member-name">{{ props.invitation.sender ? props.invitation.sender.name : '' }}</h5>
             <div class="action-btns">
-                <button class="btn btn-accept" @click="$emit('accept', invitation.id)"><i
+                <button class="btn btn-accept" :disabled="loading" @click="handleAccept(props.invitation.id)"><i
                         class="bi bi-check2"></i></button>
-                <button class="btn btn-decline" @click="$emit('decline', invitation.id)"><i
+                <button class="btn btn-decline" :disabled="loading" @click="handleDecline(props.invitation.id)"><i
                         class="bi bi-x"></i></button>
             </div>
         </div>
     </div>
 </template>
 <script setup lang="ts">
+import { ref, defineProps } from 'vue';
 import { getAvatarSrc } from '../../../../helper/avatar';
-defineProps<{ invitation: any }>();
-defineEmits(['accept', 'decline']);
+const props = defineProps<{ invitation: any }>();
+const emit = defineEmits(['accept', 'decline']);
+
+const loading = ref(false);
+
+function handleAccept(id: number) {
+    if (loading.value) return;
+    loading.value = true;
+    emit('accept', id);
+}
+function handleDecline(id: number) {
+    if (loading.value) return;
+    loading.value = true;
+    emit('decline', id);
+}
 </script>
 <style scoped>
 .member-card {

@@ -174,6 +174,16 @@ class MemberInvitationService
                 'avatar' => $receiverUser->avatar,
             ]
         ]));
+        // Broadcast event tới receiver (người nhận) - chính là user vừa decline
+        broadcast(new MemberEvent($user->id, $invitation->sender_id, 'invitation_declined', [
+            'invitation_id' => $invitation->id,
+            'receiver' => [
+                'id' => $receiverUser->id,
+                'name' => $receiverUser->name,
+                'email' => $receiverUser->email,
+                'avatar' => $receiverUser->avatar,
+            ]
+        ]));
         return ['message' => 'Invitation declined'];
     }
 

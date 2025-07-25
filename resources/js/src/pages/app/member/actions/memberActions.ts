@@ -40,7 +40,6 @@ export async function fetchSentInvitations(
       "member-invitations/sent",
       "GET"
     );
-    // Đảm bảo sentInvitations.value.data.data luôn là mảng invitation và có trường id là id của invitation
     let arr = [];
     if (res && Array.isArray(res.data)) {
       arr = res.data;
@@ -49,9 +48,8 @@ export async function fetchSentInvitations(
     }
     sentInvitations.value.data.data = arr.map((inv: any) => ({
       ...inv,
-      id: inv.id || inv.invitation_id, // fallback nếu BE trả về invitation_id
+      id: inv.id || inv.invitation_id,
     }));
-    // console.log("Fetched sentInvitations:", sentInvitations.value.data.data);
   } catch (e) {
     sentInvitations.value.data.data = [];
   }
@@ -68,7 +66,6 @@ export async function fetchReceivedInvitations(
       "member-invitations/received",
       "GET"
     );
-    // Đảm bảo receivedInvitations.value.data.data luôn là mảng invitation và có trường id là id của invitation
     let arr = [];
     if (res && Array.isArray(res.data)) {
       arr = res.data;
@@ -77,12 +74,8 @@ export async function fetchReceivedInvitations(
     }
     receivedInvitations.value.data.data = arr.map((inv: any) => ({
       ...inv,
-      id: inv.id || inv.invitation_id, // fallback nếu BE trả về invitation_id
+      id: inv.id || inv.invitation_id,
     }));
-    // console.log(
-    //   "Fetched receivedInvitations:",
-    //   receivedInvitations.value.data.data
-    // );
   } catch (e) {
     receivedInvitations.value.data.data = [];
   }

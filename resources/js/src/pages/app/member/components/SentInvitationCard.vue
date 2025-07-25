@@ -5,7 +5,7 @@
                 alt="avatar" />
             <h5 class="member-name">{{ invitation.receiver ? invitation.receiver.name : '' }}</h5>
             <div class="action-btns">
-                <button class="btn btn-decline" @click="$emit('cancel', invitation.id)">
+                <button class="btn btn-decline" :disabled="loading" @click="handleCancel(props.invitation.id)">
                     <i class="bi bi-x"></i>
                 </button>
             </div>
@@ -13,9 +13,18 @@
     </div>
 </template>
 <script setup lang="ts">
+import { ref } from 'vue';
 import { getAvatarSrc } from '../../../../helper/avatar';
-defineProps<{ invitation: any }>();
-defineEmits(['cancel']);
+const emit = defineEmits(['cancel']);
+const props = defineProps<{ invitation: any }>();
+
+const loading = ref(false);
+
+function handleCancel(id: number) {
+    if (loading.value) return;
+    loading.value = true;
+    emit('cancel', id);
+}
 </script>
 <style scoped>
 .member-card {

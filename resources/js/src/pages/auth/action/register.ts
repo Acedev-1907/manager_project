@@ -46,9 +46,7 @@ export function useRegisterUser() {
       router.push("/login");
     } catch (error) {
       loading.value = false;
-      for (const message of error as string) {
-        showError(message);
-      }
+      showError((error as any).message);
     }
   }
   return { register, loading };

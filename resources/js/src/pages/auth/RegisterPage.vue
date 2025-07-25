@@ -2,7 +2,7 @@
 import useVuelidate from '@vuelidate/core';
 import { required, email, sameAs, helpers } from '@vuelidate/validators';
 import { registerInput, useRegisterUser } from './action/register';
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 
 const passwordValue = computed(() => registerInput.value.password);
 
@@ -26,10 +26,20 @@ const rules = {
 const v$ = useVuelidate(rules, registerInput);
 const { loading, register } = useRegisterUser();
 
+const lastSubmittedInput = ref({ ...registerInput.value });
+
+type RegisterInputKey = keyof typeof registerInput.value;
+
 async function submitRegister() {
     const result = await v$.value.$validate();
     if (!result) return;
+    // So sánh dữ liệu hiện tại với lần submit trước
+    const isChanged = Object.keys(registerInput.value).some(
+        key => registerInput.value[key as RegisterInputKey] !== lastSubmittedInput.value[key as RegisterInputKey]
+    );
+    if (!isChanged) return;
     await register();
+    lastSubmittedInput.value = { ...registerInput.value };
     v$.value.$reset();
 }
 </script>

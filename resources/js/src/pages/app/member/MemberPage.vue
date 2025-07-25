@@ -48,12 +48,18 @@ async function handleAddMember(friendCode: string, cb: (err: string | null) => v
 }
 async function handleAcceptInvitation(id: number) {
     await makeHttpReq<undefined, any>(`member-invitations/${id}/accept`, 'POST');
-    fetchReceivedInvitations(receivedInvitations, isLoading);
+    // Xóa các dòng log accept/decline
+    if (Array.isArray(receivedInvitations.value.data?.data)) {
+        receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+    }
     showSuccess('Invitation accepted!');
 }
 async function handleDeclineInvitation(id: number) {
     await makeHttpReq<undefined, any>(`member-invitations/${id}/decline`, 'POST');
-    fetchReceivedInvitations(receivedInvitations, isLoading);
+    // Xóa các dòng log accept/decline
+    if (Array.isArray(receivedInvitations.value.data?.data)) {
+        receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+    }
     showSuccess('Invitation declined!');
 }
 async function handleCancelInvitation(id: number) {
@@ -102,7 +108,6 @@ onMounted(() => {
                     friendsList,
                     receivedInvitations,
                     sentInvitations,
-                    showSuccess,
                     memberCacheRef
                 );
             });

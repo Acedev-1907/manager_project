@@ -35,12 +35,9 @@ export function handleMemberEvent(
   friendsList: Ref<any>,
   receivedInvitations: Ref<any>,
   sentInvitations: Ref<any>,
-  showSuccess: (msg: string) => void,
   memberCacheRef?: Ref<{ [key: string]: any }>
 ) {
-  console.log("[MemberEvent] Received:", e);
   if (e.action === "removed") {
-    console.log("[MemberEvent] Action: removed", e);
     if (friendsList.value && friendsList.value.data) {
       if (!Array.isArray(friendsList.value.data.data)) {
         friendsList.value.data.data = [];
@@ -51,7 +48,6 @@ export function handleMemberEvent(
     }
   }
   if (e.action === "invitation_sent") {
-    console.log("[MemberEvent] Action: invitation_sent", e);
     const data = JSON.parse(localStorage.getItem("userData") || "{}");
     const userId = data.user?.id;
     // Nếu user hiện tại là receiver thì cập nhật receivedInvitations
@@ -69,19 +65,10 @@ export function handleMemberEvent(
         (m: any) => m.id === e.payload.invitation.id
       );
       if (!exists) {
-        // Gán lại mảng mới để đảm bảo Vue reactivity
-        console.log(
-          "Realtime invitation object (receiver):",
-          e.payload.invitation
-        );
         receivedInvitations.value.data.data = [
           e.payload.invitation,
           ...receivedInvitations.value.data.data,
         ];
-        console.log(
-          "Realtime receivedInvitations:",
-          receivedInvitations.value.data.data
-        );
       }
     }
     // Nếu user hiện tại là sender thì cập nhật sentInvitations
@@ -100,15 +87,10 @@ export function handleMemberEvent(
       );
       if (!exists) {
         sentInvitations.value.data.data.unshift(e.payload.invitation);
-        console.log(
-          "Updated sentInvitations (sender):",
-          sentInvitations.value.data.data
-        );
       }
     }
   }
   if (e.action === "invitation_declined") {
-    console.log("[MemberEvent] Action: invitation_declined", e);
     // Xóa invitation khỏi sentInvitations local dựa vào invitation_id
     if (
       e.payload &&
@@ -119,21 +101,28 @@ export function handleMemberEvent(
       if (!Array.isArray(sentInvitations.value.data.data)) {
         sentInvitations.value.data.data = [];
       }
-      console.log(
-        "Before filter (declined):",
-        sentInvitations.value.data.data,
-        "invitation_id:",
-        e.payload.invitation_id
-      );
       sentInvitations.value.data.data = sentInvitations.value.data.data.filter(
         (m: any) => String(m.id) !== String(e.payload.invitation_id)
       );
-      console.log("After filter (declined):", sentInvitations.value.data.data);
+    }
+    // Xóa invitation khỏi receivedInvitations local dựa vào invitation_id (cho receiver)
+    if (
+      e.payload &&
+      e.payload.invitation_id &&
+      receivedInvitations.value &&
+      receivedInvitations.value.data
+    ) {
+      if (!Array.isArray(receivedInvitations.value.data.data)) {
+        receivedInvitations.value.data.data = [];
+      }
+      receivedInvitations.value.data.data =
+        receivedInvitations.value.data.data.filter(
+          (m: any) => String(m.id) !== String(e.payload.invitation_id)
+        );
     }
     // showSuccess("Your invitation has been declined.");
   }
   if (e.action === "invitation_cancelled") {
-    console.log("[MemberEvent] Action: invitation_cancelled", e);
     // Nếu có invitation_id thì xóa khỏi receivedInvitations local (ưu tiên đúng invitation_id)
     if (
       e.payload &&
@@ -165,17 +154,23 @@ export function handleMemberEvent(
     }
   }
   if (e.action === "invitation_accepted") {
-    console.log("[MemberEvent] Action: invitation_accepted", e);
     const data = JSON.parse(localStorage.getItem("userData") || "{}");
     const userId = data.user?.id;
-    console.log(
-      "userId:",
-      userId,
-      "e.byUser:",
-      e.byUser,
-      "e.payload.member.id:",
-      e.payload?.member?.id
-    );
+
+    // Luôn xóa invitation khỏi Received Invitations theo id === invitation_id
+    if (
+      receivedInvitations.value &&
+      receivedInvitations.value.data &&
+      e.payload.invitation_id
+    ) {
+      if (!Array.isArray(receivedInvitations.value.data.data)) {
+        receivedInvitations.value.data.data = [];
+      }
+      receivedInvitations.value.data.data =
+        receivedInvitations.value.data.data.filter(
+          (m: any) => String(m.id) !== String(e.payload.invitation_id)
+        );
+    }
 
     // Nếu user hiện tại là receiver (người nhận)
     if (
@@ -183,20 +178,6 @@ export function handleMemberEvent(
       e.payload.member &&
       String(userId) === String(e.payload.member.id)
     ) {
-      // 1. Xóa invitation khỏi Received Invitations theo id === invitation_id
-      if (
-        receivedInvitations.value &&
-        receivedInvitations.value.data &&
-        e.payload.invitation_id
-      ) {
-        if (!Array.isArray(receivedInvitations.value.data.data)) {
-          receivedInvitations.value.data.data = [];
-        }
-        receivedInvitations.value.data.data =
-          receivedInvitations.value.data.data.filter(
-            (m: any) => String(m.id) !== String(e.payload.invitation_id)
-          );
-      }
       // 2. Thêm member mới (người gửi) vào friendsList nếu chưa có
       if (friendsList.value && friendsList.value.data && e.byUser) {
         if (!Array.isArray(friendsList.value.data.data)) {
@@ -223,21 +204,12 @@ export function handleMemberEvent(
         }
         const removeIds = new Set([String(e.payload.invitation_id)]);
         const removeReceivers = new Set([String(e.payload.member.id)]);
-        console.log(
-          "Before filter (sender):",
-          sentInvitations.value.data.data,
-          "removeIds:",
-          removeIds,
-          "removeReceivers:",
-          removeReceivers
-        );
         sentInvitations.value.data.data =
           sentInvitations.value.data.data.filter(
             (m: any) =>
               !removeIds.has(String(m.id)) &&
               !removeReceivers.has(String(m.receiver_id))
           );
-        console.log("After filter (sender):", sentInvitations.value.data.data);
       }
       // 2. Thêm member mới vào friendsList nếu chưa có
       if (
