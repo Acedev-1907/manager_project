@@ -206,7 +206,6 @@ onMounted(() => {
 .friend-page {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 1.5rem 0 2rem 0;
 }
 
 .card-container {

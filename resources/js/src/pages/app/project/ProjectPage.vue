@@ -16,13 +16,17 @@ import { showConfirm } from '../../../helper/alert';
 import SearchInput from '../../../components/SearchInput.vue';
 import { useCacheFetch } from '../../../helper/useCacheFetch';
 import { useDashboardStore } from '../dashboard/store/dashboardStore';
+import { useGetPinnedProject } from '../dashboard/actions/GetPinnedProject';
 import eventBus from '../../../helper/eventBus';
+
+const { getPinnedProject: getPinnedProjectForCache, project: pinnedProjectForCache } = useGetPinnedProject();
 
 const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
 const tableLoading = ref(false);
 const router = useRouter();
 const { pinnendProject } = usepinnendProject();
+const { getPinnedProject, project: pinnedProject } = useGetPinnedProject();
 const showProjectModal = ref(false);
 const isEdit = ref(false);
 const loading = ref(false);
@@ -93,12 +97,24 @@ async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true) {
 }
 
 async function handlePinProject(projectId: number) {
+    // Kiểm tra xem project đã được ghim chưa
+    await getPinnedProject();
+
+    // Nếu project đã được ghim rồi, chỉ chuyển qua dashboard (không clear cache)
+    if (pinnedProject.value && pinnedProject.value.id === projectId) {
+        router.push('/dashboard');
+        return;
+    }
+
+    // Nếu project chưa được ghim, gọi API để ghim
     isLoading.value = true;
     await pinnendProject(projectId);
     isLoading.value = false;
-    // Xóa cache pinned project để Dashboard tự động fetch lại khi chuyển trang
+
+    // Lưu dữ liệu project mới vào cache
     const dashboardStore = useDashboardStore();
-    dashboardStore.clearPinnedProject();
+    await getPinnedProjectForCache(); // Lấy dữ liệu project mới
+    dashboardStore.setPinnedProject(pinnedProjectForCache.value); // Lưu vào cache
     router.push('/dashboard');
 }
 

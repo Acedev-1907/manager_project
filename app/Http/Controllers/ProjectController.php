@@ -85,7 +85,7 @@ class ProjectController extends ApiController
     {
         $user = $request->user();
         $count = $this->service->countProjectsForUser($user->id);
-        return response(['count' => $count]);
+        return $this->respondWithData(['count' => $count], 'Get project count successfully');
     }
 
     public function getPinnedProject(Request $request)

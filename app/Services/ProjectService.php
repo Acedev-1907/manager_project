@@ -281,8 +281,34 @@ class ProjectService
             ->where('task_progress.pinned_on_dashboard', \App\Models\TaskProgress::PINNED_ON_DASHBOARD)
             ->where('task_progress.user_id', $user->id)
             ->first();
+
+        if (!$project) {
+            return [
+                'data' => null,
+                'message' => 'No pinned project found'
+            ];
+        }
+
+        // Lấy số lượng task theo trạng thái
+        $pending = \App\Models\Task::where('projectId', $project->id)
+            ->where('status', \App\Models\Task::PENDING)
+            ->count();
+        $completed = \App\Models\Task::where('projectId', $project->id)
+            ->where('status', \App\Models\Task::COMPLETED)
+            ->count();
+
+        // Lấy progress
+        $progress = \App\Models\TaskProgress::where('projectId', $project->id)
+            ->where('user_id', $user->id)
+            ->value('progress') ?? 0;
+
         return [
-            'data' => $project,
+            'data' => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'tasks' => [$pending, $completed],
+                'progress' => intval($progress),
+            ],
             'message' => 'Get pinned project successfully'
         ];
     }

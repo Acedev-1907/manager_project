@@ -4,42 +4,38 @@ import { useGetPinnedProject } from './actions/GetPinnedProject';
 import ApexDonut from './components/ApexDonut.vue';
 import ApexRadialBar from './components/ApexRadialBar.vue';
 import { useGetTotalProject } from './actions/countProject';
-import { useGetChartData } from './actions/getChartData';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import { useDashboardStore } from '../dashboard/store/dashboardStore';
-import { useCacheFetch } from '../../../helper/useCacheFetch';
 
 const { project, getPinnedProject } = useGetPinnedProject()
 const { countProject, getTotalProject } = useGetTotalProject()
-const { chartData, getChartData } = useGetChartData();
 const isLoading = ref(true);
 
 const dashboardStore = useDashboardStore();
-const { getOrFetch: getPinned, refetch: refetchPinned } = useCacheFetch(
-    { pinned: dashboardStore.pinnedProject },
-    (key, data) => dashboardStore.setPinnedProject(data),
-    () => dashboardStore.clearPinnedProject()
-);
-const { getOrFetch: getCount, refetch: refetchCount } = useCacheFetch(
-    { count: dashboardStore.countProject },
-    (key, data) => dashboardStore.setCountProject(data),
-    () => dashboardStore.clearCountProject()
-);
-const { getOrFetch: getChart, refetch: refetchChart } = useCacheFetch(
-    { chart: dashboardStore.chartData },
-    (key, data) => dashboardStore.setChartData(data),
-    () => dashboardStore.clearChartData()
-);
 
 onMounted(async () => {
     isLoading.value = true;
-    await getPinned('pinned', async () => { await getPinnedProject(); return project.value; }, data => { project.value = data; });
-    await getCount('count', async () => { await getTotalProject(); return countProject.value; }, data => { countProject.value = data; });
-    if (project.value && project.value.id) {
-        await getChart('chart', async () => { await getChartData(project.value.id); return chartData.value; }, data => { chartData.value = data; });
+
+    // Kiểm tra nếu không có dữ liệu pinned project thì gọi API
+    if (!dashboardStore.pinnedProject || typeof dashboardStore.pinnedProject === 'string') {
+        await getPinnedProject();
+        dashboardStore.setPinnedProject(project.value);
+    } else {
+        project.value = dashboardStore.pinnedProject;
     }
+
+    // Kiểm tra nếu không có dữ liệu count project thì gọi API
+    if (!dashboardStore.countProject || typeof dashboardStore.countProject === 'string') {
+        await getTotalProject();
+        dashboardStore.setCountProject(countProject.value);
+    } else {
+        countProject.value = dashboardStore.countProject;
+    }
+
     isLoading.value = false;
 });
+
+
 </script>
 
 <style scoped>
@@ -57,12 +53,7 @@ onMounted(async () => {
     text-align: center;
 }
 
-.dashboard-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2rem;
-    justify-content: center;
-}
+
 
 .dashboard-card {
     background: #fff;
@@ -97,13 +88,7 @@ onMounted(async () => {
     align-items: center;
 }
 
-.dashboard-project-title {
-    color: #6c757d;
-    font-size: 1.3rem;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
-    text-align: center;
-}
+
 
 .dashboard-number {
     font-size: 2.5rem;
@@ -181,11 +166,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
-    .dashboard-row {
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-
     .dashboard-card {
         max-width: 100%;
         min-width: 0;
@@ -246,8 +226,8 @@ onMounted(async () => {
                         <div class="dashboard-card">
                             <div class="card-header"><b>Tasks</b></div>
                             <div class="card-body">
-                                <div v-if="chartData.tasks">
-                                    <ApexDonut :task="chartData.tasks" />
+                                <div v-if="project.tasks">
+                                    <ApexDonut :task="project.tasks" />
                                 </div>
                                 <div v-else>
                                     <ApexDonut :task="[0, 0]" />
@@ -259,8 +239,8 @@ onMounted(async () => {
                                 <b>Task Progress</b>
                             </div>
                             <div class="card-body">
-                                <div v-if="chartData.progress > 0">
-                                    <ApexRadialBar :percent="chartData.progress" />
+                                <div v-if="project.progress > 0">
+                                    <ApexRadialBar :percent="project.progress" />
                                 </div>
                                 <div v-else>
                                     <ApexRadialBar :percent="0" />
