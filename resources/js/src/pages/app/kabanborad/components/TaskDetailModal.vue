@@ -10,8 +10,10 @@ const comments = ref<any[]>([]);
 const newComment = ref('');
 const loadingComments = ref(false);
 const commentsListRef = ref<HTMLElement | null>(null);
+const mobileCommentsListRef = ref<HTMLElement | null>(null);
 const showNewMsgBtn = ref(false);
 const sendingComment = ref(false); // Thêm biến chống spam gửi comment
+const activeTab = ref<'content' | 'discussion'>('content'); // Tab active cho mobile
 
 // Lấy userId hiện tại
 const currentUserId = computed(() => {
@@ -97,8 +99,13 @@ watch(comments, () => {
 }, { deep: true });
 
 function scrollToBottom() {
+    // Scroll cho desktop
     if (commentsListRef.value) {
         commentsListRef.value.scrollTop = commentsListRef.value.scrollHeight;
+    }
+    // Scroll cho mobile
+    if (mobileCommentsListRef.value) {
+        mobileCommentsListRef.value.scrollTop = mobileCommentsListRef.value.scrollHeight;
     }
 }
 
@@ -145,9 +152,17 @@ async function sendComment() {
 
 // Xác định user đang ở gần cuối (dưới 150px)
 function isUserAtBottom(threshold = 150) {
-    if (!commentsListRef.value) return true;
-    const el = commentsListRef.value;
-    return Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+    // Kiểm tra desktop
+    if (commentsListRef.value) {
+        const el = commentsListRef.value;
+        return Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+    }
+    // Kiểm tra mobile
+    if (mobileCommentsListRef.value) {
+        const el = mobileCommentsListRef.value;
+        return Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < threshold;
+    }
+    return true;
 }
 
 // Xử lý khi nhận comment mới (realtime hoặc của chính mình)
@@ -201,62 +216,147 @@ function formatTime(dateStr: string) {
 <template>
     <div v-if="visible" class="modal-overlay">
         <div class="modal-content split-layout">
-            <button class="close-btn" @click="close">×</button>
-            <div class="task-info-col">
-                <h2>{{ task?.name }}</h2>
-                <div class="task-status">Status: <b>{{ getStatusText(task?.status) }}</b></div>
-                <div class="task-members">
-                    <div v-for="m in task?.task_members" :key="m.id" class="member-avatar-box">
-                        <img :src="getAvatarSrc(getMemberAvatar(m), getMemberName(m))" class="member-avatar-img"
-                            :alt="getMemberName(m)" :title="getMemberName(m)" />
-                    </div>
-                </div>
-                <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
-                <div class="task-content">
-                    <b>Content:</b>
-                    <div>{{ task?.content || task?.description || 'No content' }}</div>
-                </div>
+            <!-- Mobile Header với Close Button -->
+            <div class="mobile-header">
+                <h3 class="mobile-title">{{ task?.name }}</h3>
+                <button class="close-btn mobile-close" @click="close">×</button>
             </div>
-            <div class="task-chat-col">
-                <div class="comments-section">
-                    <h4>Discussion</h4>
-                    <hr class="divider" />
-                    <div class="comments-list" ref="commentsListRef" @scroll="onCommentsScroll">
-                        <template v-if="comments.length === 0">
-                            <div class="comments-placeholder">This is a chat for task discussion.</div>
-                        </template>
-                        <div v-for="c in comments" :key="c.id"
-                            :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
-                            <div class="comment-bubble-wrap">
-                                <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
-                                    <div class="comment-bubble">
-                                        <div class="comment-text">{{ c.content }}</div>
-                                    </div>
-                                    <img :src="getAvatarSrc(c.user?.avatar || '', c.user?.name || c.user?.email || '')"
-                                        class="comment-avatar" />
-                                </template>
-                                <template v-else>
-                                    <img v-if="c.user?.avatar"
-                                        :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
-                                        class="comment-avatar" />
-                                    <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
-                                        class="comment-avatar" />
-                                    <div class="comment-bubble">
-                                        <div class="comment-text">{{ c.content }}</div>
-                                    </div>
-                                </template>
-                            </div>
-                            <div class="comment-time">{{ formatTime(c.created_at) }}</div>
+
+            <!-- Desktop Close Button (ẩn trên mobile) -->
+            <button class="close-btn desktop-close" @click="close">×</button>
+            <!-- Mobile Tab Navigation -->
+            <div class="mobile-tabs">
+                <button :class="['tab-btn', { active: activeTab === 'content' }]" @click="activeTab = 'content'">
+                    <i class="bi bi-file-text"></i>
+                    Content
+                </button>
+                <button :class="['tab-btn', { active: activeTab === 'discussion' }]" @click="activeTab = 'discussion'">
+                    <i class="bi bi-chat-dots"></i>
+                    Discussion
+                </button>
+            </div>
+
+            <!-- Desktop Layout -->
+            <div class="desktop-layout">
+                <div class="task-info-col">
+                    <h2>{{ task?.name }}</h2>
+                    <div class="task-status">Status: <b>{{ getStatusText(task?.status) }}</b></div>
+                    <div class="task-members">
+                        <div v-for="m in task?.task_members" :key="m.id" class="member-avatar-box">
+                            <img :src="getAvatarSrc(getMemberAvatar(m), getMemberName(m))" class="member-avatar-img"
+                                :alt="getMemberName(m)" :title="getMemberName(m)" />
                         </div>
                     </div>
-                    <!-- Nút thông báo tin nhắn mới -->
-                    <div v-if="showNewMsgBtn" class="new-msg-alert">
-                        <button @click="goToBottom">New message</button>
+                    <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
+                    <div class="task-content">
+                        <b>Content:</b>
+                        <div>{{ task?.content || task?.description || 'No content' }}</div>
                     </div>
-                    <div class="comment-input">
-                        <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
-                            placeholder="Type a message..." />
-                        <button @click="sendComment" :disabled="sendingComment">Send</button>
+                </div>
+                <div class="task-chat-col">
+                    <div class="comments-section">
+                        <h4>Discussion</h4>
+                        <hr class="divider" />
+                        <div class="comments-list" ref="commentsListRef" @scroll="onCommentsScroll">
+                            <template v-if="comments.length === 0">
+                                <div class="comments-placeholder">This is a chat for task discussion.</div>
+                            </template>
+                            <div v-for="c in comments" :key="c.id"
+                                :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
+                                <div class="comment-bubble-wrap">
+                                    <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
+                                        <div class="comment-bubble">
+                                            <div class="comment-text">{{ c.content }}</div>
+                                        </div>
+                                        <img :src="getAvatarSrc(c.user?.avatar || '', c.user?.name || c.user?.email || '')"
+                                            class="comment-avatar" />
+                                    </template>
+                                    <template v-else>
+                                        <img v-if="c.user?.avatar"
+                                            :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
+                                            class="comment-avatar" />
+                                        <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
+                                            class="comment-avatar" />
+                                        <div class="comment-bubble">
+                                            <div class="comment-text">{{ c.content }}</div>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="comment-time">{{ formatTime(c.created_at) }}</div>
+                            </div>
+                        </div>
+                        <!-- Nút thông báo tin nhắn mới -->
+                        <div v-if="showNewMsgBtn" class="new-msg-alert">
+                            <button @click="goToBottom">New message</button>
+                        </div>
+                        <div class="comment-input">
+                            <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
+                                placeholder="Type a message..." />
+                            <button @click="sendComment" :disabled="sendingComment">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Layout -->
+            <div class="mobile-layout">
+                <!-- Content Tab -->
+                <div v-if="activeTab === 'content'" class="mobile-content-tab">
+                    <h2 class="mobile-content-title">{{ task?.name }}</h2>
+                    <div class="task-status">Status: <b>{{ getStatusText(task?.status) }}</b></div>
+                    <div class="task-members">
+                        <div v-for="m in task?.task_members" :key="m.id" class="member-avatar-box">
+                            <img :src="getAvatarSrc(getMemberAvatar(m), getMemberName(m))" class="member-avatar-img"
+                                :alt="getMemberName(m)" :title="getMemberName(m)" />
+                        </div>
+                    </div>
+                    <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
+                    <div class="task-content">
+                        <b>Content:</b>
+                        <div>{{ task?.content || task?.description || 'No content' }}</div>
+                    </div>
+                </div>
+
+                <!-- Discussion Tab -->
+                <div v-if="activeTab === 'discussion'" class="mobile-discussion-tab">
+                    <div class="comments-section">
+                        <div class="comments-list" ref="mobileCommentsListRef" @scroll="onCommentsScroll">
+                            <template v-if="comments.length === 0">
+                                <div class="comments-placeholder">This is a chat for task discussion.</div>
+                            </template>
+                            <div v-for="c in comments" :key="c.id"
+                                :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
+                                <div class="comment-bubble-wrap">
+                                    <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
+                                        <div class="comment-bubble">
+                                            <div class="comment-text">{{ c.content }}</div>
+                                        </div>
+                                        <img :src="getAvatarSrc(c.user?.avatar || '', c.user?.name || c.user?.email || '')"
+                                            class="comment-avatar" />
+                                    </template>
+                                    <template v-else>
+                                        <img v-if="c.user?.avatar"
+                                            :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
+                                            class="comment-avatar" />
+                                        <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
+                                            class="comment-avatar" />
+                                        <div class="comment-bubble">
+                                            <div class="comment-text">{{ c.content }}</div>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="comment-time">{{ formatTime(c.created_at) }}</div>
+                            </div>
+                        </div>
+                        <!-- Nút thông báo tin nhắn mới -->
+                        <div v-if="showNewMsgBtn" class="new-msg-alert">
+                            <button @click="goToBottom">New message</button>
+                        </div>
+                        <div class="comment-input">
+                            <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
+                                placeholder="Type a message..." />
+                            <button @click="sendComment" :disabled="sendingComment">Send</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -269,7 +369,7 @@ function formatTime(dateStr: string) {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.25);
-    z-index: 2000;
+    z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -287,6 +387,8 @@ function formatTime(dateStr: string) {
     display: flex;
     flex-direction: row;
     gap: 0;
+    /* Thêm cho mobile để không bị co giãn khi chuyển tab */
+    transition: min-width 0.2s, min-height 0.2s, max-width 0.2s;
 }
 
 .split-layout {
@@ -315,7 +417,8 @@ function formatTime(dateStr: string) {
     height: 550px;
 }
 
-.close-btn {
+/* Desktop Close Button */
+.desktop-close {
     position: absolute;
     right: 18px;
     top: 12px;
@@ -324,6 +427,67 @@ function formatTime(dateStr: string) {
     border: none;
     color: #888;
     cursor: pointer;
+    z-index: 10000;
+}
+
+/* Mobile Close Button */
+.mobile-close {
+    display: none;
+    font-size: 1.4rem;
+    color: #6b7280;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background 0.2s ease;
+}
+
+.mobile-close:hover {
+    background: #f3f4f6;
+}
+
+@media (max-width: 900px) {
+    .modal-content {
+        flex-direction: column;
+        min-width: 90vw;
+        max-width: 98vw;
+        min-height: 500px;
+        max-height: 98vh;
+        padding: 18px 8px 18px 8px;
+        box-sizing: border-box;
+        /* Cố định chiều rộng/chiều cao khi chuyển tab */
+        transition: none;
+    }
+
+    .mobile-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 20px;
+        padding: 0 0 10px 0;
+    }
+
+    /* Ẩn desktop close button trên mobile */
+    .desktop-close {
+        display: none;
+    }
+
+    /* Hiển thị mobile close button */
+    .mobile-close {
+        display: block;
+    }
+
+    .mobile-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0;
+        flex: 1;
+        text-align: left;
+        padding-right: 0;
+    }
 }
 
 .task-status {
@@ -594,16 +758,147 @@ function formatTime(dateStr: string) {
     opacity: 0.85;
 }
 
+/* Mobile Header */
+.mobile-header {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 16px 0;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 20px;
+}
+
+.mobile-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    flex: 1;
+    text-align: center;
+    padding-right: 40px;
+    /* Để tránh overlap với close button */
+}
+
+/* Mobile Tab Navigation */
+.mobile-tabs {
+    display: none;
+    width: 100%;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 6px;
+    margin-bottom: 20px;
+    gap: 6px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 14px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tab-btn i {
+    font-size: 1.1rem;
+}
+
+.tab-btn.active {
+    background: #2563eb;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.tab-btn:hover:not(.active) {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+/* Desktop Layout */
+.desktop-layout {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    width: 100%;
+}
+
+/* Mobile Layout */
+.mobile-layout {
+    display: none;
+    width: 100%;
+    min-height: 400px;
+}
+
+.mobile-content-tab {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    height: 500px;
+    overflow-y: auto;
+}
+
+.mobile-discussion-tab {
+    display: flex;
+    flex-direction: column;
+    height: 500px;
+}
+
+.mobile-discussion-tab .comments-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.mobile-discussion-tab .comments-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 12px;
+    width: 100%;
+}
+
 @media (max-width: 900px) {
     .modal-content {
         flex-direction: column;
         min-width: 90vw;
         max-width: 98vw;
         padding: 18px 8px 18px 8px;
+        min-height: 500px;
     }
 
     .split-layout {
         flex-direction: column;
+    }
+
+    /* Hide desktop layout on mobile */
+    .desktop-layout {
+        display: none;
+    }
+
+    /* Show mobile layout on mobile */
+    .mobile-layout {
+        display: block;
+    }
+
+    /* Show mobile header and tabs on mobile */
+    .mobile-header {
+        display: flex;
+    }
+
+    .mobile-tabs {
+        display: flex;
     }
 
     .task-info-col {
@@ -616,6 +911,77 @@ function formatTime(dateStr: string) {
 
     .task-chat-col {
         padding-left: 0;
+    }
+
+    /* Mobile specific adjustments */
+    .mobile-content-title {
+        display: none;
+        /* Ẩn title trong content tab vì đã có ở header */
+    }
+
+    .mobile-content-tab {
+        padding: 12px;
+        height: 500px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .mobile-discussion-tab {
+        height: 500px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .mobile-content-tab .task-status {
+        font-size: 1rem;
+        margin-bottom: 8px;
+    }
+
+    .mobile-content-tab .task-members {
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .mobile-content-tab .member-avatar-img {
+        width: 32px;
+        height: 32px;
+    }
+
+    .mobile-content-tab .task-date {
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+    }
+
+    .mobile-content-tab .task-content {
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    /* Mobile discussion tab adjustments */
+    .mobile-discussion-tab .comment-bubble {
+        max-width: 280px;
+        padding: 10px 14px;
+    }
+
+    .mobile-discussion-tab .comment-text {
+        font-size: 1rem;
+    }
+
+    .mobile-discussion-tab .comment-input {
+        margin-top: 12px;
+        padding: 8px 12px;
+    }
+
+    .mobile-discussion-tab .comment-input input {
+        font-size: 1rem;
+        padding: 8px 12px;
+    }
+
+    .mobile-discussion-tab .comment-input button {
+        padding: 8px 16px;
+        font-size: 1rem;
     }
 }
 </style>
