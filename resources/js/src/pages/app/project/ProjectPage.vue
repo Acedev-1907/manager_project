@@ -29,7 +29,6 @@ const loading = ref(false);
 const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
 const projectCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('projectCache') || '{}'));
-const userId = ref(null);
 
 watch(projectCache, (val) => {
     localStorage.setItem('projectCache', JSON.stringify(val));
@@ -166,10 +165,6 @@ const handleSearch = async (searchQuery: string) => {
 };
 
 onMounted(async () => {
-    // Lấy userId từ localStorage hoặc API
-    const userDataRaw = localStorage.getItem('userData');
-    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
-    userId.value = userData.id || (userData.user && userData.user.id) || null;
     await fetchProjects();
     projectStore.edit = false;
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };

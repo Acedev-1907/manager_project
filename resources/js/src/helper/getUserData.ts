@@ -28,16 +28,3 @@ export function setUserData(userData: LoginResponseType): void {
     // console.error("Error saving user data to localStorage:", error);
   }
 }
-
-export function clearUserData(): void {
-  try {
-    localStorage.removeItem("userData");
-  } catch (error) {
-    // console.error("Error clearing user data from localStorage:", error);
-  }
-}
-
-export function isUserLoggedIn(): boolean {
-  const userData = getUserData();
-  return userData !== null && !!userData.token;
-}

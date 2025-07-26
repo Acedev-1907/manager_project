@@ -125,7 +125,7 @@ const userStore = useUserStore();
                             :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" class="custom-avatar-img" />
                         <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                             userStore.user.name.charAt(0).toUpperCase()
-                        }}</span>
+                            }}</span>
                         <span v-else class="avatar-circle">?</span>
                         <div class="user-info-block">
                             <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name }}</span>
@@ -193,13 +193,13 @@ const userStore = useUserStore();
                                 class="custom-avatar-img" />
                             <span v-else-if="userStore.user?.name" class="avatar-circle">{{
                                 userStore.user.name.charAt(0).toUpperCase()
-                            }}</span>
+                                }}</span>
                             <span v-else class="avatar-circle">?</span>
                             <div class="user-info-block"
                                 style="display: flex; flex-direction: column; align-items: flex-start;">
                                 <span v-if="userStore.user?.name" class="custom-user-name">{{
                                     userStore.user.name
-                                    }}</span>
+                                }}</span>
                                 <span v-if="userStore.user.friend_code"
                                     style="color: #2563eb; font-size: 0.95em; display: block; line-height: 1.2; margin-left: 0; margin-top: 2px;">
                                     Friend code: {{ userStore.user.friend_code }}

@@ -4,7 +4,6 @@ import FabButton from '../../../components/FabButton.vue';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import MemberTable from './components/MemberTable.vue';
 import AddMemberModal from './components/AddMemberModal.vue';
-import type { GetMemberType, MemberType } from './actions/getMember';
 import { makeHttpReq } from '../../../helper/makeHttpReq';
 import { showSuccess } from '../../../helper/alert';
 import InvitationCard from './components/InvitationCard.vue';
@@ -16,19 +15,25 @@ import {
     fetchReceivedInvitations,
     handleRemoveMember,
 } from './actions/memberActions';
+import type { Member, MemberListResponse } from '../../../types/common';
+import { useResponsive } from '../../../helper/useResponsive';
+import { useErrorHandler } from '../../../helper/useErrorHandler';
 
 const tabs = ['Members', 'Sent Invitations', 'Received Invitations'];
 const activeTab = ref('Members');
 const showAddModal = ref(false);
 const isLoading = ref(false);
 const searchQuery = ref('');
-const friendsList = ref<GetMemberType>({ data: { data: [] } });
-const sentInvitations = ref<GetMemberType>({ data: { data: [] } });
-const receivedInvitations = ref<GetMemberType>({ data: { data: [] } });
-const memberCacheRef = ref<{ [key: string]: GetMemberType }>({}) as Ref<{ [key: string]: GetMemberType }>;
+const friendsList = ref<MemberListResponse>({ data: { data: [] } });
+const sentInvitations = ref<MemberListResponse>({ data: { data: [] } });
+const receivedInvitations = ref<MemberListResponse>({ data: { data: [] } });
+const memberCacheRef = ref<{ [key: string]: MemberListResponse }>({}) as Ref<{ [key: string]: MemberListResponse }>;
 const hasFetched = ref<{ [key: string]: boolean }>({});
 
-const isMobile = computed(() => window.innerWidth <= 600);
+const { state } = useResponsive();
+const isMobile = computed(() => state.value.isMobile);
+const { withErrorHandling } = useErrorHandler();
+
 const tabIcons = {
     'Members': 'bi-people',
     'Sent Invitations': 'bi-send',
@@ -36,36 +41,67 @@ const tabIcons = {
 };
 
 async function handleAddMember(friendCode: string, cb: (err: string | null) => void) {
-    try {
-        await makeHttpReq<{ friend_code: string }, any>('member-invitations/send', 'POST', { friend_code: friendCode });
+    const result = await withErrorHandling(
+        async () => {
+            await makeHttpReq<{ friend_code: string }, any>('member-invitations/send', 'POST', { friend_code: friendCode });
+            return true;
+        },
+        'Failed to send invitation'
+    );
+
+    if (result) {
         cb(null);
         showAddModal.value = false;
-        // fetchSentInvitations(sentInvitations, isLoading); // bỏ dòng này, rely vào realtime
         showSuccess('Invitation sent!');
-    } catch (e: any) {
-        cb(e?.error || 'Add failed');
+    } else {
+        cb('Add failed');
     }
 }
+
 async function handleAcceptInvitation(id: number) {
-    await makeHttpReq<undefined, any>(`member-invitations/${id}/accept`, 'POST');
-    // Xóa các dòng log accept/decline
-    if (Array.isArray(receivedInvitations.value.data?.data)) {
-        receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+    const result = await withErrorHandling(
+        async () => {
+            await makeHttpReq<undefined, any>(`member-invitations/${id}/accept`, 'POST');
+            if (Array.isArray(receivedInvitations.value.data?.data)) {
+                receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+            }
+            return true;
+        },
+        'Failed to accept invitation'
+    );
+
+    if (result) {
+        showSuccess('Invitation accepted!');
     }
-    showSuccess('Invitation accepted!');
 }
+
 async function handleDeclineInvitation(id: number) {
-    await makeHttpReq<undefined, any>(`member-invitations/${id}/decline`, 'POST');
-    // Xóa các dòng log accept/decline
-    if (Array.isArray(receivedInvitations.value.data?.data)) {
-        receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+    const result = await withErrorHandling(
+        async () => {
+            await makeHttpReq<undefined, any>(`member-invitations/${id}/decline`, 'POST');
+            if (Array.isArray(receivedInvitations.value.data?.data)) {
+                receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+            }
+            return true;
+        },
+        'Failed to decline invitation'
+    );
+
+    if (result) {
+        showSuccess('Invitation declined!');
     }
-    showSuccess('Invitation declined!');
 }
+
 async function handleCancelInvitation(id: number) {
-    await makeHttpReq<undefined, any>(`member-invitations/${id}/cancel`, 'DELETE');
-    // showSuccess('Invitation cancelled!');
+    await withErrorHandling(
+        async () => {
+            await makeHttpReq<undefined, any>(`member-invitations/${id}/cancel`, 'DELETE');
+            return true;
+        },
+        'Failed to cancel invitation'
+    );
 }
+
 function setTab(tab: string) {
     activeTab.value = tab;
     if (tab === 'Members') {
@@ -78,12 +114,13 @@ function setTab(tab: string) {
         hasFetched.value['received'] = true;
     }
 }
+
 function handleSearchMembers(q: string) {
     searchQuery.value = q;
     fetchMembers(friendsList, memberCacheRef, isLoading, q);
 }
 
-function handleRemoveMemberWrapper(member: MemberType) {
+function handleRemoveMemberWrapper(member: Member) {
     handleRemoveMember(
         member,
         memberCacheRef,
@@ -184,7 +221,7 @@ onMounted(() => {
     display: flex;
     align-items: center;
     font-size: 1.4rem;
-    font-weight: 700;
+    font-weight: 500;
     color: #22223b;
     margin-bottom: 1.2rem;
     gap: 0.7rem;

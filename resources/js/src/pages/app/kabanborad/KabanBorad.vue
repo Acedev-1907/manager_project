@@ -33,7 +33,7 @@ function setMenuState(val: { column: string, taskId: number } | null) {
     menuState.value = val;
 }
 
-const { getOrFetch, refetch } = useCacheFetch(
+const { refetch } = useCacheFetch(
     taskStore.projectDetailCache,
     taskStore.setProjectDetailCache,
     taskStore.clearProjectDetailCache

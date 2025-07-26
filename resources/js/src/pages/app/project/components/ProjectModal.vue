@@ -126,7 +126,6 @@ const currentUserId = ref<number | null>(null);
 const searchQuery = ref('');
 const showAvailable = ref(false);
 const showAll = ref(false);
-const showTooltip = ref(false);
 // Thêm biến errors để lưu lỗi các trường
 const errors = ref<{ name?: string; startDate?: string; endDate?: string }>({});
 

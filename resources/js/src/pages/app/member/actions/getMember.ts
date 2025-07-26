@@ -1,21 +1,14 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { showErrorResponse } from "../../../../helper/utils";
+import type { Member, MemberListResponse } from "../../../../types/common";
 
-export type MemberType = {
-  id: number;
-  name: string;
-  email: string;
-  avatar?: string;
-};
-
-export type GetMemberType = {
-  data: { data: Array<MemberType> };
-} & Record<string, any>;
+export type MemberType = Member;
+export type GetMemberType = MemberListResponse;
 
 export function useGetMembers() {
   const loading = ref(false);
-  const memberData = ref<GetMemberType>({} as GetMemberType);
+  const memberData = ref<MemberListResponse>({ data: { data: [] } });
   async function getMembers(
     page: number = 1,
     query: string = "",
@@ -23,7 +16,7 @@ export function useGetMembers() {
   ) {
     try {
       loading.value = true;
-      const data = await makeHttpReq<undefined, GetMemberType>(
+      const data = await makeHttpReq<undefined, MemberListResponse>(
         `members?query=${query}&page=${page}`,
         "GET",
         undefined,

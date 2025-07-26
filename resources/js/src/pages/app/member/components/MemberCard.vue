@@ -1,8 +1,6 @@
 <template>
-    <div class="member-card">
-        <div class="row-main">
-            <img :src="getAvatarSrc(member.avatar, member.name)" class="avatar" alt="avatar" />
-            <h5 class="member-name">{{ member.name }}</h5>
+    <BaseCard :title="member.name" :avatar="member.avatar" :name="member.name" variant="member">
+        <template #actions>
             <div class="menu-wrapper" ref="menuWrapperRef" @click.stop="toggleMenu">
                 <i class="bi bi-three-dots"></i>
                 <div v-if="showMenu" class="menu-dropdown">
@@ -10,13 +8,13 @@
                     <div class="menu-item remove" @click.stop="handleRemove">Remove</div>
                 </div>
             </div>
-        </div>
-    </div>
+        </template>
+    </BaseCard>
 </template>
 
 <script setup lang="ts">
 import { ref, defineProps, defineEmits, onMounted, onBeforeUnmount } from 'vue';
-import { getAvatarSrc } from '../../../../helper/avatar';
+import BaseCard from '../../../../components/BaseCard.vue';
 
 const props = defineProps<{ member: { id: number; name: string; email: string; avatar?: string } }>();
 const emit = defineEmits(['remove']);
@@ -51,51 +49,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.member-card {
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(34, 34, 59, 0.08);
-    padding: 1.1rem 1.3rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 90px;
-    position: relative;
-    transition: box-shadow 0.2s;
-}
-
-.member-card:hover {
-    box-shadow: 0 4px 18px rgba(34, 34, 59, 0.16);
-}
-
-.row-main {
-    display: flex;
-    align-items: center;
-    gap: 1.1rem;
-    width: 100%;
-    height: 100%;
-}
-
-.avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid #e0e7ff;
-}
-
-.member-name {
-    font-size: 1.13rem;
-    font-weight: 600;
-    color: #1e293b;
-    margin: 0;
-    flex: 1;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .menu-wrapper {
     position: relative;
     margin-left: auto;

@@ -1,8 +1,11 @@
 import type { Ref } from "vue";
-import type { GetMemberType, MemberType } from "./getMember";
+import type { Member, MemberListResponse } from "../../../../types/common";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import Swal from "sweetalert2";
 import { showSuccess } from "../../../../helper/alert";
+
+type GetMemberType = MemberListResponse;
+type MemberType = Member;
 
 export async function fetchMembers(
   friendsList: Ref<GetMemberType>,
