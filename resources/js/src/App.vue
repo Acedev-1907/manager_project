@@ -6,8 +6,6 @@ import { defineComponent, onMounted, ref } from 'vue';
 import { useUserStore } from './state/userStore';
 import { makeHttpReq } from './helper/makeHttpReq';
 import { useGlobalEchoListener } from './helper/useGlobalEchoListener';
-import { projectStore } from './pages/app/project/store/projectStore';
-import eventBus from './helper/eventBus';
 import { useProjectRealtimeCacheClear } from './helper/useProjectRealtimeCacheClear';
 import { useAppGlobalRealtime } from './helper/useAppGlobalRealtime';
 
