@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -13,25 +12,42 @@ class TrackCompletedAndPending implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /**
-     * Create a new event instance.
-     */
+    public $tasks;
+    public $projectId;
+    public $taskId;
+    public $updatedAt;
+    public $userId;
 
-    public $tasks=array();
-    public function __construct($tasks)
+    public function __construct($tasks, $projectId = null, $taskId = null, $userId = null)
     {
-       $this->tasks = $tasks;
+        $this->tasks = $tasks;
+        $this->projectId = $projectId;
+        $this->taskId = $taskId;
+        $this->userId = $userId;
+        $this->updatedAt = now()->toISOString();
     }
 
-    /**
-     * Get the channels the event should broadcast on.
-     *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
-     */
     public function broadcastOn(): array
     {
+        if (!$this->projectId) {
+            return [];
+        }
+
         return [
-            new Channel('channel-tasks-project'),
+            new PrivateChannel('project.' . $this->projectId),
+        ];
+    }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'tasks' => $this->tasks,
+            'projectId' => $this->projectId,
+            'taskId' => $this->taskId,
+            'userId' => $this->userId,
+            'updatedAt' => $this->updatedAt,
+            'eventType' => 'task_status_changed',
+            'eventName' => 'TrackCompletedAndPending'
         ];
     }
 }

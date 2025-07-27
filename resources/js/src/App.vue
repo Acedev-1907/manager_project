@@ -12,7 +12,10 @@ import { useAppGlobalRealtime } from './helper/useAppGlobalRealtime';
 export default defineComponent({
     name: 'App',
     setup() {
-        useAppGlobalRealtime();
+        // Initialize global real-time manager
+        const globalRealtime = useAppGlobalRealtime();
+
+
         const { setUser } = useUserStore();
         // Lấy userId từ localStorage và dùng ref để reactive
         const userId = ref<string | number | null>(null);
@@ -46,7 +49,6 @@ export default defineComponent({
                     userData.user = { ...userData.user, name: res.data.name, avatar: res.data.avatar || '', friend_code: res.data.friend_code || null };
                     localStorage.setItem("userData", JSON.stringify(userData));
                 } catch {
-                    // Nếu lỗi, không làm gì thêm
                 }
             }
         });

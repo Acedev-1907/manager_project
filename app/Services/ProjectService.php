@@ -4,8 +4,9 @@ namespace App\Services;
 
 use App\Repositories\ProjectRepository;
 use App\Models\TaskProgress;
-use App\Events\NewProjectCreated;
+use App\Events\UserProjectCountUpdated;
 use Illuminate\Support\Facades\DB;
+
 use Illuminate\Support\Facades\Validator;
 use App\Events\NewProjectForMembers;
 
@@ -58,10 +59,13 @@ class ProjectService
                 'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
             ]);
 
-            NewProjectCreated::dispatch(\App\Models\Project::count());
-
             // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
             DB::afterCommit(function () use ($project, $broadcastMembers) {
+                // Dispatch UserProjectCountUpdated event cho tất cả members
+                foreach ($broadcastMembers as $memberId) {
+                    $memberProjectCount = $this->countProjectsForUser($memberId);
+                    UserProjectCountUpdated::dispatch($memberId, $memberProjectCount);
+                }
                 $project->load([
                     'creator',
                     'users' => function ($q) {
@@ -114,6 +118,13 @@ class ProjectService
                         $q->select('users.id', 'users.name', 'users.avatar');
                     }
                 ]);
+
+                // Dispatch UserProjectCountUpdated event cho member mới
+                foreach ($newMembers as $memberId) {
+                    $memberProjectCount = $this->countProjectsForUser($memberId);
+                    UserProjectCountUpdated::dispatch($memberId, $memberProjectCount);
+                }
+
                 // Broadcast cho user bị remove
                 foreach ($removedMembers as $removedId) {
                     broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));

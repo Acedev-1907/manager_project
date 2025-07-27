@@ -18,11 +18,14 @@ import {
 import type { Member, MemberListResponse } from '../../../types/common';
 import { useResponsive } from '../../../helper/useResponsive';
 import { useErrorHandler } from '../../../helper/useErrorHandler';
+import SearchInput from '../../../components/SearchInput.vue';
+import { getCurrentUserId } from '../../../helper/getUserData';
 
 const tabs = ['Members', 'Sent Invitations', 'Received Invitations'];
 const activeTab = ref('Members');
 const showAddModal = ref(false);
 const isLoading = ref(false);
+const searchLoading = ref(false);
 const searchQuery = ref('');
 const friendsList = ref<MemberListResponse>({ data: { data: [] } });
 const sentInvitations = ref<MemberListResponse>({ data: { data: [] } });
@@ -117,7 +120,10 @@ function setTab(tab: string) {
 
 function handleSearchMembers(q: string) {
     searchQuery.value = q;
-    fetchMembers(friendsList, memberCacheRef, isLoading, q);
+    searchLoading.value = true;
+    fetchMembers(friendsList, memberCacheRef, isLoading, q).finally(() => {
+        searchLoading.value = false;
+    });
 }
 
 function handleRemoveMemberWrapper(member: Member) {
@@ -167,11 +173,8 @@ onMounted(() => {
                     </button>
                 </div>
                 <div class="header-actions">
-                    <div class="search-bar">
-                        <i class="bi bi-search search-icon"></i>
-                        <input v-model="searchQuery" placeholder="Search member..."
-                            @input="handleSearchMembers(searchQuery)" />
-                    </div>
+                    <SearchInput v-model="searchQuery" placeholder="Search member..." :loading="searchLoading"
+                        @search="handleSearchMembers" />
                     <button v-if="!isMobile" class="btn btn-primary create-btn" @click="showAddModal = true">
                         <i class="bi bi-plus-circle me-1"></i> Add Member
                     </button>
@@ -270,32 +273,7 @@ onMounted(() => {
     gap: 1.2rem;
 }
 
-.search-bar {
-    position: relative;
-    background: #f3f4f6;
-    border-radius: 2rem;
-    padding: 0.2rem 1.2rem 0.2rem 2.2rem;
-    display: flex;
-    align-items: center;
-    min-width: 260px;
-    max-width: 340px;
-}
 
-.search-bar input {
-    border: none;
-    background: transparent;
-    outline: none;
-    font-size: 1.05rem;
-    width: 100%;
-    padding: 0.4rem 0;
-}
-
-.search-icon {
-    position: absolute;
-    left: 0.8rem;
-    color: #94a3b8;
-    font-size: 1.15rem;
-}
 
 .create-btn {
     font-weight: 500;
@@ -323,10 +301,7 @@ onMounted(() => {
         align-items: stretch;
     }
 
-    .search-bar {
-        min-width: 0;
-        max-width: 100%;
-    }
+
 }
 
 @media (max-width: 600px) {

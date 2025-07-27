@@ -36,7 +36,7 @@ async function submitProject() {
             router.push('/projects');
         }
     } catch (error) {
-        console.error('Error creating project:', error);
+        // Silent error handling
     }
 }
 </script>

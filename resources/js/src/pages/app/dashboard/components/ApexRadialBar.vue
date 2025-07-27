@@ -3,11 +3,10 @@
 </template>
 
 <script>
-import { defineComponent } from 'vue';
+import { defineComponent, watch } from 'vue';
 export default defineComponent({
     name: 'ApexRadialBar',
     props: {
-
         percent: {
             type: Number,
             required: true,
@@ -30,7 +29,7 @@ export default defineComponent({
                     offsetY: 20,
                 },
                 colors: [
-
+                    '#3b82f6', // blue
                 ],
                 plotOptions: {
                     radialBar: {
@@ -80,6 +79,21 @@ export default defineComponent({
             },
             series: [this.$props.percent],
         };
+    },
+    watch: {
+        // Watch prop changes để update chart
+        percent: {
+            handler(newPercent) {
+                this.series = [newPercent];
+                // Update track strokeWidth
+                this.options.plotOptions.radialBar.track.strokeWidth = newPercent + '%';
+            },
+            immediate: true
+        }
+    },
+    mounted() {
+        // Initialize series
+        this.series = [this.percent];
     },
     methods: {
         generateData(baseval, count, yrange) {

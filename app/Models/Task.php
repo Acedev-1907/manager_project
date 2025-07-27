@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Events\TrackProjectProgress;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use  App\Events\TrackCompletedAndPending;
+use App\Events\TrackCompletedAndPending;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class Task extends Model
 {
@@ -21,6 +23,78 @@ class Task extends Model
         'content',
         'status'
     ];
+
+    /**
+     * Model events - tự động dispatch events khi có thay đổi
+     */
+    protected static function booted()
+    {
+        // Khi task được updated (đặc biệt là status thay đổi)
+        static::updated(function ($task) {
+            // Chỉ dispatch event khi status thay đổi
+            if ($task->wasChanged('status')) {
+                try {
+                    // Log::info('Task status changed', [
+                    //     'taskId' => $task->id,
+                    //     'projectId' => $task->projectId,
+                    //     'oldStatus' => $task->getOriginal('status'),
+                    //     'newStatus' => $task->status,
+                    //     'userId' => Auth::id()
+                    // ]);
+
+                    // Dispatch events cho project progress
+                    Task::handleProjectProgress($task->projectId, Auth::id());
+                } catch (\Exception $e) {
+                    Log::error('Error in task updated event', [
+                        'taskId' => $task->id,
+                        'projectId' => $task->projectId,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+        });
+
+        // Khi task được created
+        static::created(function ($task) {
+            try {
+                // Log::info('New task created', [
+                //     'taskId' => $task->id,
+                //     'projectId' => $task->projectId,
+                //     'status' => $task->status,
+                //     'userId' => Auth::id()
+                // ]);
+
+                // Dispatch events cho project progress
+                Task::handleProjectProgress($task->projectId, Auth::id());
+            } catch (\Exception $e) {
+                Log::error('Error in task created event', [
+                    'taskId' => $task->id,
+                    'projectId' => $task->projectId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        });
+
+        // Khi task được deleted
+        static::deleted(function ($task) {
+            try {
+                // Log::info('Task deleted', [
+                //     'taskId' => $task->id,
+                //     'projectId' => $task->projectId,
+                //     'userId' => Auth::id()
+                // ]);
+
+                // Dispatch events cho project progress
+                Task::handleProjectProgress($task->projectId, Auth::id());
+            } catch (\Exception $e) {
+                Log::error('Error in task deleted event', [
+                    'taskId' => $task->id,
+                    'projectId' => $task->projectId,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        });
+    }
 
     public function task_members()
     {
@@ -69,28 +143,48 @@ class Task extends Model
         $count = Task::where('projectId', $projectId)->count();
         return $count;
     }
-    public static function handleProjectProgress($projectId)
+    public static function handleProjectProgress($projectId, $userId = null)
     {
-        $totalTask = Task::countProjectTask($projectId);
-        $totalCompletedTask = Task::countCompletedTask($projectId);
+        try {
+            $totalTask = Task::countProjectTask($projectId);
+            if ($totalTask === 0) {
+                return 0;
+            }
 
-        $progress = Task::aroundNumber(($totalCompletedTask * 100) / $totalTask);
+            $totalCompletedTask = Task::countCompletedTask($projectId);
+            $progress = Task::aroundNumber(($totalCompletedTask * 100) / $totalTask);
 
-        $taskProgress = TaskProgress::where('projectId', $projectId)->first();
-        if (!is_null($taskProgress)) {
+            $taskProgress = TaskProgress::where('projectId', $projectId)->first();
+            if (!is_null($taskProgress)) {
+                $taskProgress->where('projectId', $projectId)
+                    ->update(['progress' => $progress]);
 
-            $taskProgress->where('projectId', $projectId)
-                ->update(['progress' => $progress]);
+                $tasks = Task::countCompletedAndPendingTask($projectId);
 
-            Task::countCompletedAndPendingTask($projectId);
+                // Dispatch events with user information
+                TrackCompletedAndPending::dispatch($tasks, $projectId, null, $userId);
+                TrackProjectProgress::dispatch($progress, $projectId, $userId);
 
-            $tasks = Task::countCompletedAndPendingTask($projectId);
+                // Log::info('Project progress updated', [
+                //     'projectId' => $projectId,
+                //     'progress' => $progress,
+                //     'totalTasks' => $totalTask,
+                //     'completedTasks' => $totalCompletedTask,
+                //     'userId' => $userId
+                // ]);
 
-            TrackCompletedAndPending::dispatch($tasks);
-            TrackProjectProgress::dispatch($progress);
-
-            return $progress;
+                return $progress;
+            }
+        } catch (\Exception $e) {
+            Log::error('Error in handleProjectProgress', [
+                'projectId' => $projectId,
+                'userId' => $userId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
+
+        return 0;
     }
 
     public static function aroundNumber($number)

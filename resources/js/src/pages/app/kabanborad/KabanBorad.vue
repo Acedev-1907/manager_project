@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useGetProjectDetail } from './actions/getProjectDetail';
 import ProjectProgress from './components/ProjectProgress.vue';
@@ -16,6 +16,10 @@ import TaskDetailModal from './components/TaskDetailModal.vue';
 import { makeHttpReq } from '../../../helper/makeHttpReq';
 import { showSuccess, showError, showConfirm } from '../../../helper/alert';
 import { useCacheFetch } from '../../../helper/useCacheFetch';
+import eventBus, { emitForceCacheClear } from '../../../helper/eventBus';
+import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
+import { createDebouncedFunction } from '../../../helper/utils';
+import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
 
 const route = useRoute();
 const router = useRouter();
@@ -29,6 +33,12 @@ const modalVisible = ref(false);
 const showTaskDetail = ref(false);
 const selectedTask = ref<any>(null);
 const menuState = ref<{ column: string, taskId: number } | null>(null);
+
+// Debounced function để clear cache
+const debouncedCacheClear = createDebouncedFunction((eventData: any) => {
+    emitForceCacheClear(eventData.projectId, eventData.reason, eventData.userId);
+}, 1000);
+
 function setMenuState(val: { column: string, taskId: number } | null) {
     menuState.value = val;
 }
@@ -39,6 +49,9 @@ const { refetch } = useCacheFetch(
     taskStore.clearProjectDetailCache
 );
 
+// Initialize global real-time manager
+const globalRealtime = useGlobalRealtimeSetup();
+
 onMounted(async () => {
     // Luôn fetch lại project detail từ API, không lấy từ cache để tránh trường hợp project đã bị xóa
     await getProjectDetail(slug);
@@ -47,9 +60,7 @@ onMounted(async () => {
         setupAllDropListeners();
     }, 100);
 
-    const userDataRaw = localStorage.getItem('userData');
-    const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
-    const userId = userData.id || (userData.user && userData.user.id);
+    const userId = getCurrentUserId();
     if (userId) {
         window.Echo.private(`user.${userId}`)
             .listen('UserRemovedFromProject', (e: { projectId: number }) => {
@@ -59,6 +70,55 @@ onMounted(async () => {
                 }
             });
     }
+
+    // Setup global project listener for current project
+    if (ProjectData.value?.data?.id) {
+        globalRealtime.setupProjectListener(ProjectData.value.data.id);
+
+        // Setup global task listeners for all tasks
+        if (ProjectData.value?.data?.tasks && Array.isArray(ProjectData.value.data.tasks)) {
+            ProjectData.value.data.tasks.forEach((task: any) => {
+                if (task.id) {
+                    globalRealtime.setupTaskListener(task.id);
+                }
+            });
+        }
+    }
+
+    // Listen for force cache clear events
+    eventBus.on('force-cache-clear', async (eventData: any) => {
+        try {
+            // Chỉ xử lý nếu event liên quan đến project hiện tại
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                // Chỉ clear cache nếu không phải do user hiện tại thực hiện
+                if (!isCurrentUser(eventData.userId)) {
+                    debouncedCacheClear({
+                        projectId: ProjectData.value?.data?.id,
+                        reason: 'task-status-changed-by-other-user',
+                        timestamp: Date.now(),
+                        userId: getCurrentUserId()
+                    });
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Listen for task comment events
+    eventBus.on('task-comment-created', async (eventData: any) => {
+        try {
+            // Chỉ refresh nếu comment thuộc về task trong project hiện tại
+            if (ProjectData.value?.data?.tasks && Array.isArray(ProjectData.value.data.tasks)) {
+                const taskExists = ProjectData.value.data.tasks.some((task: any) => task.id === eventData.taskId);
+                if (taskExists) {
+                    await getProjectDetail(slug);
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
 });
 
 async function openTaskModal() {
@@ -133,6 +193,13 @@ async function handleDeleteTask(taskId: number) {
         showError(err?.message || 'Delete task failed!');
     }
 }
+
+// Cleanup event listeners when component is unmounted
+onUnmounted(() => {
+    // Remove eventBus listeners
+    eventBus.off('force-cache-clear');
+    eventBus.off('task-comment-created');
+});
 </script>
 
 <template>

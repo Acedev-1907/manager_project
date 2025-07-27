@@ -97,7 +97,7 @@ router.beforeEach((to, from, next) => {
         token = parsedData?.token;
         isAuthenticated = !!token;
       } catch (parseError) {
-        console.warn("Error parsing userData:", parseError);
+        // Silent error handling
         // Clear invalid data
         localStorage.removeItem("userData");
         isAuthenticated = false;
@@ -120,7 +120,7 @@ router.beforeEach((to, from, next) => {
     // Các trường hợp khác - cho phép
     next();
   } catch (error) {
-    console.error("Router guard error:", error);
+    // Silent error handling
     localStorage.removeItem("userData");
     next({ path: "/login" });
   }

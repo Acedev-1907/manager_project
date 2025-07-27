@@ -20,11 +20,10 @@ export default defineComponent({
                 chart: {
                     id: 'apex-donut',
                 },
-                // labels: this.$props.labels,
                 labels: ['pending', 'completed'],
                 colors: [
-
-
+                    '#f59e0b', // pending - orange
+                    '#10b981', // completed - green
                 ],
                 markers: {
                     size: 5,
@@ -32,13 +31,29 @@ export default defineComponent({
                         sizeOffset: 6,
                     },
                 },
-                //   xaxis: {
-                //     categories: [1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998],
-                //   },
             },
             series: this.$props.task,
-            // series:[40,60]
         };
     },
+    computed: {
+        // Computed property để reactive với prop changes
+        chartSeries() {
+            return this.task;
+        }
+    },
+    watch: {
+        // Watch prop changes để update chart
+        task: {
+            handler(newTasks) {
+                this.series = newTasks;
+            },
+            deep: true,
+            immediate: true
+        }
+    },
+    mounted() {
+        // Initialize series
+        this.series = this.task;
+    }
 });
 </script>

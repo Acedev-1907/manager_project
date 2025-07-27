@@ -22,44 +22,65 @@ export function showErrorResponse(err: unknown) {
 }
 
 // Debounce utility
-export function myDebounce<T extends (...args: any[]) => any>(
+export function createDebouncedFunction<T extends (...args: any[]) => any>(
   func: T,
   delay: number
 ): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout>;
+
   return (...args: Parameters<T>) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => func(...args), delay);
   };
 }
 
-// Throttle utility
-export function myThrottle<T extends (...args: any[]) => any>(
-  func: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let lastCall = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - lastCall >= delay) {
-      lastCall = now;
-      func(...args);
+// Cache utilities
+export const CACHE_TIMEOUT = 1800000; // 30 minutes
+
+export function isCacheValid(timestamp: string | null): boolean {
+  if (!timestamp) return false;
+  const age = Date.now() - parseInt(timestamp);
+  return age < CACHE_TIMEOUT;
+}
+
+export function saveToCache(key: string, data: any) {
+  localStorage.setItem(key, JSON.stringify(data));
+  localStorage.setItem(`${key}_timestamp`, Date.now().toString());
+}
+
+export function getFromCache<T>(key: string): T | null {
+  try {
+    const data = localStorage.getItem(key);
+    const timestamp = localStorage.getItem(`${key}_timestamp`);
+
+    if (!data || !timestamp || !isCacheValid(timestamp)) {
+      return null;
     }
-  };
+
+    return JSON.parse(data);
+  } catch (error) {
+    return null;
+  }
 }
 
-// String utilities
-export function capitalizeFirstLetter(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
+export function clearCache(key: string) {
+  localStorage.removeItem(key);
+  localStorage.removeItem(`${key}_timestamp`);
 }
 
-export function truncateString(str: string, maxLength: number): string {
-  if (str.length <= maxLength) return str;
-  return str.slice(0, maxLength) + "...";
+// Validation utilities
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+export function isValidPhone(phone: string): boolean {
+  const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+  return phoneRegex.test(phone);
 }
 
 // Date utilities
-export function formatDate(date: Date | string): string {
+export function formatDate(date: string | Date): string {
   const d = new Date(date);
   return d.toLocaleDateString("en-US", {
     year: "numeric",
@@ -68,7 +89,7 @@ export function formatDate(date: Date | string): string {
   });
 }
 
-export function formatDateTime(date: Date | string): string {
+export function formatDateTime(date: string | Date): string {
   const d = new Date(date);
   return d.toLocaleString("en-US", {
     year: "numeric",
@@ -79,37 +100,26 @@ export function formatDateTime(date: Date | string): string {
   });
 }
 
-// Validation utilities
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+// String utilities
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + "...";
 }
 
-export function isValidPhoneNumber(phone: string): boolean {
-  const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
-  return phoneRegex.test(phone);
+export function capitalizeFirst(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-// Object utilities
-export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== "object") {
-    return obj;
-  }
+// Array utilities
+export function uniqueArray<T>(array: T[]): T[] {
+  return [...new Set(array)];
+}
 
-  if (obj instanceof Date) {
-    return new Date(obj.getTime()) as unknown as T;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => deepClone(item)) as unknown as T;
-  }
-
-  const cloned = {} as T;
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      cloned[key] = deepClone(obj[key]);
-    }
-  }
-
-  return cloned;
+export function groupBy<T>(array: T[], key: keyof T): Record<string, T[]> {
+  return array.reduce((groups, item) => {
+    const group = String(item[key]);
+    groups[group] = groups[group] || [];
+    groups[group].push(item);
+    return groups;
+  }, {} as Record<string, T[]>);
 }

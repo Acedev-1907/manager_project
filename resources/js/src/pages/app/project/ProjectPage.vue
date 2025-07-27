@@ -14,16 +14,20 @@ import FabButton from '../../../components/FabButton.vue';
 import { deleteProject } from './actions/deleteProject';
 import { showConfirm } from '../../../helper/alert';
 import SearchInput from '../../../components/SearchInput.vue';
-import { useCacheFetch } from '../../../helper/useCacheFetch';
 import { useDashboardStore } from '../dashboard/store/dashboardStore';
 import { useGetPinnedProject } from '../dashboard/actions/GetPinnedProject';
-import eventBus from '../../../helper/eventBus';
+import eventBus, { replayRecentEvents, getRecentEvents } from '../../../helper/eventBus';
+import { useProjectRealtime } from '../../../helper/useProjectRealtime';
+import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
+import { createDebouncedFunction } from '../../../helper/utils';
+import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
 
 const { getPinnedProject: getPinnedProjectForCache, project: pinnedProjectForCache } = useGetPinnedProject();
 
 const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
 const tableLoading = ref(false);
+const searchLoading = ref(false);
 const router = useRouter();
 const { pinnendProject } = usepinnendProject();
 const { getPinnedProject, project: pinnedProject } = useGetPinnedProject();
@@ -32,8 +36,29 @@ const isEdit = ref(false);
 const loading = ref(false);
 const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
-const projectCache = ref<Record<string, any>>(JSON.parse(localStorage.getItem('projectCache') || '{}'));
 
+// Cache management
+const projectCache = ref<Record<string, any>>({});
+
+// Initialize cache from localStorage with error handling
+try {
+    const cachedData = localStorage.getItem('projectCache');
+    if (cachedData && cachedData !== '0' && cachedData !== 'null') {
+        const parsed = JSON.parse(cachedData);
+        if (parsed && typeof parsed === 'object') {
+            projectCache.value = parsed;
+        }
+    }
+} catch (error) {
+    projectCache.value = {};
+}
+
+// Initialize global real-time manager
+const globalRealtime = useGlobalRealtimeSetup();
+
+
+
+// Auto-save cache to localStorage
 watch(projectCache, (val) => {
     localStorage.setItem('projectCache', JSON.stringify(val));
 }, { deep: true });
@@ -43,57 +68,153 @@ const userDataRaw = localStorage.getItem('userData');
 const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
 const currentUserId = userData.id || (userData.user && userData.user.id) || null;
 
+// Function để setup listeners cho từng project với global real-time manager
+async function setupProjectListeners() {
+    try {
+        const userProjects = projectData.value?.data?.data || [];
+
+        // Lấy danh sách projects đang được listen
+        const activeProjects = globalRealtime.getActiveProjectListeners();
+
+        // Chỉ setup cho projects chưa được listen
+        const projectsToSetup = userProjects.filter(p => !activeProjects.includes(p.id));
+
+        if (projectsToSetup.length > 0) {
+            globalRealtime.setupProjectListeners(projectsToSetup.map(p => p.id));
+        }
+    } catch (error) {
+        // Silent error handling
+    }
+}
+
+// Page visibility listener để refresh khi user quay lại tab
+let visibilityTimeout: any = null;
+const handleVisibilityChange = async () => {
+    if (!document.hidden) {
+        // Debounce để tránh gọi nhiều lần
+        if (visibilityTimeout) {
+            clearTimeout(visibilityTimeout);
+        }
+
+        visibilityTimeout = setTimeout(async () => {
+            // Refresh data ngay lập tức khi user quay lại tab - không hiển thị loading
+            projectCache.value = {};
+            localStorage.setItem('projectCache', '{}');
+            await fetchProjects(1, query.value, false); // false = không hiển thị loading
+        }, 100); // Debounce 100ms
+    }
+};
+
 // Lắng nghe eventBus để reload project khi có event real-time
-onMounted(() => {
-    eventBus.on('new-project-for-members', (eventProjectRaw) => {
-        const eventProject = (eventProjectRaw as any).project as ProjectType;
-        // Thêm project mới vào đầu danh sách nếu chưa có
-        if (projectData.value?.data?.data) {
-            const exists = projectData.value.data.data.some(p => p.id === eventProject.id);
-            if (!exists) {
-                projectData.value.data.data.unshift(eventProject);
-                if ('total' in projectData.value.data && typeof projectData.value.data.total === 'number') {
-                    (projectData.value.data as any).total += 1;
+onMounted(async () => {
+    // Fetch projects data (sử dụng cache bình thường)
+    await fetchProjects(1, query.value, true);
+
+    // Setup global project listeners
+    setupProjectListeners();
+
+    // Replay recent events that might have been missed
+    const currentProjectIds = projectData.value?.data?.data?.map(p => p.id) || [];
+
+    // Replay recent force-cache-clear events for current projects
+    currentProjectIds.forEach(projectId => {
+        replayRecentEvents('force-cache-clear', projectId);
+    });
+
+    // Smart cache strategy: Chỉ clear cache nếu có recent events
+    const recentEvents = getRecentEvents('force-cache-clear');
+    if (recentEvents.length > 0) {
+        projectCache.value = {};
+        localStorage.setItem('projectCache', '{}');
+        // Clear timestamps
+        Object.keys(localStorage).forEach(key => {
+            if (key.includes('project_page_') && key.includes('_timestamp')) {
+                localStorage.removeItem(key);
+            }
+        });
+        // Fetch fresh data
+        await fetchProjects(1, query.value, false, true);
+    }
+
+    // Listen for force cache clear events
+    eventBus.on('force-cache-clear', async (eventData: any) => {
+        try {
+            // Debug: Log current projects
+            const currentProjectIds = projectData.value?.data?.data?.map(p => p.id) || [];
+
+            // Chỉ refresh nếu event liên quan đến project trong danh sách hiện tại
+            if (eventData?.projectId && currentProjectIds.includes(eventData.projectId)) {
+                // Nếu là optimistic update từ current user, refresh ngay lập tức
+                if (isCurrentUser(eventData.userId) && eventData.reason === 'task-status-changed-by-drag') {
+                    // Clear cache hoàn toàn và refresh ngay lập tức
+                    projectCache.value = {};
+                    localStorage.setItem('projectCache', '{}');
+                    // Clear tất cả timestamps
+                    Object.keys(localStorage).forEach(key => {
+                        if (key.includes('project_page_') && key.includes('_timestamp')) {
+                            localStorage.removeItem(key);
+                        }
+                    });
+                    await fetchProjects(1, query.value, false, true); // forceRefresh = true
+                } else if (!isCurrentUser(eventData.userId)) {
+                    // Chỉ clear cache cho project cụ thể, không clear toàn bộ
+                    const cacheKey = `project_page_1_${query.value}`;
+                    delete projectCache.value[cacheKey];
+                    localStorage.removeItem(`${cacheKey}_timestamp`);
+                    await fetchProjects(1, query.value, false, false); // Không force refresh
                 }
             }
+        } catch (error) {
+            // Silent error handling
         }
     });
-    eventBus.on('user-removed-from-project', async () => {
-        Object.keys(projectCache.value).forEach(key => delete projectCache.value[key]);
-        await fetchProjects(1, query.value, true);
-    });
+
+    // Listen for page visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
-const { getOrFetch, refetch } = useCacheFetch(
-    projectCache.value,
-    (key, data) => { projectCache.value[key] = data; },
-    (key) => { if (key) delete projectCache.value[key]; else projectCache.value = {}; }
-);
-
-async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true) {
+async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true, forceRefresh = false) {
     const cacheKey = `project_page_${page}_${queryStr}`;
-    if (projectCache.value[cacheKey]) {
-        projectData.value = projectCache.value[cacheKey];
-        isLoading.value = false;
-        tableLoading.value = false;
-        return;
+
+    // Nếu forceRefresh = true, bỏ qua cache hoàn toàn
+    const currentTime = Date.now();
+    if (!forceRefresh) {
+        // Tăng thời gian cache lên 30 giây để tối ưu cho navigation
+        const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+        const cacheAge = cacheTimestamp ? currentTime - parseInt(cacheTimestamp) : Infinity;
+        const isCacheValid = cacheAge < 30000; // 30 giây thay vì 5 giây
+
+        // Kiểm tra cache
+        if (projectCache.value[cacheKey] && isCacheValid) {
+            projectData.value = projectCache.value[cacheKey];
+            isLoading.value = false;
+            tableLoading.value = false;
+            return;
+        }
     }
-    if (showLoadingPage) isLoading.value = true;
-    else tableLoading.value = true;
+
+    if (showLoadingPage) {
+        isLoading.value = true;
+    }
+    // Không set tableLoading khi refresh/clear cache để tránh hiển thị loading trên search input
+
     try {
-        await getOrFetch(cacheKey, async () => {
-            await getProjects(page, queryStr);
-            return projectData.value;
-        }, (data) => {
-            projectData.value = data;
-        });
+        // Fetch data trực tiếp
+        await getProjects(page, queryStr);
+
+        // Lưu vào cache
+        projectCache.value[cacheKey] = projectData.value;
+        localStorage.setItem(`${cacheKey}_timestamp`, currentTime.toString());
+
+        // Update localStorage
+        localStorage.setItem('projectCache', JSON.stringify(projectCache.value));
+
     } catch (e) {
         isLoading.value = false;
-        tableLoading.value = false;
         throw e;
     }
+
     isLoading.value = false;
-    tableLoading.value = false;
 }
 
 async function handlePinProject(projectId: number) {
@@ -125,12 +246,7 @@ async function handleDeleteProject(projectId: number) {
     try {
         await deleteProject(projectId);
         projectCache.value = {}; // Xóa toàn bộ cache project
-        await refetch(`project_page_1_${query.value}`, async () => {
-            await getProjects(1, query.value);
-            return projectData.value;
-        }, (data) => {
-            projectData.value = data;
-        });
+        await fetchProjects(1, query.value, true);
     } catch (e: any) {
         alert(e?.message || 'Delete project failed!');
     }
@@ -166,37 +282,63 @@ async function handleSubmitProject(data: ProjectInputType) {
     loading.value = false;
     showProjectModal.value = false;
     projectCache.value = {}; // Xóa toàn bộ cache project
-    await refetch(`project_page_1_${query.value}`, async () => {
-        await getProjects(1, query.value);
-        return projectData.value;
-    }, (data) => {
-        projectData.value = data;
-    });
-    // setupEchoListener(userId.value); // Removed as per edit hint
+    await fetchProjects(1, query.value, false); // false = không hiển thị loading page
 }
 
 const handleSearch = async (searchQuery: string) => {
     query.value = searchQuery;
-    await fetchProjects(1, searchQuery, false);
+    searchLoading.value = true;
+    try {
+        await fetchProjects(1, searchQuery, false); // false = không hiển thị loading
+    } finally {
+        searchLoading.value = false;
+    }
 };
 
 onMounted(async () => {
-    await fetchProjects();
+    // Kiểm tra cache trước khi fetch data
+    const cacheKey = `project_page_1_`;
+    const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
+    const currentTime = Date.now();
+    const cacheAge = cacheTimestamp ? currentTime - parseInt(cacheTimestamp) : Infinity;
+    const isCacheValid = cacheAge < 30000; // 30 giây thay vì 5 giây
+
+    // Chỉ fetch nếu không có cache hoặc cache đã hết hạn
+    if (!projectCache.value[cacheKey] || !isCacheValid) {
+        await fetchProjects();
+    } else {
+        // Sử dụng cache data
+        projectData.value = projectCache.value[cacheKey];
+        isLoading.value = false;
+    }
+
+    // Setup listeners cho từng project sau khi đã load projects
+    await setupProjectListeners();
+
     projectStore.edit = false;
     projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
-    watch(() => projectData.value, (val) => {
-        if (val && val.current_page) {
-            localStorage.setItem(
-                `project_page_${val.current_page}`,
-                JSON.stringify(val)
-            );
+
+    // Watch for project data changes and re-setup listeners if needed
+    watch(() => projectData.value?.data?.data, async (newProjects, oldProjects) => {
+        if (newProjects && newProjects.length > 0) {
+            // Chỉ re-setup nếu danh sách project thực sự thay đổi
+            const newProjectIds = newProjects.map(p => p.id).sort().join(',');
+            const oldProjectIds = oldProjects?.map(p => p.id).sort().join(',') || '';
+
+            if (newProjectIds !== oldProjectIds) {
+                await setupProjectListeners();
+            }
         }
-    }, { immediate: true, deep: true });
+    }, { deep: true });
 });
 
-// Thêm leave kênh khi component bị unmount để tránh nhận event trùng
+// Cleanup event listeners when component is unmounted
 onUnmounted(() => {
-    // Removed as per edit hint
+    // Remove eventBus listeners
+    eventBus.off('force-cache-clear');
+
+    // Remove page visibility listener
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
 
@@ -205,7 +347,7 @@ onUnmounted(() => {
         containerStyle="padding:1rem 0 1rem 0; position:relative;">
         <template #action>
             <div class="main-action-bar">
-                <SearchInput v-model="query" placeholder="Search project..." :loading="tableLoading"
+                <SearchInput v-model="query" placeholder="Search project..." :loading="searchLoading"
                     @search="handleSearch" />
                 <button class="btn btn-primary create-btn d-none d-md-block" @click="openCreateProject">
                     <i class="bi bi-plus-circle me-1"></i> Create Project

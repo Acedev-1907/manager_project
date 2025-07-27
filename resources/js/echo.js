@@ -5,7 +5,9 @@ window.Pusher = Pusher;
 
 function getCurrentToken() {
     const userDataRaw = localStorage.getItem('userData');
-    return userDataRaw ? JSON.parse(userDataRaw)?.token : '';
+    const token = userDataRaw ? JSON.parse(userDataRaw)?.token : '';
+
+    return token;
 }
 
 export function initEcho() {
@@ -13,6 +15,10 @@ export function initEcho() {
         window.Echo.disconnect();
         window.Echo = null;
     }
+
+    const token = getCurrentToken();
+
+
     window.Echo = new Echo({
         // broadcaster: 'reverb',
         // key: import.meta.env.VITE_REVERB_APP_KEY,
@@ -28,7 +34,7 @@ export function initEcho() {
         encrypted: true,
         auth: {
             headers: {
-                Authorization: `Bearer ${getCurrentToken()}`,
+                Authorization: `Bearer ${token}`,
                 Accept: 'application/json'
             }
         }

@@ -1,6 +1,101 @@
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { taskStore } from "../store/kabanStore";
 import { getAvatarSrc } from "../../../../helper/avatar";
+import { emitForceCacheClear } from "../../../../helper/eventBus";
+import { getCurrentUserId } from "../../../../helper/getUserData";
+
+// Optimistic UI update - cập nhật UI ngay lập tức
+export function updateTaskOptimistically(
+  taskId: number,
+  newStatus: string,
+  projectData: any
+) {
+  if (!projectData?.value?.data?.tasks) {
+    return;
+  }
+
+  // Tìm task và cập nhật status ngay lập tức
+  const tasks = projectData.value.data.tasks;
+  const taskIndex = tasks.findIndex((t: any) => t.id === taskId);
+
+  if (taskIndex !== -1) {
+    // Cập nhật task với reactive trigger
+    const updatedTask = { ...tasks[taskIndex] };
+    updatedTask.status = parseInt(newStatus);
+    updatedTask.updated_at = new Date().toISOString();
+
+    // Replace task trong array để trigger reactive update
+    tasks.splice(taskIndex, 1, updatedTask);
+  }
+}
+
+// Debounced API call để tránh gọi quá nhiều
+let apiCallTimeout: any = null;
+export function debouncedChangeTaskStatus(
+  taskId: number,
+  projectId: number,
+  endPoint: string,
+  newStatus: string,
+  projectData: any
+) {
+  // Clear timeout cũ nếu có
+  if (apiCallTimeout) {
+    clearTimeout(apiCallTimeout);
+  }
+
+  // Cập nhật UI ngay lập tức (optimistic)
+  updateTaskOptimistically(taskId, newStatus, projectData);
+
+  // Emit event ngay lập tức để các page khác cập nhật
+  emitForceCacheClear(
+    projectId,
+    "task-status-changed-by-drag",
+    getCurrentUserId()
+  );
+
+  // Debounce API call (500ms)
+  apiCallTimeout = setTimeout(async () => {
+    try {
+      await changeTaskStatus(taskId, projectId, endPoint);
+    } catch (error) {
+      // Silent error handling
+    }
+  }, 500);
+}
+
+export async function changeTaskStatus(
+  taskId: number,
+  projectId: number,
+  endPoint: string
+) {
+  try {
+    await makeHttpReq<changeTaskInput, { message: string }>(endPoint, "POST", {
+      taskId: taskId,
+      projectId: projectId,
+    });
+
+    // Emit event để dashboard biết task đã được cập nhật
+    emitForceCacheClear(
+      projectId,
+      "task-status-changed-by-drag",
+      getCurrentUserId()
+    );
+  } catch (error) {
+    // Silent error handling
+  }
+}
+
+export function cleanupDrag() {
+  if (apiCallTimeout) {
+    clearTimeout(apiCallTimeout);
+    apiCallTimeout = null;
+  }
+}
+
+interface changeTaskInput {
+  taskId: number;
+  projectId: number;
+}
 
 export function useDragTask(
   fn: (slug: string) => Promise<void>,
@@ -20,26 +115,6 @@ export function useDragTask(
   let originalOpacity = "";
   let ghostElement: HTMLElement | null = null;
   let ghostAnimationFrame: number | null = null;
-
-  // Hàm cập nhật trạng thái task trên UI ngay lập tức
-  function updateTaskStatusInUI(taskId: number, newStatus: number) {
-    if (!ProjectData?.value?.data?.tasks) return;
-    const tasks = ProjectData.value.data.tasks;
-    const idx = tasks.findIndex((t: any) => t.id === taskId);
-    if (idx !== -1) {
-      const [task] = tasks.splice(idx, 1);
-      task.status = newStatus;
-      tasks.unshift(task);
-
-      // Tính lại progress (giả sử progress là % task hoàn thành)
-      const total = tasks.length;
-      const completed = tasks.filter((t: any) => t.status === 2).length; // 2 = COMPLETED
-      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-      if (ProjectData.value.data.task_progress) {
-        ProjectData.value.data.task_progress.progress = progress;
-      }
-    }
-  }
 
   // Đảm bảo chỉ gắn listener một lần cho mỗi cột
   const attachedColumns = new Set<HTMLElement>();
@@ -68,16 +143,24 @@ export function useDragTask(
     targetColumn.addEventListener("drop", function (event) {
       event.preventDefault();
       targetColumn.classList.remove("hovered");
+
       const taskId = taskStore.draggedTaskId;
       const projectId = taskStore.draggedProjectId;
+
       if (taskId && projectId) {
         // Kiểm tra nếu status đã đúng thì không làm gì
         const task = ProjectData?.value?.data?.tasks?.find(
           (t: any) => t.id === taskId
         );
+
         if (task && task.status !== newStatus) {
-          updateTaskStatusInUI(taskId, newStatus);
-          changeTaskStatus(taskId, projectId, endpoint);
+          debouncedChangeTaskStatus(
+            taskId,
+            projectId,
+            endpoint,
+            newStatus.toString(),
+            ProjectData
+          );
         }
       }
       taskStore.clearDraggedTask();
@@ -107,8 +190,13 @@ export function useDragTask(
                 (t: any) => t.id === taskId
               );
               if (task && task.status !== newStatus) {
-                updateTaskStatusInUI(taskId, newStatus);
-                changeTaskStatus(taskId, projectId, endpoint);
+                debouncedChangeTaskStatus(
+                  taskId,
+                  projectId,
+                  endpoint,
+                  newStatus.toString(),
+                  ProjectData
+                );
               }
             }
             taskStore.clearDraggedTask();
@@ -169,6 +257,7 @@ export function useDragTask(
     const dragEvent = event as DragEvent;
     const target = dragEvent.target as HTMLElement;
     const taskCard = target.closest(".task-card") as HTMLElement;
+
     if (taskCard) {
       const taskId = parseInt(taskCard.dataset.taskId || "0");
       const projectId = parseInt(taskCard.dataset.projectId || "0");
@@ -326,8 +415,13 @@ export function useDragTask(
             (t: any) => t.id === taskId
           );
           if (task && task.status !== columnStatus) {
-            updateTaskStatusInUI(taskId, columnStatus);
-            changeTaskStatus(taskId, projectId, columnEndpoint);
+            debouncedChangeTaskStatus(
+              taskId,
+              projectId,
+              columnEndpoint,
+              columnStatus.toString(),
+              ProjectData
+            );
           }
         }
       }
@@ -382,6 +476,12 @@ export function useDragTask(
     });
 
     taskStore.clearDraggedTask();
+
+    // Clear API call timeout if exists
+    if (apiCallTimeout) {
+      clearTimeout(apiCallTimeout);
+      apiCallTimeout = null;
+    }
   }
 
   function getMemberName(member: any) {
@@ -540,22 +640,4 @@ export function useDragTask(
     setupAllDropListeners,
     setupTaskCardDragListeners,
   };
-}
-
-export type changeTaskInput = {
-  taskId: number;
-  projectId: number;
-};
-
-export async function changeTaskStatus(
-  taskId: number,
-  projectId: number,
-  endPoint: string
-) {
-  try {
-    await makeHttpReq<changeTaskInput, { message: string }>(endPoint, "POST", {
-      taskId: taskId,
-      projectId: projectId,
-    });
-  } catch (error) {}
 }

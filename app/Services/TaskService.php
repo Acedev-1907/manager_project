@@ -59,11 +59,12 @@ class TaskService
     {
         $taskId = $data['taskId'];
         $projectId = $data['projectId'];
+        $userId = $data['userId'] ?? null;
 
         $updated = $this->taskRepository->updateById($taskId, ['status' => $status]);
 
         if ($updated) {
-            Task::handleProjectProgress($projectId);
+            Task::handleProjectProgress($projectId, $userId);
         }
 
         return $updated;

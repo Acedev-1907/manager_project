@@ -24,7 +24,35 @@ export function getUserData(): LoginResponseType | null {
 export function setUserData(userData: LoginResponseType): void {
   try {
     localStorage.setItem("userData", JSON.stringify(userData));
+  } catch (error) {}
+}
+
+// Helper function để lấy current user ID
+export function getCurrentUserId(): string | number | null {
+  try {
+    const userData = getUserData();
+    if (!userData) return null;
+
+    return userData.user?.id || null;
   } catch (error) {
-    // console.error("Error saving user data to localStorage:", error);
+    return null;
   }
+}
+
+// Helper function để lấy current user data với fallback
+export function getCurrentUserData(): any {
+  try {
+    const userData = getUserData();
+    if (!userData) return {};
+
+    return userData;
+  } catch (error) {
+    return {};
+  }
+}
+
+// Helper function để kiểm tra user có phải là current user không
+export function isCurrentUser(userId: string | number | null): boolean {
+  const currentUserId = getCurrentUserId();
+  return currentUserId !== null && currentUserId === userId;
 }

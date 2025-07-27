@@ -48,7 +48,8 @@ async function createProject() {
   const data = await makeHttpReq<ProjectInputType, ProjectResponseType>(
     "projects",
     "POST",
-    projectStore.projectInput
+    projectStore.projectInput,
+    { showGlobalLoading: false }
   );
   return data;
 }
@@ -56,7 +57,8 @@ async function updateProject() {
   const data = await makeHttpReq<ProjectInputType, ProjectResponseType>(
     "projects",
     "PUT",
-    projectStore.projectInput
+    projectStore.projectInput,
+    { showGlobalLoading: false }
   );
   projectStore.edit = false;
 

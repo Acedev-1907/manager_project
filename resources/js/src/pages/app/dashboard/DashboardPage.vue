@@ -1,41 +1,253 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, onUnmounted, watch } from 'vue';
 import { useGetPinnedProject } from './actions/GetPinnedProject';
 import ApexDonut from './components/ApexDonut.vue';
 import ApexRadialBar from './components/ApexRadialBar.vue';
 import { useGetTotalProject } from './actions/countProject';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import { useDashboardStore } from '../dashboard/store/dashboardStore';
+import eventBus, { replayRecentEvents, getRecentEvents } from '../../../helper/eventBus';
+import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
+import { createDebouncedFunction } from '../../../helper/utils';
+import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
 
 const { project, getPinnedProject } = useGetPinnedProject()
 const { countProject, getTotalProject } = useGetTotalProject()
 const isLoading = ref(true);
-
 const dashboardStore = useDashboardStore();
+const globalRealtime = useGlobalRealtimeSetup();
 
-onMounted(async () => {
-    isLoading.value = true;
+// Cache management
+const dashboardCache = ref<Record<string, any>>({});
+const CACHE_TIMEOUT = 1800000; // 30 minutes
 
-    // Kiểm tra nếu không có dữ liệu pinned project thì gọi API
-    if (!dashboardStore.pinnedProject || typeof dashboardStore.pinnedProject === 'string') {
+// Initialize cache from localStorage
+const initializeCache = () => {
+    try {
+        const cachedData = localStorage.getItem('dashboardCache');
+        if (cachedData && cachedData !== '0' && cachedData !== 'null') {
+            const parsed = JSON.parse(cachedData);
+            if (parsed && typeof parsed === 'object') {
+                dashboardCache.value = parsed;
+            }
+        }
+    } catch (error) {
+        dashboardCache.value = {};
+    }
+};
+
+// Auto-save cache to localStorage
+watch(dashboardCache, (val) => {
+    localStorage.setItem('dashboardCache', JSON.stringify(val));
+}, { deep: true });
+
+// Helper function to check cache validity
+const isCacheValid = (timestamp: string | null): boolean => {
+    if (!timestamp) return false;
+    const age = Date.now() - parseInt(timestamp);
+    return age < CACHE_TIMEOUT;
+};
+
+// Helper function to setup project listeners
+const setupProjectListeners = (projectData: any) => {
+    if (!projectData?.id) return;
+
+    globalRealtime.setupProjectListener(projectData.id);
+
+    if (projectData?.tasks && Array.isArray(projectData.tasks)) {
+        projectData.tasks.forEach((task: any) => {
+            if (task.id) {
+                globalRealtime.setupTaskListener(task.id);
+            }
+        });
+    }
+};
+
+// Helper function to save to cache
+const saveToCache = (key: string, data: any) => {
+    dashboardCache.value[key] = data;
+    localStorage.setItem(`${key}_timestamp`, Date.now().toString());
+};
+
+// Helper function to clear dashboard cache
+const clearDashboardCache = () => {
+    dashboardCache.value = {};
+    localStorage.setItem('dashboardCache', '{}');
+    localStorage.removeItem('pinned_project_timestamp');
+    localStorage.removeItem('count_project_timestamp');
+};
+
+// Debounced function to refresh pinned project
+const debouncedRefreshPinnedProject = createDebouncedFunction(async () => {
+    try {
         await getPinnedProject();
         dashboardStore.setPinnedProject(project.value);
-    } else {
-        project.value = dashboardStore.pinnedProject;
+        saveToCache('pinned_project', project.value);
+        setupProjectListeners(project.value);
+    } catch (error) {
+        // Silent error handling
     }
+}, 1000);
 
-    // Kiểm tra nếu không có dữ liệu count project thì gọi API
-    if (!dashboardStore.countProject || typeof dashboardStore.countProject === 'string') {
-        await getTotalProject();
-        dashboardStore.setCountProject(countProject.value);
-    } else {
-        countProject.value = dashboardStore.countProject;
+// Setup count project listener
+const setupCountProjectListener = () => {
+    try {
+        const currentUserId = getCurrentUserId();
+        if (currentUserId) {
+            window.Echo.private(`user.${currentUserId}`).listen(
+                "UserProjectCountUpdated",
+                (e: { countProject: number; userId: number }) => {
+                    const newCount = { count: e.countProject };
+                    dashboardStore.setCountProject(newCount);
+                    saveToCache('count_project', newCount);
+                }
+            );
+        }
+    } catch (error) {
+        // Silent error handling
     }
+};
+
+// Handle pinned project data
+const handlePinnedProjectData = async (hasValidCache: boolean) => {
+    if (hasValidCache) {
+        const cachedData = dashboardCache.value['pinned_project'];
+        dashboardStore.setPinnedProject(cachedData);
+        project.value = cachedData;
+        setupProjectListeners(project.value);
+
+        // Replay recent events if any
+        if (project.value?.id) {
+            const recentEvents = getRecentEvents('force-cache-clear', project.value.id);
+            if (recentEvents.length > 0) {
+                replayRecentEvents('force-cache-clear', project.value.id);
+            }
+        }
+    } else {
+        await getPinnedProject();
+        dashboardStore.setPinnedProject(project.value);
+        saveToCache('pinned_project', project.value);
+        setupProjectListeners(project.value);
+
+        // Replay recent events if any
+        if (project.value?.id) {
+            const recentEvents = getRecentEvents('force-cache-clear', project.value.id);
+            if (recentEvents.length > 0) {
+                replayRecentEvents('force-cache-clear', project.value.id);
+            }
+        }
+    }
+};
+
+// Handle count project data
+const handleCountProjectData = async (hasValidCache: boolean) => {
+    if (hasValidCache) {
+        const cachedData = dashboardCache.value['count_project'];
+        dashboardStore.setCountProject(cachedData);
+    } else {
+        try {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Count project API timeout')), 10000);
+            });
+
+            await Promise.race([getTotalProject(), timeoutPromise]);
+            dashboardStore.setCountProject(countProject.value);
+            saveToCache('count_project', countProject.value);
+        } catch (error) {
+            const defaultCount = { count: 0 };
+            countProject.value = defaultCount;
+            dashboardStore.setCountProject(defaultCount);
+            saveToCache('count_project', defaultCount);
+        }
+    }
+};
+
+// Setup event listeners
+const setupEventListeners = () => {
+    // Count project updated events
+    eventBus.on('count-project-updated', (newCount: any) => {
+        dashboardCache.value['count_project'] = newCount;
+        dashboardStore.setCountProject(newCount);
+    });
+
+    // Force cache clear events
+    eventBus.on('force-cache-clear', async (eventData: any) => {
+        try {
+            if (project.value?.id && eventData?.projectId === project.value.id) {
+                if (isCurrentUser(eventData.userId) && eventData.reason === 'task-status-changed-by-drag') {
+                    clearDashboardCache();
+                    await getPinnedProject();
+                    dashboardStore.setPinnedProject(project.value);
+                } else {
+                    debouncedRefreshPinnedProject();
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Task comment events
+    eventBus.on('task-comment-created', async (eventData: any) => {
+        try {
+            if (project.value?.tasks && Array.isArray(project.value.tasks)) {
+                const taskExists = project.value.tasks.some((task: any) => task.id === eventData.taskId);
+                if (taskExists) {
+                    debouncedRefreshPinnedProject();
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+};
+
+// Handle page visibility change
+const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+        debouncedRefreshPinnedProject();
+    }
+};
+
+onMounted(async () => {
+    // Initialize cache
+    initializeCache();
+
+    // Check cache validity
+    const pinnedProjectTimestamp = localStorage.getItem('pinned_project_timestamp');
+    const countProjectTimestamp = localStorage.getItem('count_project_timestamp');
+
+    const hasValidPinnedProjectCache = dashboardCache.value['pinned_project'] && isCacheValid(pinnedProjectTimestamp);
+    const hasValidCountProjectCache = dashboardCache.value['count_project'] && isCacheValid(countProjectTimestamp);
+
+    // Set loading based on cache validity
+    isLoading.value = !(hasValidPinnedProjectCache && hasValidCountProjectCache);
+
+    // Handle data
+    await handlePinnedProjectData(hasValidPinnedProjectCache);
+    await handleCountProjectData(hasValidCountProjectCache);
+
+    // Setup listeners
+    setupCountProjectListener();
+    setupEventListeners();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     isLoading.value = false;
+
+    // Fallback timeout
+    setTimeout(() => {
+        if (isLoading.value === true) {
+            isLoading.value = false;
+        }
+    }, 5000);
 });
 
-
+onUnmounted(() => {
+    eventBus.off('force-cache-clear');
+    eventBus.off('task-comment-created');
+    eventBus.off('count-project-updated');
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
 </script>
 
 <style scoped>
@@ -204,7 +416,7 @@ onMounted(async () => {
 
 <template>
     <div class="dashboard-container">
-        <LoadingPage v-if="isLoading" />
+        <LoadingPage :visible="isLoading" />
         <h2 class="dashboard-title">Dashboard</h2>
         <div class="dashboard-main-row">
             <div class="dashboard-main-col">
@@ -213,7 +425,7 @@ onMounted(async () => {
                         <b>Total Projects</b>
                     </div>
                     <div class="card-body">
-                        <div class="dashboard-number">{{ countProject?.count }}</div>
+                        <div class="dashboard-number">{{ dashboardStore.countProject?.count }}</div>
                     </div>
                 </div>
             </div>

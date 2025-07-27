@@ -4,7 +4,7 @@
             <svg class="spinner" viewBox="0 0 50 50">
                 <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5" />
             </svg>
-            <div class="loading-text">Wait a moment...</div>
+            <div class="loading-text">{{ props.text }}</div>
         </div>
     </div>
 </template>
@@ -14,20 +14,28 @@ const props = defineProps({
     visible: {
         type: Boolean,
         default: true
+    },
+    text: {
+        type: String,
+        default: 'Wait a moment...'
     }
 });
 </script>
 <style scoped>
 .loading-overlay {
-    position: absolute;
-    z-index: 20;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.85);
+    position: fixed;
+    top: 62px;
+    /* Chiều cao của navbar */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    background: rgba(255, 255, 255, 0.95);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: opacity 0.3s;
-    min-height: 100%;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(2px);
 }
 
 .loader {
@@ -35,14 +43,15 @@ const props = defineProps({
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    min-height: 100vh;
+    text-align: center;
+    padding: 2rem;
 }
 
 .spinner {
     animation: spin 1s linear infinite;
-    width: 64px;
-    height: 64px;
+    width: 80px;
+    height: 80px;
+    margin-bottom: 1rem;
 }
 
 .path {
@@ -75,35 +84,27 @@ const props = defineProps({
 }
 
 .loading-text {
-    margin-top: 18px;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: #2470dc;
     letter-spacing: 0.08em;
-    text-shadow: 0 2px 8px #b3c6e0;
+    text-shadow: 0 2px 8px rgba(36, 112, 220, 0.2);
+    margin: 0;
 }
 
 @media (max-width: 768px) {
     .loading-overlay {
-        position: fixed !important;
-        left: 0;
-        top: 62px;
-        width: 100vw;
-        height: calc(100vh - 62px);
-        min-height: unset;
-        border-radius: 0 !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 20000 !important;
+        top: 60px;
+        /* Chiều cao navbar mobile */
     }
 
-    .loader {
-        min-height: calc(100vh - 62px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100vw;
+    .spinner {
+        width: 60px;
+        height: 60px;
+    }
+
+    .loading-text {
+        font-size: 1.25rem;
     }
 }
 </style>

@@ -46,7 +46,11 @@ class TaskController extends Controller
 
         [$newStatus, $nameStatus] = $transitions[$transition];
 
-        $checkUpdate = $this->taskService->updateTaskStatus($req->all(), $newStatus);
+        // Add userId to the data
+        $data = $req->all();
+        $data['userId'] = Auth::id();
+
+        $checkUpdate = $this->taskService->updateTaskStatus($data, $newStatus);
 
         if ($checkUpdate) {
             return response(['message' => "Task status updated to {$nameStatus}"], 200);

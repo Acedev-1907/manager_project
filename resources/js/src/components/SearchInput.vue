@@ -1,19 +1,19 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue';
-import { myDebounce } from '../helper/utils';
+import { createDebouncedFunction } from '../helper/utils';
 
 interface Props {
     modelValue?: string;
     placeholder?: string;
-    loading?: boolean;
     debounceTime?: number;
+    loading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
     modelValue: '',
     placeholder: 'Search...',
-    loading: false,
-    debounceTime: 200
+    debounceTime: 200,
+    loading: false
 });
 
 const emit = defineEmits<{
@@ -28,7 +28,7 @@ watch(() => props.modelValue, (newValue) => {
     query.value = newValue || '';
 });
 
-const search = myDebounce(async function () {
+const search = createDebouncedFunction(async function () {
     emit('search', query.value);
     emit('update:modelValue', query.value);
 }, props.debounceTime);
@@ -47,11 +47,13 @@ const clearSearch = () => {
                 <i class="bi bi-search"></i>
             </span>
             <BaseInput @keydown="search" v-model="query" :placeholder="placeholder" class="search-input-beauty" />
-            <span v-if="query" class="clear-icon" @click="clearSearch">
+            <span v-if="query && !loading" class="clear-icon" @click="clearSearch">
                 <i class="bi bi-x-circle"></i>
             </span>
-            <span v-show="loading" class="loading-spinner">
-                <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+            <span v-if="loading" class="loading-spinner">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
             </span>
         </div>
     </div>
@@ -120,11 +122,12 @@ const clearSearch = () => {
 
 .loading-spinner {
     position: absolute;
-    right: 0.5rem;
+    right: 1.7rem;
     display: flex;
     align-items: center;
     top: 50%;
     transform: translateY(-50%);
+    z-index: 2;
 }
 
 /* Dropdown suggestion cho search project */
@@ -150,6 +153,10 @@ const clearSearch = () => {
     .clear-icon {
         right: 1.1rem;
         font-size: 0.95rem;
+    }
+
+    .loading-spinner {
+        right: 1.1rem;
     }
 
     .search-suggestion-dropdown {
