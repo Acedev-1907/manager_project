@@ -74,4 +74,107 @@
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
+  touch-action: pan-y !important; /* Allow vertical scrolling but prevent horizontal */
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* When dragging, disable all touch actions */
+.task-card.dragging {
+  touch-action: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Prevent scrolling on kanban columns during drag */
+.kanban-column {
+  touch-action: pan-y !important;
+}
+
+.kanban-column.hovered {
+  touch-action: none !important;
+}
+
+/* Better approach to prevent scroll during drag */
+body.dragging {
+  overflow: hidden !important;
+  position: relative !important; /* Use relative instead of fixed */
+}
+
+/* Prevent scroll on kanban container during drag */
+body.dragging .kanban-container,
+body.dragging .kanban-content {
+  overflow: hidden !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  .task-card {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .task-card.dragging {
+    touch-action: none !important;
+    position: relative !important;
+    z-index: 1000 !important;
+  }
+
+  /* Prevent body scroll during drag - FIXED */
+  body.dragging {
+    overflow: hidden !important;
+    /* Remove position: fixed to prevent page jumping */
+    /* position: fixed !important; */
+    /* width: 100% !important; */
+  }
+
+  /* Smooth scrolling for auto-scroll */
+  html {
+    scroll-behavior: auto; /* Use auto for better performance with requestAnimationFrame */
+  }
+
+  /* Optimize scrolling performance */
+  body {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: auto;
+  }
+
+  /* Auto-scroll indicators with better animations */
+  .auto-scroll-indicator {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(59, 130, 246, 0.95);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 10000;
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    backdrop-filter: blur(10px);
+    animation: indicatorFadeIn 0.3s ease-out;
+  }
+
+  @keyframes indicatorFadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+  }
+
+  .auto-scroll-indicator.top {
+    top: 30px;
+  }
+
+  .auto-scroll-indicator.bottom {
+    bottom: 30px;
+  }
 }

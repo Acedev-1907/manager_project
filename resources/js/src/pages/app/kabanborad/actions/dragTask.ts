@@ -4,32 +4,40 @@ import { getAvatarSrc } from "../../../../helper/avatar";
 import { emitForceCacheClear } from "../../../../helper/eventBus";
 import { getCurrentUserId } from "../../../../helper/getUserData";
 
-// Optimistic UI update - cập nhật UI ngay lập tức
+// Constants
+const DRAG_CONFIG = {
+  threshold: 5,
+  directionThreshold: 3,
+  scrollThreshold: 50,
+  maxScrollSpeed: 8,
+  minScrollSpeed: 2,
+  speedMultiplier: 0.6,
+  transitionFactor: 0.7,
+  slowdownFactor: 0.8,
+  scrollInterval: 16, // ~60fps
+  apiDebounceTime: 500,
+} as const;
+
+// Optimistic UI update
 export function updateTaskOptimistically(
   taskId: number,
   newStatus: string,
   projectData: any
 ) {
-  if (!projectData?.value?.data?.tasks) {
-    return;
-  }
+  if (!projectData?.value?.data?.tasks) return;
 
-  // Tìm task và cập nhật status ngay lập tức
   const tasks = projectData.value.data.tasks;
   const taskIndex = tasks.findIndex((t: any) => t.id === taskId);
 
   if (taskIndex !== -1) {
-    // Cập nhật task với reactive trigger
     const updatedTask = { ...tasks[taskIndex] };
     updatedTask.status = parseInt(newStatus);
     updatedTask.updated_at = new Date().toISOString();
-
-    // Replace task trong array để trigger reactive update
     tasks.splice(taskIndex, 1, updatedTask);
   }
 }
 
-// Debounced API call để tránh gọi quá nhiều
+// Debounced API call
 let apiCallTimeout: any = null;
 export function debouncedChangeTaskStatus(
   taskId: number,
@@ -38,29 +46,24 @@ export function debouncedChangeTaskStatus(
   newStatus: string,
   projectData: any
 ) {
-  // Clear timeout cũ nếu có
   if (apiCallTimeout) {
     clearTimeout(apiCallTimeout);
   }
 
-  // Cập nhật UI ngay lập tức (optimistic)
   updateTaskOptimistically(taskId, newStatus, projectData);
-
-  // Emit event ngay lập tức để các page khác cập nhật
   emitForceCacheClear(
     projectId,
     "task-status-changed-by-drag",
     getCurrentUserId()
   );
 
-  // Debounce API call (500ms)
   apiCallTimeout = setTimeout(async () => {
     try {
       await changeTaskStatus(taskId, projectId, endPoint);
     } catch (error) {
-      // Silent error handling
+      console.error("Error in debounced API call:", error);
     }
-  }, 500);
+  }, DRAG_CONFIG.apiDebounceTime);
 }
 
 export async function changeTaskStatus(
@@ -74,14 +77,13 @@ export async function changeTaskStatus(
       projectId: projectId,
     });
 
-    // Emit event để dashboard biết task đã được cập nhật
     emitForceCacheClear(
       projectId,
       "task-status-changed-by-drag",
       getCurrentUserId()
     );
   } catch (error) {
-    // Silent error handling
+    console.error("HTTP request failed:", error);
   }
 }
 
@@ -109,14 +111,121 @@ export function useDragTask(
   let startY = 0;
   let currentX = 0;
   let currentY = 0;
-  let dragThreshold = 10; // Minimum distance to start dragging
   let originalTransform = "";
   let originalZIndex = "";
   let originalOpacity = "";
   let ghostElement: HTMLElement | null = null;
   let ghostAnimationFrame: number | null = null;
 
-  // Đảm bảo chỉ gắn listener một lần cho mỗi cột
+  // Auto-scroll state
+  let autoScrollInterval: number | null = null;
+  let autoScrollSpeed = 0;
+  let lastY = 0;
+  let dragDirection = 0; // -1: up, 0: none, 1: down
+
+  // Auto-scroll functions
+  function startAutoScroll() {
+    if (autoScrollInterval) return;
+
+    autoScrollInterval = setInterval(() => {
+      if (autoScrollSpeed !== 0) {
+        const currentScrollY = window.scrollY;
+        const newScrollY = currentScrollY + autoScrollSpeed;
+        window.scrollTo(0, newScrollY);
+      }
+    }, DRAG_CONFIG.scrollInterval);
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollInterval) {
+      clearInterval(autoScrollInterval);
+      autoScrollInterval = null;
+      autoScrollSpeed = 0;
+    }
+  }
+
+  function updateAutoScroll(y: number) {
+    const windowHeight = window.innerHeight;
+    const scrollY = window.scrollY;
+    const documentHeight = document.documentElement.scrollHeight;
+
+    // Track drag direction
+    if (lastY !== 0) {
+      const deltaY = y - lastY;
+      if (Math.abs(deltaY) > DRAG_CONFIG.directionThreshold) {
+        dragDirection = deltaY > 0 ? 1 : -1;
+      }
+    }
+    lastY = y;
+
+    // Remove existing indicators
+    const existingIndicators = document.querySelectorAll(
+      ".auto-scroll-indicator"
+    );
+    existingIndicators.forEach((indicator) => indicator.remove());
+
+    // Calculate distances
+    const distanceFromTop = y;
+    const distanceFromBottom = windowHeight - y;
+
+    let shouldScroll = false;
+    let scrollDirection = 0;
+    let speed = 0;
+
+    // Scroll up when near top edge OR dragging up
+    if (distanceFromTop < DRAG_CONFIG.scrollThreshold || dragDirection === -1) {
+      if (scrollY > 0) {
+        shouldScroll = true;
+        scrollDirection = -1;
+        speed = DRAG_CONFIG.maxScrollSpeed * DRAG_CONFIG.speedMultiplier;
+      }
+    }
+    // Scroll down when near bottom edge OR dragging down
+    else if (
+      distanceFromBottom < DRAG_CONFIG.scrollThreshold ||
+      dragDirection === 1
+    ) {
+      if (scrollY < documentHeight - windowHeight) {
+        shouldScroll = true;
+        scrollDirection = 1;
+        speed = DRAG_CONFIG.maxScrollSpeed * DRAG_CONFIG.speedMultiplier;
+      }
+    }
+
+    if (shouldScroll) {
+      const targetSpeed = scrollDirection * speed;
+      autoScrollSpeed =
+        autoScrollSpeed * DRAG_CONFIG.transitionFactor +
+        targetSpeed * (1 - DRAG_CONFIG.transitionFactor);
+
+      if (!autoScrollInterval) {
+        startAutoScroll();
+      }
+
+      showAutoScrollIndicator(scrollDirection === -1 ? "top" : "bottom");
+    } else {
+      autoScrollSpeed *= DRAG_CONFIG.slowdownFactor;
+      if (Math.abs(autoScrollSpeed) < 0.1) {
+        stopAutoScroll();
+      }
+    }
+  }
+
+  function showAutoScrollIndicator(position: "top" | "bottom") {
+    const indicator = document.createElement("div");
+    indicator.className = `auto-scroll-indicator ${position}`;
+    indicator.textContent =
+      position === "top" ? "↑ Scroll Up" : "↓ Scroll Down";
+    document.body.appendChild(indicator);
+
+    setTimeout(() => {
+      if (indicator.parentNode) {
+        indicator.parentNode.removeChild(indicator);
+      }
+    }, 2000);
+  }
+
+  // Drop listeners
   const attachedColumns = new Set<HTMLElement>();
 
   function addDropListener(
@@ -148,7 +257,6 @@ export function useDragTask(
       const projectId = taskStore.draggedProjectId;
 
       if (taskId && projectId) {
-        // Kiểm tra nếu status đã đúng thì không làm gì
         const task = ProjectData?.value?.data?.tasks?.find(
           (t: any) => t.id === taskId
         );
@@ -166,7 +274,7 @@ export function useDragTask(
       taskStore.clearDraggedTask();
     });
 
-    // Touch drop listeners for mobile - simplified
+    // Touch drop listeners for mobile
     targetColumn.addEventListener(
       "touchend",
       function (event) {
@@ -181,7 +289,6 @@ export function useDragTask(
             touch.clientY >= rect.top &&
             touch.clientY <= rect.bottom
           ) {
-            // Drop on this column
             targetColumn.classList.remove("hovered");
             const taskId = taskStore.draggedTaskId;
             const projectId = taskStore.draggedProjectId;
@@ -201,8 +308,6 @@ export function useDragTask(
             }
             taskStore.clearDraggedTask();
           }
-
-          // Clean up
           cleanupDrag();
         }
       },
@@ -220,6 +325,7 @@ export function useDragTask(
     const completedColumn = document.querySelector(
       ".completed-column"
     ) as HTMLElement;
+
     if (notStartedColumn)
       addDropListener(notStartedColumn, "task/pending_to_not_started", 0);
     if (pendingColumn)
@@ -227,29 +333,32 @@ export function useDragTask(
     if (completedColumn)
       addDropListener(completedColumn, "task/not_started_to_completed", 2);
 
-    // Setup drag listeners for task cards
     setupTaskCardDragListeners();
   }
 
   function setupTaskCardDragListeners() {
-    // Remove existing listeners first
-    const existingCards = document.querySelectorAll(".task-card");
-    existingCards.forEach((card) => {
+    const taskCards = document.querySelectorAll(".task-card");
+
+    taskCards.forEach((card) => {
+      // Remove existing listeners
       card.removeEventListener("dragstart", handleDragStart as EventListener);
       card.removeEventListener("dragend", handleDragEnd as EventListener);
       card.removeEventListener("touchstart", handleTouchStart as EventListener);
       card.removeEventListener("touchmove", handleTouchMove as EventListener);
       card.removeEventListener("touchend", handleTouchEnd as EventListener);
-    });
 
-    // Add new listeners
-    const taskCards = document.querySelectorAll(".task-card");
-    taskCards.forEach((card) => {
+      // Add new listeners
       card.addEventListener("dragstart", handleDragStart as EventListener);
       card.addEventListener("dragend", handleDragEnd as EventListener);
-      card.addEventListener("touchstart", handleTouchStart as EventListener);
-      card.addEventListener("touchmove", handleTouchMove as EventListener);
-      card.addEventListener("touchend", handleTouchEnd as EventListener);
+      card.addEventListener("touchstart", handleTouchStart as EventListener, {
+        passive: false,
+      });
+      card.addEventListener("touchmove", handleTouchMove as EventListener, {
+        passive: false,
+      });
+      card.addEventListener("touchend", handleTouchEnd as EventListener, {
+        passive: false,
+      });
     });
   }
 
@@ -266,7 +375,6 @@ export function useDragTask(
         taskStore.setDraggedTask(taskId, projectId);
         taskCard.classList.add("dragging");
 
-        // Create ghost element
         const ghost = taskCard.cloneNode(true) as HTMLElement;
         ghost.classList.add("ghost-task");
         ghost.style.opacity = "0.5";
@@ -275,7 +383,6 @@ export function useDragTask(
 
         if (dragEvent.dataTransfer) {
           dragEvent.dataTransfer.effectAllowed = "move";
-          // Đặt ghost-task ở giữa chuột
           const rect = ghost.getBoundingClientRect();
           const offsetX = rect.width / 2;
           const offsetY = rect.height / 2;
@@ -290,58 +397,61 @@ export function useDragTask(
     const taskCard = target.closest(".task-card") as HTMLElement;
     if (taskCard) {
       taskCard.classList.remove("dragging");
-
-      // Remove ghost element
       const ghost = document.querySelector(".ghost-task");
-      if (ghost) {
-        ghost.remove();
-      }
+      if (ghost) ghost.remove();
     }
     taskStore.clearDraggedTask();
   }
 
-  // New simplified touch handlers for mobile
   function handleTouchStart(event: Event) {
     const touchEvent = event as TouchEvent;
-    const target = touchEvent.target as HTMLElement;
+    const touch = touchEvent.touches[0];
+
+    // Reset drag state
+    isDragging = false;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    currentX = touch.clientX;
+    currentY = touch.clientY;
+
+    // Initialize auto-scroll state
+    dragDirection = 0;
+    lastY = touch.clientY;
+    stopAutoScroll();
+
+    // Store the dragged element and set taskStore values
+    const target = event.target as HTMLElement;
     const taskCard = target.closest(".task-card") as HTMLElement;
-
-    if (taskCard && touchEvent.touches.length === 1) {
-      const touch = touchEvent.touches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
-
+    if (taskCard) {
+      draggedElement = taskCard;
       const taskId = parseInt(taskCard.dataset.taskId || "0");
       const projectId = parseInt(taskCard.dataset.projectId || "0");
 
       if (taskId && projectId) {
-        draggedElement = taskCard;
         taskStore.setDraggedTask(taskId, projectId);
-
-        // Store original styles
-        originalTransform = taskCard.style.transform;
-        originalZIndex = taskCard.style.zIndex;
-        originalOpacity = taskCard.style.opacity;
       }
     }
   }
 
   function handleTouchMove(event: Event) {
-    if (draggedElement && !isDragging) {
-      const touchEvent = event as TouchEvent;
-      const touch = touchEvent.touches[0];
+    if (!draggedElement) return;
+
+    const touchEvent = event as TouchEvent;
+    const touch = touchEvent.touches[0];
+
+    if (!isDragging) {
       const deltaX = Math.abs(touch.clientX - startX);
       const deltaY = Math.abs(touch.clientY - startY);
       const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-      // Start dragging only if moved enough distance
-      if (distance > dragThreshold) {
+      if (distance > DRAG_CONFIG.threshold) {
         isDragging = true;
+        event.preventDefault();
 
-        // Simple visual feedback - just add dragging class
+        document.body.style.touchAction = "none";
+        document.body.style.overflow = "auto";
+
         draggedElement.classList.add("dragging");
-
-        // Add additional visual feedback for mobile
         draggedElement.style.backgroundColor = "#eff6ff";
         draggedElement.style.border = "2px solid #3b82f6";
         draggedElement.style.boxShadow = "0 4px 16px rgba(59, 130, 246, 0.3)";
@@ -349,26 +459,17 @@ export function useDragTask(
         draggedElement.style.opacity = "0.8";
         draggedElement.style.zIndex = "1000";
 
-        // Create ghost element for mobile
         createMobileGhost(touch.clientX, touch.clientY);
-
-        // Check which column we're hovering over
         checkColumnHover(touch.clientX, touch.clientY);
       }
-    }
-
-    if (isDragging) {
+    } else {
       event.preventDefault();
-      const touchEvent = event as TouchEvent;
-      const touch = touchEvent.touches[0];
       currentX = touch.clientX;
       currentY = touch.clientY;
 
-      // Update ghost position
       updateMobileGhost(currentX, currentY);
-
-      // Check which column we're hovering over
       checkColumnHover(currentX, currentY);
+      updateAutoScroll(currentY);
     }
   }
 
@@ -392,7 +493,6 @@ export function useDragTask(
         ) {
           droppedColumn = column as HTMLElement;
 
-          // Determine status based on column class
           if (column.classList.contains("not-started-column")) {
             columnStatus = 0;
             columnEndpoint = "task/pending_to_not_started";
@@ -410,10 +510,12 @@ export function useDragTask(
       if (droppedColumn && columnStatus !== -1) {
         const taskId = taskStore.draggedTaskId;
         const projectId = taskStore.draggedProjectId;
+
         if (taskId && projectId) {
           const task = ProjectData?.value?.data?.tasks?.find(
             (t: any) => t.id === taskId
           );
+
           if (task && task.status !== columnStatus) {
             debouncedChangeTaskStatus(
               taskId,
@@ -427,7 +529,8 @@ export function useDragTask(
       }
 
       // Clean up
-      cleanupDrag();
+      cleanupDragVisuals();
+      taskStore.clearDraggedTask();
     }
   }
 
@@ -448,11 +551,10 @@ export function useDragTask(
     });
   }
 
-  function cleanupDrag() {
+  function cleanupDragVisuals() {
     isDragging = false;
     if (draggedElement) {
       draggedElement.classList.remove("dragging");
-      // Restore original styles
       draggedElement.style.transform = originalTransform;
       draggedElement.style.zIndex = originalZIndex;
       draggedElement.style.opacity = originalOpacity;
@@ -470,18 +572,13 @@ export function useDragTask(
       ghostAnimationFrame = null;
     }
 
-    // Remove hover states from all columns
     document.querySelectorAll(".kanban-column").forEach((column) => {
       column.classList.remove("hovered");
     });
 
-    taskStore.clearDraggedTask();
-
-    // Clear API call timeout if exists
-    if (apiCallTimeout) {
-      clearTimeout(apiCallTimeout);
-      apiCallTimeout = null;
-    }
+    document.body.style.touchAction = "";
+    document.body.style.overflow = "";
+    stopAutoScroll();
   }
 
   function getMemberName(member: any) {
@@ -493,6 +590,7 @@ export function useDragTask(
       ""
     );
   }
+
   function getMemberAvatar(member: any) {
     return (
       member?.avatar ||
@@ -531,7 +629,7 @@ export function useDragTask(
     ghostElement.style.padding = "16px";
     ghostElement.style.boxSizing = "border-box";
 
-    // Lấy thông tin task đang kéo
+    // Get task info
     let taskName = "";
     let taskDate = "";
     let taskMembers: any[] = [];
@@ -540,7 +638,6 @@ export function useDragTask(
       if (nameEl) taskName = nameEl.textContent || "";
       const dateEl = draggedElement.querySelector(".task-date span");
       if (dateEl) taskDate = dateEl.textContent || "";
-      // Lấy data-task-id để tìm task trong ProjectData
       const taskId = draggedElement.dataset.taskId;
       let taskObj = null;
       if (taskId && ProjectData?.value?.data?.tasks) {
@@ -551,7 +648,7 @@ export function useDragTask(
       }
     }
 
-    // Tạo nội dung HTML cho ghost-task (hiển thị avatar đúng)
+    // Create ghost content
     ghostElement.innerHTML = `
       <div style="font-size:20px;font-weight:bold;margin-bottom:8px;">${taskName}</div>
       <div style="font-size:14px;margin-bottom:8px;">${
@@ -574,7 +671,7 @@ export function useDragTask(
       </div>
     `;
 
-    // Đặt vị trí center theo ngón tay
+    // Position ghost
     const rect = ghostElement.getBoundingClientRect();
     const offsetX = rect.width / 2;
     const offsetY = rect.height / 2;
