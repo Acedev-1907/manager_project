@@ -10,16 +10,28 @@ use App\Services\ProjectService;
 use App\Http\Requests\Project\UpdateProjectRequest;
 use App\Http\Controllers\Api\ApiController;
 
+/**
+ * Project Controller
+ * 
+ * Handles all project-related operations including CRUD operations,
+ * column management, and project analytics.
+ */
 class ProjectController extends ApiController
 {
-    protected $service;
+    protected ProjectService $service;
 
     public function __construct(ProjectService $service)
     {
         $this->service = $service;
     }
 
-    public function getProject($slug)
+    /**
+     * Get a specific project by slug
+     * 
+     * @param string $slug Project slug identifier
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getProject(string $slug)
     {
         $project = $this->service->getProjectBySlug($slug);
         $user = request()->user();
@@ -29,34 +41,51 @@ class ProjectController extends ApiController
                 ->setReturnCode(self::ERROR_FORBIDDEN)
                 ->respondWithError('You do not have permission to access this project');
         }
+
         return $this->respondWithData($project, 'Project retrieved successfully');
     }
 
+    /**
+     * Get all projects for the authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index(Request $request)
     {
         $userId = $request->user()->id;
         $query = $request->get('query');
         $projects = $this->service->getProjectsForUser($userId, $query);
 
-
-
         return $this->respondWithData($projects, 'Projects retrieved successfully');
     }
 
-    public function store(Request $req)
+    /**
+     * Create a new project
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function store(Request $request)
     {
-        $user = $req->user();
-
-        $result = $this->service->createProject($req->all(), $user);
+        $user = $request->user();
+        $result = $this->service->createProject($request->all(), $user);
 
         if (isset($result['errors'])) {
             return $this->setStatusCode($result['status'])
                 ->setReturnCode(self::ERROR_VALIDATION)
                 ->respondWithError($result['errors']);
         }
+
         return $this->respondWithMessage($result['message']);
     }
 
+    /**
+     * Update an existing project
+     * 
+     * @param UpdateProjectRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function update(UpdateProjectRequest $request)
     {
         $user = $request->user();
@@ -80,10 +109,18 @@ class ProjectController extends ApiController
                 ->setReturnCode(self::ERROR_VALIDATION)
                 ->respondWithError($result['errors']);
         }
+
         return $this->respondUpdated($result['message']);
     }
 
-    public function addColumn(Request $request, $projectId)
+    /**
+     * Add a new column to a project
+     * 
+     * @param Request $request
+     * @param int $projectId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function addColumn(Request $request, int $projectId)
     {
         $user = $request->user();
         $project = Project::find($projectId);
@@ -120,7 +157,14 @@ class ProjectController extends ApiController
         }
     }
 
-    public function updateColumn(Request $request, $projectId)
+    /**
+     * Update an existing column in a project
+     * 
+     * @param Request $request
+     * @param int $projectId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateColumn(Request $request, int $projectId)
     {
         $user = $request->user();
         $project = Project::find($projectId);
@@ -161,7 +205,14 @@ class ProjectController extends ApiController
         }
     }
 
-    public function deleteColumn(Request $request, $projectId)
+    /**
+     * Delete a column from a project
+     * 
+     * @param Request $request
+     * @param int $projectId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function deleteColumn(Request $request, int $projectId)
     {
         $user = $request->user();
         $project = Project::find($projectId);
@@ -184,7 +235,7 @@ class ProjectController extends ApiController
         }
 
         try {
-            // Check if column has tasks
+            // Check if column has tasks before deletion
             $columnStatus = $project->getColumnStatus($columnId);
             if ($columnStatus !== null) {
                 $tasksInColumn = $project->tasks()->where('status', $columnStatus)->count();
@@ -208,86 +259,160 @@ class ProjectController extends ApiController
         }
     }
 
+    /**
+     * Pin a project for the authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function pinnedProject(Request $request)
     {
         $result = $this->service->pinProjectForUser($request->user(), $request->all());
+
         if (isset($result['error'])) {
             return $this->respondWithError($result['error'], $result['code'] ?? 400);
         }
+
         return $this->respondWithData($result['data'], $result['message']);
     }
 
+    /**
+     * Get project count for the authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function countProject(Request $request)
     {
         $user = $request->user();
         $count = $this->service->countProjectsForUser($user->id);
+
         return $this->respondWithData(['count' => $count], 'Get project count successfully');
     }
 
+    /**
+     * Get the pinned project for the authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getPinnedProject(Request $request)
     {
         $result = $this->service->getPinnedProjectForUser($request->user());
+
         if (isset($result['error'])) {
             return $this->respondWithError($result['error'], $result['code'] ?? 404);
         }
+
         return $this->respondWithData($result['data'], $result['message'] ?? 'Get pinned project successfully');
     }
 
-    public  function getProjectChartData(Request $req)
+    /**
+     * Get chart data for project analytics
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getProjectChartData(Request $request)
     {
-        $projectId = $req->projectId;
-        $task = Task::where('projectId', $projectId)->get();
+        $projectId = $request->projectId;
+        $tasks = Task::where('projectId', $projectId)->get();
+        $taskProgress = TaskProgress::where('projectId', $projectId)->select('progress')->first();
 
-        $taskProject = TaskProgress::where('projectId', $projectId)->select('progress')->first();
+        // Get project to retrieve column information
+        $project = Project::find($projectId);
+        $boardColumns = $project->getBoardColumns();
 
-        $pending = 0;
-        $completed = 0;
-        foreach ($task as $row) {
-            if (intval($row->status) === Task::PENDING) {
-                $pending++;
-            }
+        // Count tasks by column
+        $columnStats = [];
+        $columnNames = [];
+        $columnColors = [];
 
-            if (intval($row->status) === Task::COMPLETED) {
-                $completed++;
+        // Initialize stats for each column
+        foreach ($boardColumns as $column) {
+            $position = $column['position'];
+            $columnStats[$position] = 0;
+            $columnNames[$position] = $column['name'];
+            $columnColors[$position] = $column['color'];
+        }
+
+        // Count tasks by status
+        foreach ($tasks as $task) {
+            $status = $task->status;
+
+            // Special handling for completed status
+            if ($status === Task::COMPLETED) {
+                // Find "Completed" column in board_columns
+                foreach ($boardColumns as $column) {
+                    if ($column['name'] === 'Completed') {
+                        $position = $column['position'];
+                        if (isset($columnStats[$position])) {
+                            $columnStats[$position]++;
+                        }
+                        break;
+                    }
+                }
+            } else {
+                // Handle other statuses (position-based)
+                $statusInt = intval($status);
+                if (isset($columnStats[$statusInt])) {
+                    $columnStats[$statusInt]++;
+                }
             }
         }
 
-        return response(
-            [
-                'tasks' => [$pending, $completed],
-                'progress' => intval($taskProject->progress)
-            ]
-        );
+        // Sort by column position
+        ksort($columnStats);
+        ksort($columnNames);
+        ksort($columnColors);
+
+        return response([
+            'tasks' => array_values($columnStats),
+            'columnNames' => array_values($columnNames),
+            'columnColors' => array_values($columnColors),
+            'progress' => intval($taskProgress->progress)
+        ]);
     }
 
-    // API: Get members of a specific project
-    public function getProjectMembers($id)
+    /**
+     * Get all members of a specific project
+     * 
+     * @param int $id Project ID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getProjectMembers(int $id)
     {
         $project = Project::with('users')->findOrFail($id);
         return response(['data' => $project->users], 200);
     }
 
     /**
-     * Delete a project if the user is the creator. Also deletes all related tasks, members, and related data.
-     *
-     * @param int $id
+     * Delete a project and all related data
+     * 
+     * @param int $id Project ID
      * @param Request $request
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy($id, Request $request)
+    public function destroy(int $id, Request $request)
     {
         $user = $request->user();
         $result = $this->service->deleteProject($id, $user);
+
         if (isset($result['errors'])) {
             return response($result['errors'], $result['status']);
         }
+
         return response(['message' => $result['message']], $result['status']);
     }
 
     /**
      * Get completed tasks for a project
+     * 
+     * @param Request $request
+     * @param int $projectId
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function getCompletedTasks(Request $request, $projectId)
+    public function getCompletedTasks(Request $request, int $projectId)
     {
         $user = $request->user();
         $project = Project::find($projectId);
@@ -302,7 +427,7 @@ class ProjectController extends ApiController
                 ->respondWithError('You do not have permission to access this project');
         }
 
-        $completedTasks = \App\Models\Task::getCompletedTasks($projectId);
+        $completedTasks = Task::getCompletedTasks($projectId);
         return $this->respondWithData($completedTasks, 'Completed tasks retrieved successfully');
     }
 }

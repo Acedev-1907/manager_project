@@ -9,6 +9,8 @@ export default defineComponent({
     name: 'ApexDonut',
     props: {
         task: { type: Array, required: true },
+        columnNames: { type: Array, default: () => ['pending', 'completed'] },
+        columnColors: { type: Array, default: () => ['#f59e0b', '#10b981'] },
     },
     data() {
         return {
@@ -20,11 +22,8 @@ export default defineComponent({
                 chart: {
                     id: 'apex-donut',
                 },
-                labels: ['pending', 'completed'],
-                colors: [
-                    '#f59e0b', // pending - orange
-                    '#10b981', // completed - green
-                ],
+                labels: this.$props.columnNames,
+                colors: this.$props.columnColors,
                 markers: {
                     size: 5,
                     hover: {
@@ -46,6 +45,20 @@ export default defineComponent({
         task: {
             handler(newTasks) {
                 this.series = newTasks;
+            },
+            deep: true,
+            immediate: true
+        },
+        columnNames: {
+            handler(newNames) {
+                this.options.labels = newNames;
+            },
+            deep: true,
+            immediate: true
+        },
+        columnColors: {
+            handler(newColors) {
+                this.options.colors = newColors;
             },
             deep: true,
             immediate: true

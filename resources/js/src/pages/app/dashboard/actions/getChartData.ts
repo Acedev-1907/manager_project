@@ -3,37 +3,49 @@ import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { showErrorResponse } from "../../../../helper/utils";
 
 type chartDataType = {
-    tasks: Array<number>
-    progress: number
-}
+  tasks: Array<number>;
+  columnNames: Array<string>;
+  columnColors: Array<string>;
+  progress: number;
+};
 
 export function useGetChartData() {
-    const chartData = ref<chartDataType>({} as chartDataType)
-    async function getChartData(projectsId: number) {
-        try {
-            const data = await makeHttpReq<undefined, chartDataType>(`chart-data/projects?projectId=${projectsId}`, 'GET')
-            chartData.value = data
-            updateData()
+  const chartData = ref<chartDataType>({} as chartDataType);
+  let currentProjectId: number | null = null;
 
-        } catch (error) {
-            showErrorResponse(error)
-        }
+  async function getChartData(projectsId: number) {
+    try {
+      const data = await makeHttpReq<undefined, chartDataType>(
+        `chart-data/projects?projectId=${projectsId}`,
+        "GET"
+      );
+      chartData.value = data;
+      currentProjectId = projectsId;
+      updateData();
+    } catch (error) {
+      showErrorResponse(error);
     }
+  }
 
-    function updateData() {
-        window.Echo.channel('channel-project-progress').listen('TrackProjectProgress',
-            (e: { projectProgress: number }) => {
-                chartData.value.progress=0
-                setTimeout(()=>chartData.value.progress=e.projectProgress,1000)
-            }
-        );
+  function updateData() {
+    if (!currentProjectId) return;
 
-        window.Echo.channel('channel-tasks-project').listen('TrackCompletedAndPending',
-            (e: { tasks:Array<number> }) => {
-                chartData.value.tasks=undefined as any
-                setTimeout(()=>chartData.value.tasks=e.tasks,1000)
-            }
-        );
-    }
-    return { chartData, getChartData };
+    // Sử dụng private channels với projectId động
+    window.Echo.private(`project.${currentProjectId}`).listen(
+      "TrackProjectProgress",
+      (e: { projectProgress: number }) => {
+        chartData.value.progress = 0;
+        setTimeout(() => (chartData.value.progress = e.projectProgress), 1000);
+      }
+    );
+
+    window.Echo.private(`project.${currentProjectId}`).listen(
+      "TrackCompletedAndPending",
+      (e: { tasks: Array<number> }) => {
+        // Refresh data từ API để có thông tin cột mới nhất
+        getChartData(currentProjectId!);
+      }
+    );
+  }
+  return { chartData, getChartData };
 }

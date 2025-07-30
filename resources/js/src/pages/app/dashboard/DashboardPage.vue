@@ -439,10 +439,13 @@ onUnmounted(() => {
                             <div class="card-header"><b>Tasks</b></div>
                             <div class="card-body">
                                 <div v-if="project.tasks">
-                                    <ApexDonut :task="project.tasks" />
+                                    <ApexDonut :task="project.tasks"
+                                        :columnNames="project.columnNames || ['pending', 'completed']"
+                                        :columnColors="project.columnColors || ['#f59e0b', '#10b981']" />
                                 </div>
                                 <div v-else>
-                                    <ApexDonut :task="[0, 0]" />
+                                    <ApexDonut :task="[0, 0]" :columnNames="['pending', 'completed']"
+                                        :columnColors="['#f59e0b', '#10b981']" />
                                 </div>
                             </div>
                         </div>

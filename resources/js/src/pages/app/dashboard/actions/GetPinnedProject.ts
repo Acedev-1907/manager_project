@@ -7,6 +7,8 @@ type pinnedProject = {
   name: string;
   progress: number;
   tasks: Array<number>;
+  columnNames?: Array<string>;
+  columnColors?: Array<string>;
 };
 export type pinnedProjectType = {
   data: pinnedProject;

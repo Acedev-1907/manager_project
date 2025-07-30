@@ -9,25 +9,40 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use App\Events\NewProjectForMembers;
 
-
+/**
+ * Project Service
+ * 
+ * Handles all business logic related to project operations including
+ * creation, updates, deletion, and project analytics.
+ */
 class ProjectService
 {
-    protected $repo;
+    protected ProjectRepository $repo;
 
     public function __construct(ProjectRepository $repo)
     {
         $this->repo = $repo;
     }
 
-    public function createProject($fields, $user)
+    /**
+     * Create a new project with members
+     * 
+     * @param array $fields Project data
+     * @param \App\Models\User $user Creator user
+     * @return array
+     */
+    public function createProject(array $fields, $user): array
     {
-        $errs = Validator::make($fields, [
+        $validator = Validator::make($fields, [
             'name' => 'required',
             'startDate' => 'required',
             'endDate' => 'required',
             'content' => 'nullable|string',
         ]);
-        if ($errs->fails()) return ['errors' => $errs->errors()->all(), 'status' => 422];
+
+        if ($validator->fails()) {
+            return ['errors' => $validator->errors()->all(), 'status' => 422];
+        }
 
         return DB::transaction(function () use ($fields, $user) {
             $project = $this->repo->create([
@@ -40,8 +55,10 @@ class ProjectService
                 'creator_id' => $user->id,
             ]);
 
+            // Attach creator to project
             $this->repo->attachUsers($project, [$user->id]);
 
+            // Handle additional members
             $members = $fields['members'] ?? [];
             if (!empty($members) && is_array($members)) {
                 $members = array_diff($members, [$user->id]);
@@ -51,8 +68,8 @@ class ProjectService
             }
 
             $allMembers = array_unique(array_merge($members, [$user->id]));
-            $broadcastMembers = $allMembers;
 
+            // Create task progress record for creator
             TaskProgress::create([
                 'projectId' => $project->id,
                 'user_id' => $user->id,
@@ -60,44 +77,31 @@ class ProjectService
                 'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
             ]);
 
-            // Tạo 3 cột mặc định cho project (sẽ được tạo tự động khi truy cập)
-            // Không cần gọi createDefaultColumns vì đã được handle trong Project model
-
-            // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
-            DB::afterCommit(function () use ($project, $broadcastMembers) {
-                // Dispatch UserProjectCountUpdated event cho tất cả members
-                foreach ($broadcastMembers as $memberId) {
-                    $memberProjectCount = $this->countProjectsForUser($memberId);
-                    UserProjectCountUpdated::dispatch($memberId, $memberProjectCount);
-                }
-                $project->load([
-                    'creator',
-                    'users' => function ($q) {
-                        $q->select('users.id', 'users.name', 'users.avatar');
-                    }
-                ]);
-                foreach ($broadcastMembers as $memberId) {
-                    broadcast(new NewProjectForMembers($project, $memberId));
-                    // Gửi notification cho member khi được thêm vào project
-                    $member = \App\Models\User::find($memberId);
-                    if ($member) {
-                        $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
-                    }
-                }
+            // Broadcast events after transaction commit
+            DB::afterCommit(function () use ($project, $allMembers) {
+                $this->broadcastProjectEvents($project, $allMembers);
             });
 
             return ['message' => 'Project created', 'status' => 200];
         });
     }
 
-    public function updateProject($fields, $user)
+    /**
+     * Update an existing project
+     * 
+     * @param array $fields Updated project data
+     * @param \App\Models\User $user User performing the update
+     * @return array
+     */
+    public function updateProject(array $fields, $user): array
     {
         return DB::transaction(function () use ($fields, $user) {
             $project = $this->repo->find($fields['id']);
 
-            // Lấy danh sách user cũ trước khi update
+            // Get old members before update
             $oldMembers = $project->users->pluck('id')->toArray();
 
+            // Update project data
             $this->repo->updateById($fields['id'], [
                 'name' => $fields['name'],
                 'startDate' => $fields['startDate'],
@@ -105,48 +109,18 @@ class ProjectService
                 'content' => $fields['content'] ?? null,
             ]);
 
+            // Handle member updates
             $members = $fields['members'] ?? [];
             $allMembers = array_unique(array_merge($members, [$user->id]));
             $this->repo->syncUsers($project, $allMembers);
 
-            // Xác định user bị remove
+            // Determine removed and new members
             $removedMembers = array_diff($oldMembers, $allMembers);
-
-            // Xác định user mới được thêm vào
             $newMembers = array_diff($allMembers, $oldMembers);
 
-            // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
+            // Broadcast events after transaction commit
             DB::afterCommit(function () use ($project, $removedMembers, $allMembers, $newMembers) {
-                $project->load([
-                    'creator',
-                    'users' => function ($q) {
-                        $q->select('users.id', 'users.name', 'users.avatar');
-                    }
-                ]);
-
-                // Dispatch UserProjectCountUpdated event cho member mới
-                foreach ($newMembers as $memberId) {
-                    $memberProjectCount = $this->countProjectsForUser($memberId);
-                    UserProjectCountUpdated::dispatch($memberId, $memberProjectCount);
-                }
-
-                // Broadcast cho user bị remove
-                foreach ($removedMembers as $removedId) {
-                    broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
-                }
-
-                foreach ($allMembers as $memberId) {
-                    broadcast(new NewProjectForMembers($project, $memberId));
-                }
-
-                // Chỉ gửi notification cho thành viên mới (không gửi cho creator)
-                foreach ($newMembers as $memberId) {
-                    if ($memberId == $project->creator_id) continue;
-                    $member = \App\Models\User::find($memberId);
-                    if ($member) {
-                        $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
-                    }
-                }
+                $this->broadcastProjectUpdateEvents($project, $removedMembers, $allMembers, $newMembers);
             });
 
             return ['message' => 'Project updated', 'status' => 200];
@@ -154,104 +128,141 @@ class ProjectService
     }
 
     /**
-     * Delete a project and all related data if the user is the creator.
-     *
+     * Delete a project and all related data
+     * 
      * @param int $projectId
      * @param \App\Models\User $user
      * @return array
      */
-    public function deleteProject($projectId, $user)
+    public function deleteProject(int $projectId, $user): array
     {
         $project = $this->repo->find($projectId);
+
         if (!$project) {
             return ['errors' => ['Project does not exist'], 'status' => 404];
         }
+
         if ($project->creator_id !== $user->id) {
             return ['errors' => ['You cannot delete this project'], 'status' => 403];
         }
-        // Broadcast UserRemovedFromProject for all members except creator
+
+        // Broadcast removal events for all members except creator
         $memberIds = $project->users->pluck('id')->filter(fn($id) => $id !== $user->id);
         foreach ($memberIds as $memberId) {
             broadcast(new \App\Events\UserRemovedFromProject($project, $memberId));
         }
+
         $project->delete();
+
         return ['message' => 'Project and related data deleted successfully', 'status' => 200];
     }
 
-    public function getProjectBySlug($slug)
+    /**
+     * Get project by slug with relations
+     * 
+     * @param string $slug
+     * @return \App\Models\Project|null
+     */
+    public function getProjectBySlug(string $slug)
     {
         return $this->repo->getBySlugWithRelations($slug);
     }
 
-    public function getProjectsForUser($userId, $query = null)
+    /**
+     * Get all projects for a specific user
+     * 
+     * @param int $userId
+     * @param string|null $query Search query
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getProjectsForUser(int $userId, ?string $query = null)
     {
         return $this->repo->getProjectsForUser($userId, $query);
     }
 
-    public function countProjectsForUser($userId)
+    /**
+     * Count projects for a specific user
+     * 
+     * @param int $userId
+     * @return int
+     */
+    public function countProjectsForUser(int $userId): int
     {
         return $this->repo->countProjectsForUser($userId);
     }
 
     /**
-     * Ensure the user has a task_progress record for the project.
+     * Ensure user has a task progress record for the project
+     * 
+     * @param int $userId
+     * @param int $projectId
+     * @return \App\Models\TaskProgress
      */
-    protected function ensureTaskProgress($userId, $projectId)
+    protected function ensureTaskProgress(int $userId, int $projectId)
     {
-        return \App\Models\TaskProgress::firstOrCreate(
+        return TaskProgress::firstOrCreate(
             [
                 'projectId' => $projectId,
                 'user_id' => $userId
             ],
             [
                 'progress' => 0,
-                'pinned_on_dashboard' => \App\Models\TaskProgress::NOT_PINNED_ON_DASHBOARD
+                'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD
             ]
         );
     }
 
     /**
-     * Unpin all projects for the user.
+     * Unpin all projects for a user
+     * 
+     * @param int $userId
+     * @return void
      */
-    protected function unpinAllProjects($userId)
+    protected function unpinAllProjects(int $userId): void
     {
-        \App\Models\TaskProgress::where('user_id', $userId)
-            ->update(['pinned_on_dashboard' => \App\Models\TaskProgress::NOT_PINNED_ON_DASHBOARD]);
+        TaskProgress::where('user_id', $userId)
+            ->update(['pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD]);
     }
 
     /**
-     * Pin a specific project for the user.
+     * Pin a specific project for a user
+     * 
+     * @param TaskProgress $taskProgress
+     * @return void
      */
-    protected function pinProject($taskProgress)
+    protected function pinProject(TaskProgress $taskProgress): void
     {
-        $taskProgress->pinned_on_dashboard = \App\Models\TaskProgress::PINNED_ON_DASHBOARD;
+        $taskProgress->pinned_on_dashboard = TaskProgress::PINNED_ON_DASHBOARD;
         $taskProgress->save();
     }
 
     /**
      * Pin a project for the current user
+     * 
      * @param \App\Models\User $user
      * @param array $fields
      * @return array
      */
-    public function pinProjectForUser($user, $fields)
+    public function pinProjectForUser($user, array $fields): array
     {
         $validator = Validator::make($fields, [
             'projectId' => 'required|numeric|exists:projects,id',
         ]);
+
         if ($validator->fails()) {
             return [
                 'error' => $validator->errors()->first(),
                 'code' => 422
             ];
         }
+
         DB::transaction(function () use ($user, $fields) {
             $taskProgress = $this->ensureTaskProgress($user->id, $fields['projectId']);
             $this->unpinAllProjects($user->id);
             $this->pinProject($taskProgress);
         });
 
-        // Lấy thông tin project
+        // Get project information
         $project = \App\Models\Project::find($fields['projectId']);
         if (!$project) {
             return [
@@ -260,7 +271,7 @@ class ProjectService
             ];
         }
 
-        // Lấy số lượng task theo trạng thái
+        // Get task counts by status
         $pending = \App\Models\Task::where('projectId', $project->id)
             ->where('status', \App\Models\Task::PENDING)
             ->count();
@@ -268,8 +279,8 @@ class ProjectService
             ->where('status', \App\Models\Task::COMPLETED)
             ->count();
 
-        // Lấy progress
-        $progress = \App\Models\TaskProgress::where('projectId', $project->id)
+        // Get progress
+        $progress = TaskProgress::where('projectId', $project->id)
             ->where('user_id', $user->id)
             ->value('progress') ?? 0;
 
@@ -286,15 +297,16 @@ class ProjectService
 
     /**
      * Get the pinned project for the current user
+     * 
      * @param \App\Models\User $user
      * @return array
      */
-    public function getPinnedProjectForUser($user)
+    public function getPinnedProjectForUser($user): array
     {
         $project = DB::table('task_progress')
             ->join('projects', 'task_progress.projectId', '=', 'projects.id')
             ->select('projects.id', 'projects.name')
-            ->where('task_progress.pinned_on_dashboard', \App\Models\TaskProgress::PINNED_ON_DASHBOARD)
+            ->where('task_progress.pinned_on_dashboard', TaskProgress::PINNED_ON_DASHBOARD)
             ->where('task_progress.user_id', $user->id)
             ->first();
 
@@ -305,16 +317,56 @@ class ProjectService
             ];
         }
 
-        // Lấy số lượng task theo trạng thái
-        $pending = \App\Models\Task::where('projectId', $project->id)
-            ->where('status', \App\Models\Task::PENDING)
-            ->count();
-        $completed = \App\Models\Task::where('projectId', $project->id)
-            ->where('status', \App\Models\Task::COMPLETED)
-            ->count();
+        // Get project model for column information
+        $projectModel = \App\Models\Project::find($project->id);
+        $boardColumns = $projectModel->getBoardColumns();
 
-        // Lấy progress
-        $progress = \App\Models\TaskProgress::where('projectId', $project->id)
+        // Count tasks by column
+        $columnStats = [];
+        $columnNames = [];
+        $columnColors = [];
+
+        // Initialize stats for each column
+        foreach ($boardColumns as $column) {
+            $position = $column['position'];
+            $columnStats[$position] = 0;
+            $columnNames[$position] = $column['name'];
+            $columnColors[$position] = $column['color'];
+        }
+
+        // Count tasks by status
+        $tasks = \App\Models\Task::where('projectId', $project->id)->get();
+        foreach ($tasks as $task) {
+            $status = $task->status;
+
+            // Special handling for completed status
+            if ($status === \App\Models\Task::COMPLETED) {
+                // Find "Completed" column in board_columns
+                foreach ($boardColumns as $column) {
+                    if ($column['name'] === 'Completed') {
+                        $position = $column['position'];
+                        if (isset($columnStats[$position])) {
+                            $columnStats[$position]++;
+                        }
+                        break;
+                    }
+                }
+            } else {
+                // Handle other statuses (position-based)
+                $statusInt = intval($status);
+                if (isset($columnStats[$statusInt])) {
+                    $columnStats[$statusInt]++;
+                }
+            }
+        }
+
+        // Sort by column position
+        ksort($columnStats);
+        ksort($columnNames);
+        ksort($columnColors);
+
+        // Get progress
+        $progress = TaskProgress::where('projectId', $project->id)
             ->where('user_id', $user->id)
             ->value('progress') ?? 0;
 
@@ -322,10 +374,89 @@ class ProjectService
             'data' => [
                 'id' => $project->id,
                 'name' => $project->name,
-                'tasks' => [$pending, $completed],
+                'tasks' => array_values($columnStats),
+                'columnNames' => array_values($columnNames),
+                'columnColors' => array_values($columnColors),
                 'progress' => intval($progress),
             ],
             'message' => 'Get pinned project successfully'
         ];
+    }
+
+    /**
+     * Broadcast project creation events
+     * 
+     * @param \App\Models\Project $project
+     * @param array $allMembers
+     * @return void
+     */
+    private function broadcastProjectEvents($project, array $allMembers): void
+    {
+        // Dispatch UserProjectCountUpdated event for all members
+        foreach ($allMembers as $memberId) {
+            $memberProjectCount = $this->countProjectsForUser($memberId);
+            UserProjectCountUpdated::dispatch($memberId, $memberProjectCount);
+        }
+
+        $project->load([
+            'creator',
+            'users' => function ($q) {
+                $q->select('users.id', 'users.name', 'users.avatar');
+            }
+        ]);
+
+        foreach ($allMembers as $memberId) {
+            broadcast(new NewProjectForMembers($project, $memberId));
+
+            // Send notification for new members
+            $member = \App\Models\User::find($memberId);
+            if ($member) {
+                $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
+            }
+        }
+    }
+
+    /**
+     * Broadcast project update events
+     * 
+     * @param \App\Models\Project $project
+     * @param array $removedMembers
+     * @param array $allMembers
+     * @param array $newMembers
+     * @return void
+     */
+    private function broadcastProjectUpdateEvents($project, array $removedMembers, array $allMembers, array $newMembers): void
+    {
+        $project->load([
+            'creator',
+            'users' => function ($q) {
+                $q->select('users.id', 'users.name', 'users.avatar');
+            }
+        ]);
+
+        // Dispatch UserProjectCountUpdated event for new members
+        foreach ($newMembers as $memberId) {
+            $memberProjectCount = $this->countProjectsForUser($memberId);
+            UserProjectCountUpdated::dispatch($memberId, $memberProjectCount);
+        }
+
+        // Broadcast removal events
+        foreach ($removedMembers as $removedId) {
+            broadcast(new \App\Events\UserRemovedFromProject($project, $removedId));
+        }
+
+        // Broadcast update events for all members
+        foreach ($allMembers as $memberId) {
+            broadcast(new NewProjectForMembers($project, $memberId));
+        }
+
+        // Send notifications only to new members (not creator)
+        foreach ($newMembers as $memberId) {
+            if ($memberId == $project->creator_id) continue;
+            $member = \App\Models\User::find($memberId);
+            if ($member) {
+                $member->notify(new \App\Notifications\NewProjectAssigned($project, $memberId));
+            }
+        }
     }
 }
