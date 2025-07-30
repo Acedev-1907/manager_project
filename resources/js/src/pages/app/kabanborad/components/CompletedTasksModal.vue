@@ -79,8 +79,9 @@
                                     <div class="members-avatars">
                                         <div v-for="(member, index) in task.task_members.slice(0, 3)" :key="member.id"
                                             class="member-avatar" :style="{ zIndex: task.task_members.length - index }">
-                                            <img :src="getAvatarSrc(member.avatar, member.name)" :alt="member.name" />
-                                            <span class="member-tooltip">{{ member.name }}</span>
+                                            <img :src="getAvatarSrc(member.user?.avatar, member.user?.name)"
+                                                :alt="member.user?.name" />
+                                            <span class="member-tooltip">{{ member.user?.name }}</span>
                                         </div>
                                         <div v-if="task.task_members.length > 3" class="more-members">
                                             +{{ task.task_members.length - 3 }}
