@@ -200,6 +200,20 @@ const setupEventListeners = () => {
             // Silent error handling
         }
     });
+
+    // Project pinned events
+    eventBus.on('project-pinned', async (eventData: any) => {
+        try {
+            // Clear cache và refresh pinned project data
+            clearDashboardCache();
+            await getPinnedProject();
+            dashboardStore.setPinnedProject(project.value);
+            saveToCache('pinned_project', project.value);
+            setupProjectListeners(project.value);
+        } catch (error) {
+            // Silent error handling
+        }
+    });
 };
 
 // Handle page visibility change
@@ -246,6 +260,7 @@ onUnmounted(() => {
     eventBus.off('force-cache-clear');
     eventBus.off('task-comment-created');
     eventBus.off('count-project-updated');
+    eventBus.off('project-pinned');
     document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>

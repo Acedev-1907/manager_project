@@ -255,10 +255,32 @@ async function handlePinProject(projectId: number) {
     await pinnendProject(projectId);
     isLoading.value = false;
 
+    // Clear dashboard cache để đảm bảo dữ liệu mới được load
+    const dashboardCache = localStorage.getItem('dashboardCache');
+    if (dashboardCache) {
+        try {
+            const parsedCache = JSON.parse(dashboardCache);
+            if (parsedCache && typeof parsedCache === 'object') {
+                // Clear pinned project cache
+                delete parsedCache['pinned_project'];
+                localStorage.setItem('dashboardCache', JSON.stringify(parsedCache));
+                localStorage.removeItem('pinned_project_timestamp');
+            }
+        } catch (error) {
+            // Nếu có lỗi parse, clear toàn bộ dashboard cache
+            localStorage.setItem('dashboardCache', '{}');
+            localStorage.removeItem('pinned_project_timestamp');
+        }
+    }
+
     // Lưu dữ liệu project mới vào cache
     const dashboardStore = useDashboardStore();
     await getPinnedProjectForCache(); // Lấy dữ liệu project mới
     dashboardStore.setPinnedProject(pinnedProjectForCache.value); // Lưu vào cache
+
+    // Emit event để dashboard biết có project mới được ghim
+    eventBus.emit('project-pinned', { projectId, project: pinnedProjectForCache.value });
+
     router.push('/dashboard');
 }
 
