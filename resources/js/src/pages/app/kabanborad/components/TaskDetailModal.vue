@@ -52,13 +52,19 @@ watch([
 watch(() => props.visible, (visible) => {
     if (visible) {
         document.body.style.overflow = 'hidden';
+        // Add class to body when modal is opened
+        document.body.classList.add('modal-open');
     } else {
         document.body.style.overflow = '';
+        // Remove class from body when modal is closed
+        document.body.classList.remove('modal-open');
     }
 });
 
 onUnmounted(() => {
     document.body.style.overflow = '';
+    // Remove class from body when component is unmounted
+    document.body.classList.remove('modal-open');
 });
 
 function close() { emit('close'); }
@@ -214,171 +220,193 @@ function formatTime(dateStr: string) {
 </script>
 
 <template>
-    <div v-if="visible" class="modal-overlay">
-        <div class="modal-content split-layout">
-            <!-- Mobile Header với Close Button -->
-            <div class="mobile-header">
-                <h3 class="mobile-title">{{ task?.name }}</h3>
-                <button class="close-btn mobile-close" @click="close">×</button>
-            </div>
-
-            <!-- Desktop Close Button (ẩn trên mobile) -->
-            <button class="close-btn desktop-close" @click="close">×</button>
-            <!-- Mobile Tab Navigation -->
-            <div class="mobile-tabs">
-                <button :class="['tab-btn', { active: activeTab === 'content' }]" @click="activeTab = 'content'">
-                    <i class="bi bi-file-text"></i>
-                    Content
-                </button>
-                <button :class="['tab-btn', { active: activeTab === 'discussion' }]" @click="activeTab = 'discussion'">
-                    <i class="bi bi-chat-dots"></i>
-                    Discussion
-                </button>
-            </div>
-
-            <!-- Desktop Layout -->
-            <div class="desktop-layout">
-                <div class="task-info-col">
-                    <h2>{{ task?.name }}</h2>
-                    <div class="task-status">Status: <b>{{ getStatusText(task?.status) }}</b></div>
-                    <div class="task-members">
-                        <div v-for="m in task?.task_members" :key="m.id" class="member-avatar-box">
-                            <img :src="getAvatarSrc(getMemberAvatar(m), getMemberName(m))" class="member-avatar-img"
-                                :alt="getMemberName(m)" :title="getMemberName(m)" />
-                        </div>
+    <Teleport to="body">
+        <div v-if="visible" class="modal-backdrop" @click="close">
+            <div class="modal-dialog" @click.stop>
+                <div class="modal-content split-layout">
+                    <!-- Mobile Header với Close Button -->
+                    <div class="mobile-header">
+                        <h3 class="mobile-title">{{ task?.name }}</h3>
+                        <button class="close-btn mobile-close" @click="close">×</button>
                     </div>
-                    <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
-                    <div class="task-content">
-                        <b>Content:</b>
-                        {{ task?.content || task?.description || 'No content' }}
+
+                    <!-- Desktop Close Button (ẩn trên mobile) -->
+                    <button class="close-btn desktop-close" @click="close">×</button>
+                    <!-- Mobile Tab Navigation -->
+                    <div class="mobile-tabs">
+                        <button :class="['tab-btn', { active: activeTab === 'content' }]"
+                            @click="activeTab = 'content'">
+                            <i class="bi bi-file-text"></i>
+                            Content
+                        </button>
+                        <button :class="['tab-btn', { active: activeTab === 'discussion' }]"
+                            @click="activeTab = 'discussion'">
+                            <i class="bi bi-chat-dots"></i>
+                            Discussion
+                        </button>
                     </div>
-                </div>
-                <div class="task-chat-col">
-                    <div class="comments-section">
-                        <h4>Discussion</h4>
-                        <hr class="divider" />
-                        <div class="comments-list" ref="commentsListRef" @scroll="onCommentsScroll">
-                            <template v-if="comments.length === 0">
-                                <div class="comments-placeholder">This is a chat for task discussion.</div>
-                            </template>
-                            <div v-for="c in comments" :key="c.id"
-                                :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
-                                <div class="comment-bubble-wrap">
-                                    <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
-                                        <div class="comment-bubble">
-                                            <div class="comment-text">{{ c.content }}</div>
-                                        </div>
-                                        <img :src="getAvatarSrc(c.user?.avatar || '', c.user?.name || c.user?.email || '')"
-                                            class="comment-avatar" />
-                                    </template>
-                                    <template v-else>
-                                        <img v-if="c.user?.avatar"
-                                            :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
-                                            class="comment-avatar" />
-                                        <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
-                                            class="comment-avatar" />
-                                        <div class="comment-bubble">
-                                            <div class="comment-text">{{ c.content }}</div>
-                                        </div>
-                                    </template>
+
+                    <!-- Desktop Layout -->
+                    <div class="desktop-layout">
+                        <div class="task-info-col">
+                            <h2>{{ task?.name }}</h2>
+                            <div class="task-status">Status: <b>{{ getStatusText(task?.status) }}</b></div>
+                            <div class="task-members">
+                                <div v-for="m in task?.task_members" :key="m.id" class="member-avatar-box">
+                                    <img :src="getAvatarSrc(getMemberAvatar(m), getMemberName(m))"
+                                        class="member-avatar-img" :alt="getMemberName(m)" :title="getMemberName(m)" />
                                 </div>
-                                <div class="comment-time">{{ formatTime(c.created_at) }}</div>
+                            </div>
+                            <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
+                            <div class="task-content">
+                                <b>Content:</b>
+                                {{ task?.content || task?.description || 'No content' }}
                             </div>
                         </div>
-                        <!-- Nút thông báo tin nhắn mới -->
-                        <div v-if="showNewMsgBtn" class="new-msg-alert">
-                            <button @click="goToBottom">New message</button>
-                        </div>
-                        <div class="comment-input">
-                            <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
-                                placeholder="Type a message..." />
-                            <button @click="sendComment" :disabled="sendingComment">Send</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mobile Layout -->
-            <div class="mobile-layout">
-                <!-- Content Tab -->
-                <div v-if="activeTab === 'content'" class="mobile-content-tab">
-                    <h2 class="mobile-content-title">{{ task?.name }}</h2>
-                    <div class="task-status">Status: <b>{{ getStatusText(task?.status) }}</b></div>
-                    <div class="task-members">
-                        <div v-for="m in task?.task_members" :key="m.id" class="member-avatar-box">
-                            <img :src="getAvatarSrc(getMemberAvatar(m), getMemberName(m))" class="member-avatar-img"
-                                :alt="getMemberName(m)" :title="getMemberName(m)" />
-                        </div>
-                    </div>
-                    <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
-                    <div class="task-content">
-                        <b>Content:</b>
-                        {{ task?.content || task?.description || 'No content' }}
-                    </div>
-                </div>
-
-                <!-- Discussion Tab -->
-                <div v-if="activeTab === 'discussion'" class="mobile-discussion-tab">
-                    <div class="comments-section">
-                        <div class="comments-list" ref="mobileCommentsListRef" @scroll="onCommentsScroll">
-                            <template v-if="comments.length === 0">
-                                <div class="comments-placeholder">This is a chat for task discussion.</div>
-                            </template>
-                            <div v-for="c in comments" :key="c.id"
-                                :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
-                                <div class="comment-bubble-wrap">
-                                    <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
-                                        <div class="comment-bubble">
-                                            <div class="comment-text">{{ c.content }}</div>
-                                        </div>
-                                        <img :src="getAvatarSrc(c.user?.avatar || '', c.user?.name || c.user?.email || '')"
-                                            class="comment-avatar" />
+                        <div class="task-chat-col">
+                            <div class="comments-section">
+                                <h4>Discussion</h4>
+                                <hr class="divider" />
+                                <div class="comments-list" ref="commentsListRef" @scroll="onCommentsScroll">
+                                    <template v-if="comments.length === 0">
+                                        <div class="comments-placeholder">This is a chat for task discussion.</div>
                                     </template>
-                                    <template v-else>
-                                        <img v-if="c.user?.avatar"
-                                            :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
-                                            class="comment-avatar" />
-                                        <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
-                                            class="comment-avatar" />
-                                        <div class="comment-bubble">
-                                            <div class="comment-text">{{ c.content }}</div>
+                                    <div v-for="c in comments" :key="c.id"
+                                        :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
+                                        <div class="comment-bubble-wrap">
+                                            <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
+                                                <div class="comment-bubble">
+                                                    <div class="comment-text">{{ c.content }}</div>
+                                                </div>
+                                                <img :src="getAvatarSrc(c.user?.avatar || '', c.user?.name || c.user?.email || '')"
+                                                    class="comment-avatar" />
+                                            </template>
+                                            <template v-else>
+                                                <img v-if="c.user?.avatar"
+                                                    :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
+                                                    class="comment-avatar" />
+                                                <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
+                                                    class="comment-avatar" />
+                                                <div class="comment-bubble">
+                                                    <div class="comment-text">{{ c.content }}</div>
+                                                </div>
+                                            </template>
                                         </div>
-                                    </template>
+                                        <div class="comment-time">{{ formatTime(c.created_at) }}</div>
+                                    </div>
                                 </div>
-                                <div class="comment-time">{{ formatTime(c.created_at) }}</div>
+                                <!-- Nút thông báo tin nhắn mới -->
+                                <div v-if="showNewMsgBtn" class="new-msg-alert">
+                                    <button @click="goToBottom">New message</button>
+                                </div>
+                                <div class="comment-input">
+                                    <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
+                                        placeholder="Type a message..." />
+                                    <button @click="sendComment" :disabled="sendingComment">Send</button>
+                                </div>
                             </div>
                         </div>
-                        <!-- Nút thông báo tin nhắn mới -->
-                        <div v-if="showNewMsgBtn" class="new-msg-alert">
-                            <button @click="goToBottom">New message</button>
+                    </div>
+
+                    <!-- Mobile Layout -->
+                    <div class="mobile-layout">
+                        <!-- Content Tab -->
+                        <div v-if="activeTab === 'content'" class="mobile-content-tab">
+                            <h2 class="mobile-content-title">{{ task?.name }}</h2>
+                            <div class="task-status">Status: <b>{{ getStatusText(task?.status) }}</b></div>
+                            <div class="task-members">
+                                <div v-for="m in task?.task_members" :key="m.id" class="member-avatar-box">
+                                    <img :src="getAvatarSrc(getMemberAvatar(m), getMemberName(m))"
+                                        class="member-avatar-img" :alt="getMemberName(m)" :title="getMemberName(m)" />
+                                </div>
+                            </div>
+                            <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
+                            <div class="task-content">
+                                <b>Content:</b>
+                                {{ task?.content || task?.description || 'No content' }}
+                            </div>
                         </div>
-                        <div class="comment-input">
-                            <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
-                                placeholder="Type a message..." />
-                            <button @click="sendComment" :disabled="sendingComment">Send</button>
+
+                        <!-- Discussion Tab -->
+                        <div v-if="activeTab === 'discussion'" class="mobile-discussion-tab">
+                            <div class="comments-section">
+                                <div class="comments-list" ref="mobileCommentsListRef" @scroll="onCommentsScroll">
+                                    <template v-if="comments.length === 0">
+                                        <div class="comments-placeholder">This is a chat for task discussion.</div>
+                                    </template>
+                                    <div v-for="c in comments" :key="c.id"
+                                        :class="['comment-item', String(c.user?.id || c.user_id) === currentUserIdStr ? 'my-message' : 'other-message']">
+                                        <div class="comment-bubble-wrap">
+                                            <template v-if="String(c.user?.id || c.user_id) === currentUserIdStr">
+                                                <div class="comment-bubble">
+                                                    <div class="comment-text">{{ c.content }}</div>
+                                                </div>
+                                                <img :src="getAvatarSrc(c.user?.avatar || '', c.user?.name || c.user?.email || '')"
+                                                    class="comment-avatar" />
+                                            </template>
+                                            <template v-else>
+                                                <img v-if="c.user?.avatar"
+                                                    :src="getAvatarSrc(c.user.avatar, c.user?.name || c.user?.email || '')"
+                                                    class="comment-avatar" />
+                                                <img v-else :src="getAvatarSrc('', c.user?.name || c.user?.email || '')"
+                                                    class="comment-avatar" />
+                                                <div class="comment-bubble">
+                                                    <div class="comment-text">{{ c.content }}</div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <div class="comment-time">{{ formatTime(c.created_at) }}</div>
+                                    </div>
+                                </div>
+                                <!-- Nút thông báo tin nhắn mới -->
+                                <div v-if="showNewMsgBtn" class="new-msg-alert">
+                                    <button @click="goToBottom">New message</button>
+                                </div>
+                                <div class="comment-input">
+                                    <input v-model="newComment" @keyup.enter="sendComment" :disabled="sendingComment"
+                                        placeholder="Type a message..." />
+                                    <button @click="sendComment" :disabled="sendingComment">Send</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </Teleport>
 </template>
 
 <style scoped>
-.modal-overlay {
+.modal-backdrop {
     position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.25);
-    z-index: 9999;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 900 !important;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 20px;
+    /* Ensure modal is above all elements including Kanban page */
+    isolation: isolate;
+    pointer-events: auto;
+}
+
+.modal-dialog {
+    max-width: 1050px;
+    width: 100%;
+    max-height: 85vh;
+    z-index: 901 !important;
+    position: relative;
 }
 
 .modal-content {
     background: #fff;
-    border-radius: 18px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
     padding: 32px 18px 24px 18px;
     min-width: 540px;
     max-width: 1050px;
@@ -387,7 +415,12 @@ function formatTime(dateStr: string) {
     display: flex;
     flex-direction: row;
     gap: 0;
-    top: 20px;
+    max-height: 85vh;
+    overflow: hidden;
+    z-index: 902 !important;
+    /* Ensure content is above all elements */
+    isolation: isolate;
+    position: relative;
     transition: min-width 0.2s, min-height 0.2s, max-width 0.2s;
 }
 
@@ -448,6 +481,11 @@ function formatTime(dateStr: string) {
 }
 
 @media (max-width: 900px) {
+    .modal-dialog {
+        max-width: 95vw;
+        margin: 10px;
+    }
+
     .modal-content {
         flex-direction: column;
         min-width: 90vw;
@@ -984,5 +1022,14 @@ function formatTime(dateStr: string) {
         padding: 8px 16px;
         font-size: 1rem;
     }
+}
+
+/* Ensure SweetAlert2 notifications appear above modal */
+:deep(.swal2-container) {
+    z-index: 999 !important;
+}
+
+:deep(.swal2-popup) {
+    z-index: 999 !important;
 }
 </style>
