@@ -29,7 +29,7 @@ const props = defineProps({
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 9999;
+    z-index: 99;
     background: rgba(255, 255, 255, 0.95);
     display: flex;
     align-items: center;
