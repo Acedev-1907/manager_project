@@ -140,16 +140,6 @@ class Project extends Model
         'icon' => 'fas fa-clock',
         'created_at' => now(),
         'updated_at' => now()
-      ],
-      [
-        'id' => 3,
-        'name' => 'Completed',
-        'key_name' => 'completed',
-        'position' => 2,
-        'color' => '#10b981',
-        'icon' => 'fas fa-check-circle',
-        'created_at' => now(),
-        'updated_at' => now()
       ]
     ];
   }
