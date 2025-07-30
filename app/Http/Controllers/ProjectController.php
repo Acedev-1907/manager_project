@@ -37,6 +37,9 @@ class ProjectController extends ApiController
         $userId = $request->user()->id;
         $query = $request->get('query');
         $projects = $this->service->getProjectsForUser($userId, $query);
+
+
+
         return $this->respondWithData($projects, 'Projects retrieved successfully');
     }
 

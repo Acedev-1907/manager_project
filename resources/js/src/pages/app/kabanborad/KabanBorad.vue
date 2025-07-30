@@ -276,6 +276,20 @@ onMounted(async () => {
             // Silent error handling
         }
     });
+
+    // Listen for project progress updated events
+    eventBus.on('project-progress-updated', async (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                if (!isCurrentUser(eventData.userId)) {
+                    // Refresh project data to get updated progress
+                    await getProjectDetail(slug, false);
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
 });
 
 // Debounced function to clear cache
@@ -706,6 +720,7 @@ async function handleDeleteColumn(columnId: number) {
 onUnmounted(() => {
     eventBus.off('force-cache-clear');
     eventBus.off('task-comment-created');
+    eventBus.off('project-progress-updated');
     window.removeEventListener('resize', forceScrollbar);
 });
 </script>
@@ -1522,7 +1537,8 @@ onUnmounted(() => {
     }
 
     /* Tối ưu thêm cho scroll mượt mà */
-    .kanban-grid-container {/* Tối ưu cho iOS */
+    .kanban-grid-container {
+        /* Tối ưu cho iOS */
         -webkit-overflow-scrolling: touch;
         /* Tối ưu cho Android */
         overscroll-behavior-x: contain;

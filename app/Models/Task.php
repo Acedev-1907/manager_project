@@ -6,7 +6,6 @@ use App\Events\TrackProjectProgress;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Events\TrackCompletedAndPending;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
 class Task extends Model
@@ -152,27 +151,39 @@ class Task extends Model
             $totalCompletedTask = Task::countCompletedTask($projectId);
             $progress = Task::aroundNumber(($totalCompletedTask * 100) / $totalTask);
 
+            // Luôn cập nhật TaskProgress record, tạo mới nếu chưa tồn tại
             $taskProgress = TaskProgress::where('projectId', $projectId)->first();
-            if (!is_null($taskProgress)) {
+            if (is_null($taskProgress)) {
+                // Tạo mới TaskProgress record nếu chưa tồn tại
+                $taskProgress = TaskProgress::create([
+                    'projectId' => $projectId,
+                    'user_id' => $userId ?? 1, // Fallback user ID
+                    'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
+                    'progress' => $progress,
+                ]);
+            } else {
+                // Cập nhật progress nếu record đã tồn tại
                 $taskProgress->where('projectId', $projectId)
                     ->update(['progress' => $progress]);
-
-                $tasks = Task::countCompletedAndPendingTask($projectId);
-
-                // Dispatch events with user information
-                TrackCompletedAndPending::dispatch($tasks, $projectId, null, $userId);
-                TrackProjectProgress::dispatch($progress, $projectId, $userId);
-
-                // Log::info('Project progress updated', [
-                //     'projectId' => $projectId,
-                //     'progress' => $progress,
-                //     'totalTasks' => $totalTask,
-                //     'completedTasks' => $totalCompletedTask,
-                //     'userId' => $userId
-                // ]);
-
-                return $progress;
             }
+
+            $tasks = Task::countCompletedAndPendingTask($projectId);
+
+            // Luôn dispatch events để FE nhận được thông báo real-time
+            TrackCompletedAndPending::dispatch($tasks, $projectId, null, $userId);
+            TrackProjectProgress::dispatch($progress, $projectId, $userId);
+
+
+
+            // Log::info('Project progress updated', [
+            //     'projectId' => $projectId,
+            //     'progress' => $progress,
+            //     'totalTasks' => $totalTask,
+            //     'completedTasks' => $totalCompletedTask,
+            //     'userId' => $userId
+            // ]);
+
+            return $progress;
         } catch (\Exception $e) {
             // Log::error('Error in handleProjectProgress', [
             //     'projectId' => $projectId,

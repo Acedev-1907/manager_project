@@ -26,8 +26,9 @@ export function useAppGlobalRealtime() {
           // Emit event for project progress updates
           eventBus.emit("project-progress-updated", {
             projectId,
-            progress: e.progress,
+            progress: e.projectProgress,
             timestamp: Date.now(),
+            userId: e.userId,
           });
         });
 

@@ -169,6 +169,29 @@ onMounted(async () => {
         }
     });
 
+    // Listen for project progress updated events
+    eventBus.on('project-progress-updated', async (eventData: any) => {
+        try {
+            const currentProjectIds = projectData.value?.data?.data?.map(p => p.id) || [];
+
+            // Chỉ refresh nếu event liên quan đến project trong danh sách hiện tại
+            if (eventData?.projectId && currentProjectIds.includes(eventData.projectId)) {
+                // Clear cache hoàn toàn và force refresh để đảm bảo data mới nhất
+                projectCache.value = {};
+                localStorage.setItem('projectCache', '{}');
+                // Clear tất cả timestamps
+                Object.keys(localStorage).forEach(key => {
+                    if (key.includes('project_page_') && key.includes('_timestamp')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                await fetchProjects(1, query.value, false, true); // forceRefresh = true
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
     // Listen for page visibility changes
     document.addEventListener('visibilitychange', handleVisibilityChange);
 });
@@ -338,6 +361,7 @@ onMounted(async () => {
 onUnmounted(() => {
     // Remove eventBus listeners
     eventBus.off('force-cache-clear');
+    eventBus.off('project-progress-updated');
 
     // Remove page visibility listener
     document.removeEventListener('visibilitychange', handleVisibilityChange);
