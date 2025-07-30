@@ -247,7 +247,7 @@ class Task extends Model
      */
     public static function getCompletedTasks(int $projectId)
     {
-        return self::with(['task_members.member.user'])
+        return self::with(['task_members.user'])
             ->where('projectId', $projectId)
             ->where('status', self::COMPLETED)
             ->get();
