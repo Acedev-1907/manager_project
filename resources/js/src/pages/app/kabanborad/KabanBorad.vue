@@ -1018,6 +1018,31 @@ onUnmounted(() => {
     background: #e0e7ef;
 }
 
+/* Mobile responsive for action buttons */
+@media (max-width: 768px) {
+
+    .back-btn,
+    .edit-btn,
+    .view-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+        margin: 0 1px;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .back-btn,
+    .edit-btn,
+    .view-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 0.9rem;
+        margin: 0;
+    }
+}
+
 @media (max-width: 768px) {
     .kanban-container {
         height: calc(100vh - 62px);
@@ -1115,6 +1140,28 @@ onUnmounted(() => {
         height: 32px;
         font-size: 0.95rem;
         margin: 0;
+    }
+
+    /* Mobile complete button in mobile actions */
+    .mobile-actions .complete-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        margin-right: 4px;
+        border-width: 1.5px;
+    }
+
+    .mobile-actions .complete-btn i {
+        font-size: 0.9rem;
+    }
+
+    .mobile-actions .complete-btn .task-count {
+        width: 16px;
+        height: 16px;
+        font-size: 0.65rem;
+        top: -5px;
+        right: -5px;
+        border-width: 1px;
     }
 }
 
@@ -1283,6 +1330,53 @@ onUnmounted(() => {
     cursor: not-allowed;
 }
 
+/* Mobile responsive for complete button */
+@media (max-width: 768px) {
+    .complete-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 6px;
+        margin-right: 6px;
+        border-width: 1.5px;
+    }
+
+    .complete-btn i {
+        font-size: 1rem;
+    }
+
+    .complete-btn .task-count {
+        width: 18px;
+        height: 18px;
+        font-size: 0.7rem;
+        top: -6px;
+        right: -6px;
+        border-width: 1.5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .complete-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 5px;
+        margin-right: 4px;
+        border-width: 1px;
+    }
+
+    .complete-btn i {
+        font-size: 0.9rem;
+    }
+
+    .complete-btn .task-count {
+        width: 16px;
+        height: 16px;
+        font-size: 0.65rem;
+        top: -5px;
+        right: -5px;
+        border-width: 1px;
+    }
+}
+
 .kanban-column {
     width: 320px;
     min-width: 320px;
@@ -1428,8 +1522,7 @@ onUnmounted(() => {
     }
 
     /* Tối ưu thêm cho scroll mượt mà */
-    .kanban-grid-container {
-        /* Tối ưu cho iOS */
+    .kanban-grid-container {/* Tối ưu cho iOS */
         -webkit-overflow-scrolling: touch;
         /* Tối ưu cho Android */
         overscroll-behavior-x: contain;

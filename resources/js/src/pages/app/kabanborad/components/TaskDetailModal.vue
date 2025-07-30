@@ -393,6 +393,7 @@ function formatTime(dateStr: string) {
     /* Ensure modal is above all elements including Kanban page */
     isolation: isolate;
     pointer-events: auto;
+    align-items: stretch;
 }
 
 .modal-dialog {

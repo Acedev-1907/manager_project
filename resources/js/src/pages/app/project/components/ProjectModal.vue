@@ -36,7 +36,7 @@
                                     <DateInput v-model="projectInput.startDate" placeholder="Start Date"
                                         prefix-icon="fas fa-calendar-alt" />
                                     <div v-if="errors.startDate" class="text-danger error-message">{{ errors.startDate
-                                        }}
+                                    }}
                                     </div>
                                 </div>
                                 <div class="col">
@@ -495,6 +495,31 @@ body.modal-open .kanban-container .modal-content {
     flex-shrink: 0;
 }
 
+/* Mobile responsive for modal header */
+@media (max-width: 768px) {
+    .modal-header {
+        padding: 1rem 1.25rem 0.75rem 1.25rem;
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .header-content-centered {
+        text-align: center;
+    }
+
+    .header-actions {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-header {
+        padding: 0.75rem 1rem 0.5rem 1rem;
+        gap: 10px;
+    }
+}
+
 .header-content-centered {
     flex: 1;
     display: flex;
@@ -510,6 +535,27 @@ body.modal-open .kanban-container .modal-content {
     align-items: center;
 }
 
+/* Mobile responsive for header actions */
+@media (max-width: 768px) {
+    .header-actions {
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-actions {
+        gap: 6px;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .header-actions .btn-create,
+    .header-actions .btn-cancel {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
 .btn-create,
 .btn-cancel {
     min-width: 80px;
@@ -517,6 +563,10 @@ body.modal-open .kanban-container .modal-content {
     border-radius: 8px;
     font-weight: 500;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 .btn-cancel {
@@ -535,6 +585,41 @@ body.modal-open .kanban-container .modal-content {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+/* Mobile responsive for buttons */
+@media (max-width: 768px) {
+
+    .btn-create,
+    .btn-cancel {
+        min-width: 70px;
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        border-radius: 6px;
+        gap: 4px;
+    }
+
+    .btn-create i,
+    .btn-cancel i {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .btn-create,
+    .btn-cancel {
+        min-width: 60px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        border-radius: 5px;
+        gap: 3px;
+    }
+
+    .btn-create i,
+    .btn-cancel i {
+        font-size: 0.8rem;
+    }
+}
+
 .modal-title {
     font-size: 1.5rem;
     font-weight: 700;
@@ -551,11 +636,45 @@ body.modal-open .kanban-container .modal-content {
     text-align: center;
 }
 
+/* Mobile responsive for modal title and subtitle */
+@media (max-width: 768px) {
+    .modal-title {
+        font-size: 1.3rem;
+    }
+
+    .modal-subtitle {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-title {
+        font-size: 1.2rem;
+    }
+
+    .modal-subtitle {
+        font-size: 0.85rem;
+    }
+}
+
 .modal-body {
     padding: 1.25rem 1.5rem 1.5rem 1.5rem;
     overflow-y: auto;
     flex: 1;
     min-height: 0;
+}
+
+/* Mobile responsive for modal body */
+@media (max-width: 768px) {
+    .modal-body {
+        padding: 1rem 1.25rem 1.25rem 1.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-body {
+        padding: 0.75rem 1rem 1rem 1rem;
+    }
 }
 
 .form-group {
