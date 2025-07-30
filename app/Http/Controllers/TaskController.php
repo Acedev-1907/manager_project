@@ -59,6 +59,48 @@ class TaskController extends Controller
         return response(['error' => 'Failed to update task status'], 500);
     }
 
+    public function transitionToStatus(Request $req, string $status)
+    {
+        // Handle both numeric and string status
+        $newStatus = $status;
+
+        // If status is numeric, convert to int for validation
+        if (is_numeric($status)) {
+            $newStatus = (int)$status;
+            // Validate status range (allow any non-negative integer)
+            if ($newStatus < 0) {
+                return response(['error' => 'Invalid status: ' . $status], 400);
+            }
+        } else {
+            // For string status, only allow 'OK' for completed
+            if ($status !== 'OK') {
+                return response(['error' => 'Invalid status: ' . $status], 400);
+            }
+        }
+
+        // Add userId to the data
+        $data = $req->all();
+        $data['userId'] = Auth::id();
+
+        $checkUpdate = $this->taskService->updateTaskStatus($data, $newStatus);
+
+        if ($checkUpdate) {
+            // Map status to column name for response
+            $statusNames = [
+                0 => 'Not Started',
+                1 => 'Pending',
+                2 => 'Column 2',
+                3 => 'Column 3',
+                4 => 'Column 4',
+                'OK' => 'Completed'
+            ];
+            $statusName = $statusNames[$newStatus] ?? "Column {$newStatus}";
+            return response(['message' => "Task moved to {$statusName}"], 200);
+        }
+
+        return response(['error' => 'Failed to update task status'], 500);
+    }
+
     public function destroy($id)
     {
         $result = $this->taskService->deleteTask($id);

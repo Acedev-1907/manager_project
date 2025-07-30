@@ -25,9 +25,11 @@ class ProjectController extends ApiController
         $user = request()->user();
 
         if (!$project || !$project->users->contains('id', $user->id)) {
-            return response(['message' => 'You do not have permission to access this project!'], 403);
+            return $this->setStatusCode(403)
+                ->setReturnCode(self::ERROR_FORBIDDEN)
+                ->respondWithError('You do not have permission to access this project');
         }
-        return response(['data' => $project]);
+        return $this->respondWithData($project, 'Project retrieved successfully');
     }
 
     public function index(Request $request)
@@ -35,7 +37,7 @@ class ProjectController extends ApiController
         $userId = $request->user()->id;
         $query = $request->get('query');
         $projects = $this->service->getProjectsForUser($userId, $query);
-        return response(['data' => $projects], 200);
+        return $this->respondWithData($projects, 'Projects retrieved successfully');
     }
 
     public function store(Request $req)
@@ -45,9 +47,11 @@ class ProjectController extends ApiController
         $result = $this->service->createProject($req->all(), $user);
 
         if (isset($result['errors'])) {
-            return response($result['errors'], $result['status']);
+            return $this->setStatusCode($result['status'])
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError($result['errors']);
         }
-        return response(['message' => $result['message']], $result['status']);
+        return $this->respondWithMessage($result['message']);
     }
 
     public function update(UpdateProjectRequest $request)
@@ -57,19 +61,148 @@ class ProjectController extends ApiController
         $project = Project::find($projectId);
 
         if (!$project) {
-            return response(['message' => 'Project does not exist'], 404);
+            return $this->respondNotFound('Project does not exist');
         }
 
         if ($project->creator_id !== $user->id) {
-            return response(['message' => 'You cannot edit this project'], 403);
+            return $this->setStatusCode(403)
+                ->setReturnCode(self::ERROR_FORBIDDEN)
+                ->respondWithError('You cannot edit this project');
         }
 
         $result = $this->service->updateProject($request->all(), $user);
 
         if (isset($result['errors'])) {
-            return response($result['errors'], $result['status']);
+            return $this->setStatusCode($result['status'])
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError($result['errors']);
         }
-        return response(['message' => $result['message']], $result['status']);
+        return $this->respondUpdated($result['message']);
+    }
+
+    public function addColumn(Request $request, $projectId)
+    {
+        $user = $request->user();
+        $project = Project::find($projectId);
+
+        if (!$project) {
+            return $this->respondNotFound('Project not found');
+        }
+
+        if (!$project->users->contains('id', $user->id)) {
+            return $this->setStatusCode(403)
+                ->setReturnCode(self::ERROR_FORBIDDEN)
+                ->respondWithError('You do not have permission to access this project');
+        }
+
+        $columnData = $request->input('add_column');
+        if (!$columnData) {
+            return $this->setStatusCode(400)
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError('Column data is required');
+        }
+
+        try {
+            $column = $project->addColumn(
+                $columnData['name'],
+                $columnData['color'] ?? '#3b82f6',
+                $columnData['icon'] ?? 'fas fa-columns'
+            );
+
+            return $this->respondWithData($column, 'Column added successfully');
+        } catch (\Exception $e) {
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to add column: ' . $e->getMessage());
+        }
+    }
+
+    public function updateColumn(Request $request, $projectId)
+    {
+        $user = $request->user();
+        $project = Project::find($projectId);
+
+        if (!$project) {
+            return $this->respondNotFound('Project not found');
+        }
+
+        if (!$project->users->contains('id', $user->id)) {
+            return $this->setStatusCode(403)
+                ->setReturnCode(self::ERROR_FORBIDDEN)
+                ->respondWithError('You do not have permission to access this project');
+        }
+
+        $columnData = $request->input('update_column');
+        if (!$columnData || !isset($columnData['column_id'])) {
+            return $this->setStatusCode(400)
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError('Column ID and data are required');
+        }
+
+        try {
+            $updatedColumn = $project->updateColumn($columnData['column_id'], [
+                'name' => $columnData['name'],
+                'color' => $columnData['color'] ?? '#3b82f6',
+                'icon' => $columnData['icon'] ?? 'fas fa-columns'
+            ]);
+
+            if ($updatedColumn) {
+                return $this->respondWithData($updatedColumn, 'Column updated successfully');
+            } else {
+                return $this->respondNotFound('Column not found');
+            }
+        } catch (\Exception $e) {
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to update column: ' . $e->getMessage());
+        }
+    }
+
+    public function deleteColumn(Request $request, $projectId)
+    {
+        $user = $request->user();
+        $project = Project::find($projectId);
+
+        if (!$project) {
+            return $this->respondNotFound('Project not found');
+        }
+
+        if (!$project->users->contains('id', $user->id)) {
+            return $this->setStatusCode(403)
+                ->setReturnCode(self::ERROR_FORBIDDEN)
+                ->respondWithError('You do not have permission to access this project');
+        }
+
+        $columnId = $request->input('column_id');
+        if (!$columnId) {
+            return $this->setStatusCode(400)
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError('Column ID is required');
+        }
+
+        try {
+            // Check if column has tasks
+            $columnStatus = $project->getColumnStatus($columnId);
+            if ($columnStatus !== null) {
+                $tasksInColumn = $project->tasks()->where('status', $columnStatus)->count();
+                if ($tasksInColumn > 0) {
+                    return $this->setStatusCode(400)
+                        ->setReturnCode(self::ERROR_VALIDATION)
+                        ->respondWithError("Cannot delete column. It contains {$tasksInColumn} task(s). Please move or delete all tasks first.");
+                }
+            }
+
+            $deleted = $project->deleteColumn($columnId);
+            if ($deleted) {
+                return $this->respondWithMessage('Column deleted successfully');
+            } else {
+                return $this->respondNotFound('Column not found');
+            }
+        } catch (\Exception $e) {
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to delete column: ' . $e->getMessage());
+        }
     }
 
     public function pinnedProject(Request $request)
@@ -146,5 +279,27 @@ class ProjectController extends ApiController
             return response($result['errors'], $result['status']);
         }
         return response(['message' => $result['message']], $result['status']);
+    }
+
+    /**
+     * Get completed tasks for a project
+     */
+    public function getCompletedTasks(Request $request, $projectId)
+    {
+        $user = $request->user();
+        $project = Project::find($projectId);
+
+        if (!$project) {
+            return $this->respondNotFound('Project not found');
+        }
+
+        if (!$project->users->contains('id', $user->id)) {
+            return $this->setStatusCode(403)
+                ->setReturnCode(self::ERROR_FORBIDDEN)
+                ->respondWithError('You do not have permission to access this project');
+        }
+
+        $completedTasks = \App\Models\Task::getCompletedTasks($projectId);
+        return $this->respondWithData($completedTasks, 'Completed tasks retrieved successfully');
     }
 }

@@ -6,7 +6,6 @@ use App\Repositories\ProjectRepository;
 use App\Models\TaskProgress;
 use App\Events\UserProjectCountUpdated;
 use Illuminate\Support\Facades\DB;
-
 use Illuminate\Support\Facades\Validator;
 use App\Events\NewProjectForMembers;
 
@@ -26,6 +25,7 @@ class ProjectService
             'name' => 'required',
             'startDate' => 'required',
             'endDate' => 'required',
+            'content' => 'nullable|string',
         ]);
         if ($errs->fails()) return ['errors' => $errs->errors()->all(), 'status' => 422];
 
@@ -34,6 +34,7 @@ class ProjectService
                 'name' => $fields['name'],
                 'startDate' => $fields['startDate'],
                 'endDate' => $fields['endDate'],
+                'content' => $fields['content'] ?? null,
                 'status' => \App\Models\Project::NOT_STARTED,
                 'slug' => \App\Models\Project::createSlug($fields['name']),
                 'creator_id' => $user->id,
@@ -58,6 +59,9 @@ class ProjectService
                 'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
                 'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
             ]);
+
+            // Tạo 3 cột mặc định cho project (sẽ được tạo tự động khi truy cập)
+            // Không cần gọi createDefaultColumns vì đã được handle trong Project model
 
             // Đảm bảo broadcast và notify chỉ chạy sau khi transaction commit thành công
             DB::afterCommit(function () use ($project, $broadcastMembers) {
@@ -98,6 +102,7 @@ class ProjectService
                 'name' => $fields['name'],
                 'startDate' => $fields['startDate'],
                 'endDate' => $fields['endDate'],
+                'content' => $fields['content'] ?? null,
             ]);
 
             $members = $fields['members'] ?? [];

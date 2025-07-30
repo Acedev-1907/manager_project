@@ -1,7 +1,7 @@
 export enum TaskStatus {
   NOT_STARTED = 0,
   PENDING = 1,
-  COMPLETED = 2,
+  COMPLETED = "OK",
 }
 
 export type SingleProjectResponseType = {
@@ -11,6 +11,7 @@ export type SingleProjectResponseType = {
     status: number;
     startDate: string;
     endDate: string;
+    content?: string;
     slug: string;
     created_at: string;
     updated_at: string;
@@ -19,6 +20,11 @@ export type SingleProjectResponseType = {
       name: string;
       email: string;
     }>;
+    creator?: {
+      id: number;
+      name: string;
+      email: string;
+    };
     tasks: [
       {
         id: number;

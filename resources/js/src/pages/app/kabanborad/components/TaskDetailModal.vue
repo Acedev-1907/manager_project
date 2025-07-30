@@ -250,7 +250,7 @@ function formatTime(dateStr: string) {
                     <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
                     <div class="task-content">
                         <b>Content:</b>
-                        <div>{{ task?.content || task?.description || 'No content' }}</div>
+                        {{ task?.content || task?.description || 'No content' }}
                     </div>
                 </div>
                 <div class="task-chat-col">
@@ -313,7 +313,7 @@ function formatTime(dateStr: string) {
                     <div class="task-date">Created: {{ new Date(task?.created_at).toLocaleString() }}</div>
                     <div class="task-content">
                         <b>Content:</b>
-                        <div>{{ task?.content || task?.description || 'No content' }}</div>
+                        {{ task?.content || task?.description || 'No content' }}
                     </div>
                 </div>
 
@@ -387,7 +387,7 @@ function formatTime(dateStr: string) {
     display: flex;
     flex-direction: row;
     gap: 0;
-    /* Thêm cho mobile để không bị co giãn khi chuyển tab */
+    top: 20px;
     transition: min-width 0.2s, min-height 0.2s, max-width 0.2s;
 }
 
@@ -879,6 +879,7 @@ function formatTime(dateStr: string) {
     }
 
     .split-layout {
+        top: 23px;
         flex-direction: column;
     }
 

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('projectId');
             $table->string('name');
             $table->text('content')->nullable();
-            $table->integer('status');
+            $table->string('status');
             $table->timestamps();
 
             $table->foreign('projectId')->references('id')->on('projects')->onDelete('cascade');

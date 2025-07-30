@@ -38,11 +38,11 @@ class ChannelAuthorizationService
 
             return $isAuthorized;
         } catch (\Exception $e) {
-            Log::error('Error checking project channel authorization', [
-                'user_id' => $user->id,
-                'project_id' => $projectId,
-                'error' => $e->getMessage()
-            ]);
+            // Log::error('Error checking project channel authorization', [
+            //     'user_id' => $user->id,
+            //     'project_id' => $projectId,
+            //     'error' => $e->getMessage()
+            // ]);
             return false;
         }
     }
@@ -96,11 +96,11 @@ class ChannelAuthorizationService
 
             return $isAuthorized;
         } catch (\Exception $e) {
-            Log::error('Error checking task channel authorization', [
-                'user_id' => $user->id,
-                'task_id' => $taskId,
-                'error' => $e->getMessage()
-            ]);
+            // Log::error('Error checking task channel authorization', [
+            //     'user_id' => $user->id,
+            //     'task_id' => $taskId,
+            //     'error' => $e->getMessage()
+            // ]);
             return false;
         }
     }

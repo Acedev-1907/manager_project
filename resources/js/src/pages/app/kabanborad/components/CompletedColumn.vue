@@ -6,7 +6,7 @@ import KabanColumnBase from './KabanColumnBase.vue';
 const props = defineProps<{ projectData: SingleProjectResponseType, menuState: any, setMenuState: any }>();
 
 const completedTasks = computed(() => {
-    return props.projectData?.data?.tasks?.filter(task => task.status === TaskStatus.COMPLETED) || [];
+    return props.projectData?.data?.tasks?.filter(task => String(task.status) === 'OK') || [];
 });
 </script>
 <template>

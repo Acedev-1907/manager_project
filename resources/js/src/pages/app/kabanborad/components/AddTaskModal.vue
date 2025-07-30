@@ -93,16 +93,13 @@ async function submitTask() {
     }
     const result = await v$.value.$validate();
     if (!result) return;
-    if (taskStore.taskInput.memberIds.length > 0) {
-        await createTask();
-        taskStore.taskInput.memberIds = [];
-        taskStore.taskInput.name = "";
-        v$.value.$reset();
-        emit('refreshKabanBoard');
-        emit('closeModal');
-    } else {
-        showError('please select a member');
-    }
+
+    await createTask();
+    taskStore.taskInput.memberIds = [];
+    taskStore.taskInput.name = "";
+    v$.value.$reset();
+    emit('refreshKabanBoard');
+    emit('closeModal');
 }
 
 watch(() => props.visible, (newVal) => {

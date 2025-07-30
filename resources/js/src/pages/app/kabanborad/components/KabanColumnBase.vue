@@ -150,7 +150,7 @@ function onAddTask() {
     position: relative;
     overflow: hidden;
     min-height: 450px;
-    max-height: 600px;
+    max-height: 478px;
     display: flex;
     flex-direction: column;
 }
@@ -322,7 +322,7 @@ function onAddTask() {
     min-height: 120px;
     display: flex;
     flex-direction: column;
-    touch-action: none;
+    touch-action: pan-x pan-y;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;

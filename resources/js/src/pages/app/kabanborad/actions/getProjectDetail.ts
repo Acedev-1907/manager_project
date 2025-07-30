@@ -22,6 +22,7 @@ export function useGetProjectDetail() {
         "GET"
       );
       loading.value = false;
+
       ProjectData.value = data;
     } catch (error: any) {
       showError("Project does not exist!");

@@ -7,6 +7,7 @@ export type ProjectType = {
   name: string;
   startDate: string;
   endDate: string;
+  content?: string;
   slug: string;
   task_progress: {
     id: number;

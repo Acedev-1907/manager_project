@@ -254,7 +254,7 @@ async function handleDeleteProject(projectId: number) {
 }
 
 function openCreateProject() {
-    projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
+    projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', content: '', members: [] };
     isEdit.value = false;
     showProjectModal.value = true;
 }
@@ -264,6 +264,7 @@ function openEditProject(project: ProjectType) {
         ...project,
         startDate: project.startDate || '',
         endDate: project.endDate || '',
+        content: project.content || '',
         members: (project.users || []).map(u => u.id)
     };
     isEdit.value = true;
@@ -276,6 +277,7 @@ async function handleSubmitProject(data: ProjectInputType) {
         ...data,
         startDate: data.startDate || '',
         endDate: data.endDate || '',
+        content: data.content || '',
         members: data.members ?? [],
     };
     await createOrUpdate();
@@ -316,7 +318,7 @@ onMounted(async () => {
     await setupProjectListeners();
 
     projectStore.edit = false;
-    projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', members: [] };
+    projectStore.projectInput = { id: 0, name: '', startDate: '', endDate: '', content: '', members: [] };
 
     // Watch for project data changes and re-setup listeners if needed
     watch(() => projectData.value?.data?.data, async (newProjects, oldProjects) => {

@@ -34,7 +34,7 @@ class TaskService
             'projectId' => $fields['projectId'],
             'name' => $fields['name'],
             'content' => $fields['content'] ?? null,
-            'status' => Task::NOT_STARTED,
+            'status' => Task::NOT_STARTED, // Keep status 0 as requested
         ]);
 
         foreach ($fields['memberIds'] as $memberId) {
@@ -55,13 +55,17 @@ class TaskService
     /**
      * Update the status of a task
      */
-    public function updateTaskStatus(array $data, int $status)
+    public function updateTaskStatus(array $data, $status)
     {
         $taskId = $data['taskId'];
         $projectId = $data['projectId'];
         $userId = $data['userId'] ?? null;
 
-        $updated = $this->taskRepository->updateById($taskId, ['status' => $status]);
+        // Cập nhật cả status và column_id để đảm bảo task chỉ ở 1 cột
+        $updated = $this->taskRepository->updateById($taskId, [
+            'status' => $status,
+            'column_id' => $status // Với JSON columns, column_id = status
+        ]);
 
         if ($updated) {
             Task::handleProjectProgress($projectId, $userId);

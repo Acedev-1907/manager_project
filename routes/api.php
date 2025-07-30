@@ -53,6 +53,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/chart-data/projects', 'getProjectChartData')->name('projects.chartData');
         Route::get('/projects/{id}/members', 'getProjectMembers')->name('projects.members');
         Route::delete('/projects/{id}', 'destroy')->name('projects.destroy');
+        Route::post('/projects/{id}/add-column', 'addColumn')->name('projects.addColumn');
+        Route::put('/projects/{id}/update-column', 'updateColumn')->name('projects.updateColumn');
+        Route::delete('/projects/{id}/delete-column', 'deleteColumn')->name('projects.deleteColumn');
+        Route::get('/projects/{projectId}/completed-tasks', 'getCompletedTasks')->name('projects.completedTasks');
     });
 
     // Friend Request API
@@ -67,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::controller(TaskController::class)->group(function () {
         Route::post('/tasks', 'createTask')->name('tasks.create');
+        Route::post('/task/transition_to_{status}', 'transitionToStatus')->name('tasks.transitionToStatus');
         Route::post('/task/{transition}', 'transition')->name('tasks.transition');
         Route::delete('/tasks/{id}', 'destroy')->name('tasks.destroy');
         // API comment cho task

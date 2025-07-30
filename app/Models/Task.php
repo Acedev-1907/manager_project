@@ -15,7 +15,7 @@ class Task extends Model
 
     const NOT_STARTED = 0;
     const PENDING = 1;
-    const COMPLETED = 2;
+    const COMPLETED = 'OK'; // Chỉ dùng cho task hoàn thành
 
     protected $fillable = [
         'projectId',
@@ -45,11 +45,11 @@ class Task extends Model
                     // Dispatch events cho project progress
                     Task::handleProjectProgress($task->projectId, Auth::id());
                 } catch (\Exception $e) {
-                    Log::error('Error in task updated event', [
-                        'taskId' => $task->id,
-                        'projectId' => $task->projectId,
-                        'error' => $e->getMessage()
-                    ]);
+                    // Log::error('Error in task updated event', [
+                    //     'taskId' => $task->id,
+                    //     'projectId' => $task->projectId,
+                    //     'error' => $e->getMessage()
+                    // ]);
                 }
             }
         });
@@ -67,11 +67,11 @@ class Task extends Model
                 // Dispatch events cho project progress
                 Task::handleProjectProgress($task->projectId, Auth::id());
             } catch (\Exception $e) {
-                Log::error('Error in task created event', [
-                    'taskId' => $task->id,
-                    'projectId' => $task->projectId,
-                    'error' => $e->getMessage()
-                ]);
+                // Log::error('Error in task created event', [
+                //     'taskId' => $task->id,
+                //     'projectId' => $task->projectId,
+                //     'error' => $e->getMessage()
+                // ]);
             }
         });
 
@@ -87,11 +87,11 @@ class Task extends Model
                 // Dispatch events cho project progress
                 Task::handleProjectProgress($task->projectId, Auth::id());
             } catch (\Exception $e) {
-                Log::error('Error in task deleted event', [
-                    'taskId' => $task->id,
-                    'projectId' => $task->projectId,
-                    'error' => $e->getMessage()
-                ]);
+                // Log::error('Error in task deleted event', [
+                //     'taskId' => $task->id,
+                //     'projectId' => $task->projectId,
+                //     'error' => $e->getMessage()
+                // ]);
             }
         });
     }
@@ -119,18 +119,16 @@ class Task extends Model
 
     public static function countCompletedAndPendingTask($projectId)
     {
-
         $task = Task::where('projectId', $projectId)->get();
 
         $pending = 0;
         $completed = 0;
         foreach ($task as $row) {
-
-            if (intval($row->status) === Task::PENDING) {
+            if ($row->status == Task::PENDING || $row->status == 1) {
                 $pending++;
             }
 
-            if (intval($row->status) === Task::COMPLETED) {
+            if ($row->status === Task::COMPLETED || $row->status == 'OK') {
                 $completed++;
             }
         }
@@ -176,12 +174,12 @@ class Task extends Model
                 return $progress;
             }
         } catch (\Exception $e) {
-            Log::error('Error in handleProjectProgress', [
-                'projectId' => $projectId,
-                'userId' => $userId,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            // Log::error('Error in handleProjectProgress', [
+            //     'projectId' => $projectId,
+            //     'userId' => $userId,
+            //     'error' => $e->getMessage(),
+            //     'trace' => $e->getTraceAsString()
+            // ]);
         }
 
         return 0;
@@ -195,5 +193,25 @@ class Task extends Model
         } else {
             return $number;
         }
+    }
+
+    /**
+     * Get completed tasks for a project
+     */
+    public static function getCompletedTasks($projectId)
+    {
+        return Task::where('projectId', $projectId)
+            ->where('status', Task::COMPLETED)
+            ->with(['task_members.user', 'comments'])
+            ->orderBy('updated_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Check if task is completed
+     */
+    public function isCompleted()
+    {
+        return $this->status === Task::COMPLETED;
     }
 }

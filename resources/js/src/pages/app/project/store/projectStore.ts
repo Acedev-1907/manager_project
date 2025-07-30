@@ -7,6 +7,7 @@ const userProjectStore = defineStore("project", {
       name: "",
       startDate: "",
       endDate: "",
+      content: "",
       members: [] as number[],
     },
     edit: false,

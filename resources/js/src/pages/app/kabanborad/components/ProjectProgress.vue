@@ -10,9 +10,9 @@ const props = defineProps<{
 const taskStats = computed(() => {
     const tasks = props.ProjectData?.data?.tasks || [];
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(task => task.status === TaskStatus.COMPLETED).length;
-    const pendingTasks = tasks.filter(task => task.status === TaskStatus.PENDING).length;
-    const notStartedTasks = tasks.filter(task => task.status === TaskStatus.NOT_STARTED).length;
+    const completedTasks = tasks.filter(task => String(task.status) === 'OK').length;
+    const pendingTasks = tasks.filter(task => Number(task.status) === 1).length;
+    const notStartedTasks = tasks.filter(task => Number(task.status) === 0).length;
     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     return {
         total: totalTasks,

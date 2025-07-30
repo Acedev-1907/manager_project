@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, onUnmounted } from 'vue';
+import { onMounted, ref, watch, onUnmounted, nextTick, triggerRef, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useGetProjectDetail } from './actions/getProjectDetail';
-import ProjectProgress from './components/ProjectProgress.vue';
-import PendingColumn from './components/PendingColumn.vue';
-import CompletedColumn from './components/CompletedColumn.vue';
 import AddTaskModal from './components/AddTaskModal.vue';
+import ProjectModal from '../project/components/ProjectModal.vue';
 import { useGetMembers } from '../member/actions/getMember';
 import { taskStore } from './store/kabanStore';
-import NotStartedColumn from './components/NotStartedColumn.vue';
 import { useDragTask } from './actions/dragTask';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import { useGetProjectMembers } from '../project/actions/getProjectMembers';
 import TaskDetailModal from './components/TaskDetailModal.vue';
+import ProjectViewModal from './components/ProjectViewModal.vue';
+import CompletedTasksModal from './components/CompletedTasksModal.vue';
 import { makeHttpReq } from '../../../helper/makeHttpReq';
 import { showSuccess, showError, showConfirm } from '../../../helper/alert';
 import { useCacheFetch } from '../../../helper/useCacheFetch';
@@ -20,6 +19,8 @@ import eventBus, { emitForceCacheClear } from '../../../helper/eventBus';
 import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
 import { createDebouncedFunction } from '../../../helper/utils';
 import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
+import KanbanColumn from './components/KanbanColumn.vue';
+import AddColumnModal from './components/AddColumnModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -32,16 +33,72 @@ const slug = route.query?.query as string;
 const modalVisible = ref(false);
 const showTaskDetail = ref(false);
 const selectedTask = ref<any>(null);
+const showProjectViewModal = ref(false);
+const showProjectEditModal = ref(false);
+const showCompletedTasksModal = ref(false);
+const projectUpdateLoading = ref(false);
 const menuState = ref<{ column: string, taskId: number } | null>(null);
+const showAddColumnModal = ref(false);
+const showEditColumnModal = ref(false);
+const editingColumn = ref<any>(null);
+const kanbanColumnsRef = ref<HTMLElement | null>(null);
 
-// Debounced function để clear cache
-const debouncedCacheClear = createDebouncedFunction((eventData: any) => {
-    emitForceCacheClear(eventData.projectId, eventData.reason, eventData.userId);
-}, 1000);
+// Columns will be fetched from API
+const columns = ref<any[]>([]);
+
+// Default columns configuration
+const DEFAULT_COLUMNS = [
+    {
+        key: 'not-started',
+        title: 'Not Started',
+        icon: 'fas fa-circle',
+        iconBg: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
+        status: 0,
+        color: '#3b82f6',
+        colorLight: '#60a5fa',
+        id: 1,
+        position: 0
+    },
+    {
+        key: 'pending',
+        title: 'Pending',
+        icon: 'fas fa-clock',
+        iconBg: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+        status: 1,
+        color: '#f59e0b',
+        colorLight: '#fbbf24',
+        id: 2,
+        position: 1
+    }
+];
 
 function setMenuState(val: { column: string, taskId: number } | null) {
     menuState.value = val;
 }
+
+// Check if current user is project creator
+const isProjectCreator = computed(() => {
+    const currentUserId = getCurrentUserId();
+    const creatorId = ProjectData.value?.data?.creator?.id;
+
+    // Convert both to numbers for comparison
+    const currentUserIdNum = Number(currentUserId);
+    const creatorIdNum = Number(creatorId);
+
+    return currentUserIdNum === creatorIdNum;
+});
+
+// Check if project is completed
+const isProjectCompleted = computed(() => {
+    const status = ProjectData.value?.data?.status;
+    return String(status) === 'OK' || Number(status) === 2; // Support both string and number
+});
+
+// Get completed tasks count
+const completedTasksCount = computed(() => {
+    const tasks = ProjectData.value?.data?.tasks || [];
+    return tasks.filter((task: any) => String(task.status) === 'OK').length;
+});
 
 const { refetch } = useCacheFetch(
     taskStore.projectDetailCache,
@@ -52,13 +109,113 @@ const { refetch } = useCacheFetch(
 // Initialize global real-time manager
 const globalRealtime = useGlobalRealtimeSetup();
 
+function forceScrollbar() {
+    if (kanbanColumnsRef.value) {
+        kanbanColumnsRef.value.style.width = kanbanColumnsRef.value.scrollWidth + 'px';
+    }
+}
+
+function scrollToAddColumnButton() {
+    const addColumnBtn = document.querySelector('.add-column-btn');
+    const kanbanContainer = document.querySelector('.kanban-grid-container');
+
+    if (addColumnBtn && kanbanContainer) {
+        const btnRect = addColumnBtn.getBoundingClientRect();
+        const containerRect = kanbanContainer.getBoundingClientRect();
+
+        if (btnRect.right > containerRect.right) {
+            const scrollLeft = kanbanContainer.scrollLeft + (btnRect.right - containerRect.right) + 20;
+            kanbanContainer.scrollTo({
+                left: scrollLeft,
+                behavior: 'smooth'
+            });
+        } else if (btnRect.left < containerRect.left) {
+            const scrollLeft = kanbanContainer.scrollLeft + (btnRect.left - containerRect.left) - 20;
+            kanbanContainer.scrollTo({
+                left: scrollLeft,
+                behavior: 'smooth'
+            });
+        }
+    }
+}
+
+// Function to fetch columns from API
+async function getProjectColumns() {
+    try {
+        const projectId = ProjectData.value?.data?.id;
+        if (!projectId) {
+            columns.value = [...DEFAULT_COLUMNS];
+            setTimeout(forceScrollbar, 100);
+            return;
+        }
+
+        // Get columns from project data (board_columns field)
+        const projectData = ProjectData.value?.data as any;
+        const projectColumns = projectData?.board_columns;
+
+        if (projectColumns && (Array.isArray(projectColumns) || typeof projectColumns === 'object')) {
+            // Convert object to array if needed
+            let columnsArray = projectColumns;
+            if (!Array.isArray(projectColumns)) {
+                columnsArray = Object.values(projectColumns);
+            }
+
+            if (columnsArray.length > 0) {
+                // Transform data from BE to FE format
+                columns.value = columnsArray.map((column: any, index: number) => ({
+                    key: column.key_name || `column-${column.id}`,
+                    title: column.name,
+                    icon: column.icon,
+                    iconBg: `linear-gradient(135deg, ${column.color} 0%, ${column.color}80 100%)`,
+                    status: column.position || index,
+                    color: column.color,
+                    colorLight: column.color + '80',
+                    id: column.id,
+                    position: column.position || index
+                })).sort((a: any, b: any) => a.position - b.position); // Sort by position
+            } else {
+                // Fallback: create default columns if no data
+                columns.value = [...DEFAULT_COLUMNS];
+            }
+        } else {
+            // Fallback: create default columns if no data
+            columns.value = [...DEFAULT_COLUMNS];
+        }
+
+        setTimeout(forceScrollbar, 100);
+    } catch (error) {
+        console.error('Error in getProjectColumns:', error);
+        // Fallback: create default columns if there's an error
+        columns.value = [...DEFAULT_COLUMNS];
+        setTimeout(forceScrollbar, 100);
+    }
+}
+
 onMounted(async () => {
-    // Luôn fetch lại project detail từ API, không lấy từ cache để tránh trường hợp project đã bị xóa
+    // Always fetch project detail from API, not from cache to avoid deleted project cases
     await getProjectDetail(slug);
     getMembers(1, '');
+
+    // Fetch columns from API
+    await getProjectColumns();
+
     setTimeout(() => {
         setupAllDropListeners();
+        setupTaskCardDragListeners();
+        setupTouchDelegation();
+        setupHorizontalScrollTouch();
+        setupMouseDragListeners();
+        forceScrollbar();
     }, 100);
+
+    // Additional setup for touch listeners with longer delay
+    setTimeout(() => {
+        setupTouchDelegation();
+        setupHorizontalScrollTouch();
+    }, 500);
+
+    // Add window resize listener
+    window.addEventListener('resize', forceScrollbar);
 
     const userId = getCurrentUserId();
     if (userId) {
@@ -88,9 +245,7 @@ onMounted(async () => {
     // Listen for force cache clear events
     eventBus.on('force-cache-clear', async (eventData: any) => {
         try {
-            // Chỉ xử lý nếu event liên quan đến project hiện tại
             if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
-                // Chỉ clear cache nếu không phải do user hiện tại thực hiện
                 if (!isCurrentUser(eventData.userId)) {
                     debouncedCacheClear({
                         projectId: ProjectData.value?.data?.id,
@@ -108,11 +263,13 @@ onMounted(async () => {
     // Listen for task comment events
     eventBus.on('task-comment-created', async (eventData: any) => {
         try {
-            // Chỉ refresh nếu comment thuộc về task trong project hiện tại
+            // Only refresh if the comment is from another user and task exists in current project
             if (ProjectData.value?.data?.tasks && Array.isArray(ProjectData.value.data.tasks)) {
                 const taskExists = ProjectData.value.data.tasks.some((task: any) => task.id === eventData.taskId);
-                if (taskExists) {
-                    await getProjectDetail(slug);
+                if (taskExists && !isCurrentUser(eventData.userId)) {
+                    // For comments, we don't need to refresh the entire project data
+                    // The TaskDetailModal will handle real-time updates for comments
+                    // Only refresh if there are other changes that might affect the task list
                 }
             }
         } catch (error) {
@@ -120,6 +277,11 @@ onMounted(async () => {
         }
     });
 });
+
+// Debounced function to clear cache
+const debouncedCacheClear = createDebouncedFunction((eventData: any) => {
+    emitForceCacheClear(eventData.projectId, eventData.reason, eventData.userId);
+}, 1000);
 
 async function openTaskModal() {
     const projectId = ProjectData.value?.data?.id;
@@ -138,7 +300,159 @@ function goBackToProjects() {
     router.push('/projects');
 }
 
-function formatDate(dateString: string | undefined): string {
+function openTaskDetail(taskId: number) {
+    const allTasks = ProjectData.value?.data?.tasks || [];
+    selectedTask.value = allTasks.find((t: any) => t.id === taskId);
+    showTaskDetail.value = true;
+}
+
+function closeTaskDetail() {
+    showTaskDetail.value = false;
+    selectedTask.value = null;
+}
+
+function openAddColumnModal() {
+    showAddColumnModal.value = true;
+    setTimeout(() => {
+        scrollToAddColumnButton();
+    }, 100);
+}
+
+function closeAddColumnModal() {
+    showAddColumnModal.value = false;
+}
+
+function openEditColumnModal(column: any) {
+    editingColumn.value = column;
+    showEditColumnModal.value = true;
+}
+
+function closeEditColumnModal() {
+    showEditColumnModal.value = false;
+    editingColumn.value = null;
+}
+
+async function addNewColumn(newColumn: any) {
+    try {
+        const projectId = ProjectData.value?.data?.id;
+        if (!projectId) {
+            showError('Project not found!');
+            return;
+        }
+
+        // Save new column to database through new endpoint
+        const response = await makeHttpReq<any, any>(`projects/${projectId}/add-column`, 'POST', {
+            add_column: {
+                name: newColumn.title,
+                color: newColumn.color,
+                icon: newColumn.icon
+            }
+        });
+
+        if (response.code === 1000) {
+            // Success - refresh project data to get updated columns
+            await getProjectDetail(slug, false);
+            await getProjectColumns();
+
+            showSuccess(response.message || 'New column added successfully!');
+            setTimeout(forceScrollbar, 100);
+
+            await nextTick();
+            setTimeout(() => {
+                scrollToAddColumnButton();
+                setTimeout(() => {
+                    setupAllDropListeners();
+                }, 100);
+            }, 300);
+        } else {
+            // Error
+            showError(response.message || 'Failed to add column!');
+        }
+    } catch (error: any) {
+        showError(error?.message || 'Failed to add column!');
+    }
+}
+
+async function updateColumn(newColumn: any) {
+    try {
+        const projectId = ProjectData.value?.data?.id;
+        if (!projectId) {
+            showError('Project not found!');
+            return;
+        }
+
+        // Update column in database through new endpoint
+        const response = await makeHttpReq<any, any>(`projects/${projectId}/update-column`, 'PUT', {
+            update_column: {
+                column_id: editingColumn.value.id,
+                name: newColumn.title,
+                color: newColumn.color,
+                icon: newColumn.icon
+            }
+        });
+
+        if (response.code === 1000) {
+            // Clear cache first to ensure fresh data
+            taskStore.clearProjectDetailCache(slug);
+
+            // Success - refresh project data to get updated columns
+            await getProjectDetail(slug, false);
+            await getProjectColumns();
+
+            // Force re-render by updating the columns array
+            await nextTick();
+
+            // Force Vue to detect the change by creating a new array reference
+            columns.value = [...columns.value];
+
+            // Force trigger reactivity
+            triggerRef(columns);
+
+            // Force update ProjectData to ensure reactivity
+            if (ProjectData.value?.data) {
+                ProjectData.value = { ...ProjectData.value };
+            }
+
+            showSuccess(response.message || 'Column updated successfully!');
+            closeEditColumnModal();
+        } else {
+            // Error
+            showError(response.message || 'Failed to update column!');
+        }
+    } catch (error: any) {
+        showError(error?.message || 'Failed to update column!');
+    }
+}
+
+function updateColumnTitle(columnKey: string, newTitle: string) {
+    const column = columns.value.find(col => col.key === columnKey);
+    if (column) {
+        column.title = newTitle;
+
+        // Force reactivity by creating new array reference
+        columns.value = [...columns.value];
+        triggerRef(columns);
+
+        showSuccess('Column title updated!');
+    }
+}
+
+function updateColumnColor(columnKey: string, newColor: string, newColorLight: string) {
+    const column = columns.value.find(col => col.key === columnKey);
+    if (column) {
+        column.color = newColor;
+        column.colorLight = newColorLight;
+        column.iconBg = `linear-gradient(135deg, ${newColor} 0%, ${newColorLight} 100%)`;
+
+        // Force reactivity by creating new array reference
+        columns.value = [...columns.value];
+        triggerRef(columns);
+
+        showSuccess('Column color updated!');
+    }
+}
+
+function formatDate(dateString: string) {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -148,35 +462,99 @@ function formatDate(dateString: string | undefined): string {
     });
 }
 
-function openTaskDetail(taskId: number) {
-    const allTasks = ProjectData.value?.data?.tasks || [];
-    selectedTask.value = allTasks.find((t: any) => t.id === taskId);
-    showTaskDetail.value = true;
-}
-function closeTaskDetail() {
-    showTaskDetail.value = false;
-    selectedTask.value = null;
+function openEditProjectModal() {
+    // Only allow project creator to edit
+    if (!isProjectCreator.value) {
+        showError('Only project creator can edit project details!');
+        return;
+    }
+    showProjectEditModal.value = true;
 }
 
-const { setupAllDropListeners, setupTaskCardDragListeners } = useDragTask(getProjectDetail, slug, ProjectData);
+function closeProjectEditModal() {
+    showProjectEditModal.value = false;
+}
+
+async function handleProjectUpdate(updatedProject: any) {
+    projectUpdateLoading.value = true;
+    try {
+        const projectId = ProjectData.value?.data?.id;
+        if (!projectId) {
+            showError('Project not found!');
+            return;
+        }
+
+        // Update project in database
+        const response = await makeHttpReq<any, any>('projects', 'PUT', updatedProject);
+
+        if (response.code === 1000 || response.code === 1002) {
+            // Clear cache first to ensure fresh data
+            taskStore.clearProjectDetailCache(slug);
+
+            // Success - refresh project data
+            await getProjectDetail(slug, false);
+
+            showSuccess(response.message || 'Project updated successfully!');
+            closeProjectEditModal();
+        } else {
+            // Error
+            showError(response.message || 'Failed to update project!');
+        }
+    } catch (error: any) {
+        showError(error?.message || 'Failed to update project!');
+    } finally {
+        projectUpdateLoading.value = false;
+    }
+}
+
+function openCompletedTasksModal() {
+    showCompletedTasksModal.value = true;
+}
+
+function closeCompletedTasksModal() {
+    showCompletedTasksModal.value = false;
+}
+
+function openProjectViewModal() {
+    showProjectViewModal.value = true;
+}
+
+function closeProjectViewModal() {
+    showProjectViewModal.value = false;
+}
+
+const { setupAllDropListeners, setupTaskCardDragListeners, setupTouchListeners, setupTouchDelegation, setupHorizontalScrollTouch, setupMouseDragListeners } = useDragTask(ProjectData);
 
 watch(() => ProjectData.value?.data?.tasks, () => {
     setTimeout(() => {
         setupTaskCardDragListeners();
+        setupTouchDelegation();
+        setupHorizontalScrollTouch();
+    }, 100);
+
+    // Additional setup with longer delay
+    setTimeout(() => {
+        setupTouchDelegation();
+        setupHorizontalScrollTouch();
+    }, 500);
+}, { deep: true });
+
+// Watch columns to automatically re-setup drag & drop when columns change
+watch(() => columns.value, () => {
+    setTimeout(() => {
+        setupAllDropListeners();
     }, 100);
 }, { deep: true });
 
-// Nếu có các chỗ khác gọi getProjectDetail để refresh, hãy nhớ lưu lại cache sau khi fetch
 async function handleRefreshKabanBoard() {
     await refetch(slug, async () => {
-        await getProjectDetail(slug, false); // truyền false để không bật loading
+        await getProjectDetail(slug, false);
         return ProjectData.value;
     }, (data) => {
         ProjectData.value = data;
     });
 }
 
-// Khi cần fetch lại project detail (ví dụ sau khi xóa task), luôn clear cache trước, sau đó fetch và lưu lại cache
 async function handleDeleteTask(taskId: number) {
     const confirmed = await showConfirm('Are you sure you want to delete this task?', 'Delete Task');
     if (!confirmed) return;
@@ -194,11 +572,141 @@ async function handleDeleteTask(taskId: number) {
     }
 }
 
+async function handleCompleteTask(taskId: number) {
+    const confirmed = await showConfirm('Are you sure you want to mark this task as completed?', 'Complete Task');
+    if (!confirmed) return;
+    try {
+        await makeHttpReq<any, any>(`task/transition_to_OK`, 'POST', {
+            taskId: taskId,
+            projectId: ProjectData.value?.data?.id
+        });
+        showSuccess('Task marked as completed!');
+        await refetch(slug, async () => {
+            await getProjectDetail(slug, false);
+            return ProjectData.value;
+        }, (data) => {
+            ProjectData.value = data;
+        });
+    } catch (err: any) {
+        showError(err?.message || 'Complete task failed!');
+    }
+}
+
+async function handleBackTask(taskId: number) {
+    const confirmed = await showConfirm('Are you sure you want to move this task back to "Not Started"?', 'Move Back Task');
+    if (!confirmed) return;
+    try {
+        await makeHttpReq<any, any>(`task/transition_to_0`, 'POST', {
+            taskId: taskId,
+            projectId: ProjectData.value?.data?.id
+        });
+        showSuccess('Task moved back to "Not Started"!');
+
+        // Refresh project data
+        await refetch(slug, async () => {
+            await getProjectDetail(slug, false);
+            return ProjectData.value;
+        }, (data) => {
+            ProjectData.value = data;
+        });
+
+        // Force refresh completed tasks modal if it's open
+        if (showCompletedTasksModal.value) {
+            // Emit event to refresh completed tasks
+            const event = new CustomEvent('refreshCompletedTasks');
+            window.dispatchEvent(event);
+        }
+    } catch (err: any) {
+        showError(err?.message || 'Move back task failed!');
+    }
+}
+
+async function handleDeleteColumn(columnId: number) {
+    try {
+        // Find the column to get its status
+        const targetColumn = columns.value.find(col => col.id === columnId);
+        if (!targetColumn) {
+            showError('Column not found!');
+            return;
+        }
+
+        // Check if column has tasks by matching the status
+        const columnTasks = ProjectData.value?.data?.tasks?.filter((task: any) => task.status === targetColumn.status) || [];
+
+        if (columnTasks.length > 0) {
+            showError(`Cannot delete column "${targetColumn.title}". It contains ${columnTasks.length} task(s). Please move or delete all tasks first.`);
+            return;
+        }
+
+        // Show confirmation dialog
+        const confirmed = await showConfirm(`Are you sure you want to delete column "${targetColumn.title}"?`, 'Delete Column');
+        if (!confirmed) return;
+
+        const projectId = ProjectData.value?.data?.id;
+        if (!projectId) {
+            showError('Project not found!');
+            return;
+        }
+
+        // Delete column from database
+        const response = await makeHttpReq<any, any>(`projects/${projectId}/delete-column`, 'DELETE', {
+            column_id: columnId
+        });
+
+        if (response.code === 1000) {
+            // Clear cache first to ensure fresh data
+            taskStore.clearProjectDetailCache(slug);
+
+            // Success - refresh project data to get updated columns
+            await getProjectDetail(slug, false);
+
+            await getProjectColumns();
+
+            // Force re-render by updating the columns array
+            await nextTick();
+
+            // Force Vue to detect the change by creating a new array reference
+            columns.value = [...columns.value];
+
+            // Force trigger reactivity
+            triggerRef(columns);
+
+            // Force update ProjectData to ensure reactivity
+            if (ProjectData.value?.data) {
+                ProjectData.value = { ...ProjectData.value };
+            }
+
+            // Force DOM update with setTimeout
+            setTimeout(() => {
+                columns.value = [...columns.value];
+                triggerRef(columns);
+            }, 50);
+
+            // Re-setup drag listeners after column update
+            setTimeout(() => {
+                setupAllDropListeners();
+                setupTaskCardDragListeners();
+                setupTouchDelegation();
+                setupHorizontalScrollTouch();
+                forceScrollbar();
+            }, 100);
+
+            showSuccess(response.message || 'Column deleted successfully!');
+        } else {
+            // Error
+            showError(response.message || 'Failed to delete column!');
+        }
+    } catch (error: any) {
+        console.error('Error in handleDeleteColumn:', error);
+        showError(error?.message || 'Failed to delete column!');
+    }
+}
+
 // Cleanup event listeners when component is unmounted
 onUnmounted(() => {
-    // Remove eventBus listeners
     eventBus.off('force-cache-clear');
     eventBus.off('task-comment-created');
+    window.removeEventListener('resize', forceScrollbar);
 });
 </script>
 
@@ -209,86 +717,80 @@ onUnmounted(() => {
 
         <!-- Header Section -->
         <div class="kanban-header">
-            <div class="header-content">
-                <div class="back-section">
-                    <button @click="goBackToProjects" class="back-btn">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
+            <!-- Back Button -->
+            <button class="back-btn" @click="goBackToProjects"><i class="fas fa-arrow-left"></i></button>
+
+            <!-- Project Info Section -->
+            <div class="project-info">
+                <div class="project-title">
+                    <i class="fas fa-columns"></i>
+                    <span>{{ ProjectData?.data?.name }}</span>
                 </div>
-                <div class="title-section">
-                    <h1 class="project-title">
+                <div class="project-dates">
+                    {{ formatDate(ProjectData?.data?.startDate) }} - {{ formatDate(ProjectData?.data?.endDate) }}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="complete-btn" @click="openCompletedTasksModal"
+                    :title="`View ${completedTasksCount} completed task${completedTasksCount !== 1 ? 's' : ''}`">
+                    <i class="fas fa-check-circle"></i>
+                    <span v-if="completedTasksCount > 0" class="task-count">{{ completedTasksCount }}</span>
+                </button>
+                <button v-if="isProjectCreator" class="edit-btn" @click="openEditProjectModal" title="Edit Project">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="view-btn" @click="openProjectViewModal" title="View Project Details">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
+
+            <!-- Mobile Layout Wrapper -->
+            <div class="mobile-header-wrapper">
+                <div class="mobile-top-row">
+                    <button class="back-btn-mobile" @click="goBackToProjects"><i class="fas fa-arrow-left"></i></button>
+                    <div class="project-title-mobile">
                         <i class="fas fa-columns"></i>
-                        {{ ProjectData?.data?.name || 'Project Management' }}
-                    </h1>
-                </div>
-                <div class="dates-section project-dates-desktop">
-                    <div class="project-dates">
-                        <div class="date-card">
-                            <div class="date-icon">
-                                <i class="fas fa-calendar-alt"></i>
-                            </div>
-                            <div class="date-content">
-                                <div class="date-label">Start Date</div>
-                                <div class="date-value">{{ formatDate(ProjectData?.data?.startDate) }}</div>
-                            </div>
-                        </div>
-                        <div class="date-divider"></div>
-                        <div class="date-card">
-                            <div class="date-icon">
-                                <i class="fas fa-calendar-check"></i>
-                            </div>
-                            <div class="date-content">
-                                <div class="date-label">End Date</div>
-                                <div class="date-value">{{ formatDate(ProjectData?.data?.endDate) }}</div>
-                            </div>
-                        </div>
+                        <span>{{ ProjectData?.data?.name }}</span>
                     </div>
+                </div>
+                <div class="mobile-dates">
+                    {{ formatDate(ProjectData?.data?.startDate) }} - {{ formatDate(ProjectData?.data?.endDate) }}
+                </div>
+                <div class="mobile-actions">
+                    <button class="complete-btn" @click="openCompletedTasksModal"
+                        :title="`View ${completedTasksCount} completed task${completedTasksCount !== 1 ? 's' : ''}`">
+                        <i class="fas fa-check-circle"></i>
+                        <span v-if="completedTasksCount > 0" class="task-count">{{ completedTasksCount }}</span>
+                    </button>
+                    <button v-if="isProjectCreator" class="edit-btn" @click="openEditProjectModal" title="Edit Project">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="view-btn" @click="openProjectViewModal" title="View Project Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Content Section -->
         <div class="kanban-content">
-            <!-- Project Progress Section -->
-            <div class="progress-section">
-                <div class="project-dates-mobile">
-                    <div class="project-dates">
-                        <div class="date-card">
-                            <div class="date-icon">
-                                <i class="fas fa-calendar-alt"></i>
-                            </div>
-                            <div class="date-content">
-                                <div class="date-label">Start Date</div>
-                                <div class="date-value">{{ formatDate(ProjectData?.data?.startDate) }}</div>
-                            </div>
-                        </div>
-                        <div class="date-divider"></div>
-                        <div class="date-card">
-                            <div class="date-icon">
-                                <i class="fas fa-calendar-check"></i>
-                            </div>
-                            <div class="date-content">
-                                <div class="date-label">End Date</div>
-                                <div class="date-value">{{ formatDate(ProjectData?.data?.endDate) }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <ProjectProgress :ProjectData="ProjectData" />
-            </div>
-
             <!-- Kanban Board Section -->
-            <div class="kanban-board">
-                <div class="kanban-columns">
-                    <NotStartedColumn :projectData="ProjectData" :menuState="menuState" :setMenuState="setMenuState"
-                        @openTaskModal="openTaskModal" @viewTask="openTaskDetail" @deleteTask="handleDeleteTask"
-                        class="kanban-column not-started-column" />
-                    <PendingColumn :projectData="ProjectData" :menuState="menuState" :setMenuState="setMenuState"
-                        @viewTask="openTaskDetail" @deleteTask="handleDeleteTask"
-                        class="kanban-column pending-column" />
-                    <CompletedColumn :projectData="ProjectData" :menuState="menuState" :setMenuState="setMenuState"
-                        @viewTask="openTaskDetail" @deleteTask="handleDeleteTask"
-                        class="kanban-column completed-column" />
+            <div class="kanban-grid-container">
+                <div class="kanban-grid" ref="kanbanColumnsRef">
+                    <KanbanColumn v-for="column in columns" :key="column.key" :config="column"
+                        :tasks="ProjectData?.data?.tasks || []" :projectId="ProjectData?.data?.id"
+                        :showAddTask="column.key === 'not-started'" :menuState="menuState as any"
+                        :setMenuState="setMenuState" :isEditing="false" @viewTask="openTaskDetail"
+                        @deleteTask="handleDeleteTask" @addTask="openTaskModal" @editColumn="openEditColumnModal"
+                        @deleteColumn="handleDeleteColumn" @updateColumnTitle="updateColumnTitle"
+                        @updateColumnColor="updateColumnColor" @completeTask="handleCompleteTask" />
+                    <div class="add-column-slot">
+                        <button class="add-column-btn" @click="openAddColumnModal">
+                            <i class="fas fa-plus"></i> Add Column
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -296,23 +798,71 @@ onUnmounted(() => {
         <!-- Add Task Modal -->
         <AddTaskModal :members="projectMembers" :visible="modalVisible" @getMembers="getMembers"
             @closeModal="closeTaskModal" @refreshKabanBoard="handleRefreshKabanBoard" />
+
         <!-- Task Detail Modal -->
         <TaskDetailModal :visible="showTaskDetail" :task="selectedTask" @close="closeTaskDetail" />
+
+        <!-- Project View Modal -->
+        <ProjectViewModal :visible="showProjectViewModal" :projectData="ProjectData?.data"
+            @close="closeProjectViewModal" />
+
+        <!-- Project Edit Modal -->
+        <ProjectModal v-if="showProjectEditModal" :isEdit="true" :projectInput="ProjectData?.data"
+            :loading="projectUpdateLoading" @close="closeProjectEditModal" @submit="handleProjectUpdate" />
+
+        <!-- Completed Tasks Modal -->
+        <CompletedTasksModal :visible="showCompletedTasksModal" :projectId="ProjectData?.data?.id || null"
+            @close="closeCompletedTasksModal" @backTask="handleBackTask" />
+
+        <!-- Add Column Modal -->
+        <AddColumnModal :visible="showAddColumnModal" :existingColumns="columns" @close="closeAddColumnModal"
+            @addColumn="addNewColumn" />
+
+        <!-- Edit Column Modal -->
+        <AddColumnModal :visible="showEditColumnModal" :existingColumns="columns" :editingColumn="editingColumn"
+            @close="closeEditColumnModal" @addColumn="updateColumn" />
     </div>
 </template>
 
 <style scoped>
 /* Main Container */
 .kanban-container {
-    background: white;
-    padding: 24px;
+    background: #f8fafc;
+    padding: 8px 0 16px 0;
     display: flex;
     flex-direction: column;
     max-width: 100vw;
     box-sizing: border-box;
-    position: relative;
-    min-height: 100vh;
-    /* Đảm bảo container chiếm đủ chiều cao */
+    position: fixed !important;
+    top: 20px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(100vh - 62px);
+    overflow: hidden !important;
+    margin: 0;
+    z-index: 1;
+}
+
+/* Disable vertical scrollbar for the entire page */
+:deep(body) {
+    overflow-y: hidden !important;
+    height: 100vh !important;
+    position: fixed !important;
+    width: 100% !important;
+}
+
+/* Ensure no vertical scroll on all kanban elements */
+.kanban-container,
+.kanban-content,
+.kanban-grid-container {
+    overflow-y: hidden !important;
+}
+
+/* Force disable scroll on html element too */
+:deep(html) {
+    overflow-y: hidden !important;
+    height: 100vh !important;
 }
 
 /* Loading Page Overlay */
@@ -347,468 +897,495 @@ onUnmounted(() => {
 
 /* Header Section */
 .kanban-header {
-    background: white;
-    border-radius: 16px;
-    padding: 16px 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    flex-shrink: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-    position: sticky;
-    top: 71px;
-    z-index: 20;
-}
-
-.header-content {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 24px;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
-.back-section {
     display: flex;
-    justify-content: flex-start;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 16px 18px;
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: 0 2px 16px #0001;
+    min-height: 64px;
+    position: relative;
+    top: 10px;
+    margin: 38px;
+}
+
+.kanban-header>* {
+    flex-shrink: 0;
 }
 
 .back-btn {
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    border: 1px solid #e2e8f0;
-    color: #64748b;
-    padding: 12px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    position: absolute;
+    left: 18px;
+}
+
+.action-buttons {
+    position: absolute;
+    right: 18px;
     display: flex;
+    gap: 8px;
     align-items: center;
-    justify-content: center;
-    min-width: 44px;
-    height: 44px;
-    flex-shrink: 0;
 }
 
-.back-btn:hover {
-    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
-    border-color: #cbd5e1;
-    color: #374151;
-    transform: translateX(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.back-btn i {
-    font-size: 16px;
-}
-
-.title-section {
+.project-info {
     display: flex;
-    justify-content: center;
-    align-items: center;
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+    flex: 1;
     min-width: 0;
 }
 
 .project-title {
-    font-size: 28px;
+    font-size: 1.2rem;
     font-weight: 800;
     color: #1e293b;
-    margin: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
-    line-height: 1.2;
-    text-align: center;
+    gap: 6px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    justify-content: center;
 }
 
 .project-title i {
     color: #3b82f6;
-    font-size: 28px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    flex-shrink: 0;
-}
-
-.dates-section {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    flex-shrink: 0;
+    font-size: 1.2rem;
 }
 
 .project-dates {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 0;
-    flex-wrap: nowrap;
-}
-
-.date-card {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    transition: all 0.3s ease;
-    min-width: 120px;
-    max-width: 150px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    flex-shrink: 0;
-}
-
-.date-card:hover {
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-    border-color: #cbd5e1;
-}
-
-.date-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    border-radius: 8px;
-    color: white;
-    font-size: 10px;
-    flex-shrink: 0;
-}
-
-.date-content {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.date-label {
-    font-size: 10px;
-    font-weight: 600;
+    font-size: 13px;
     color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
     white-space: nowrap;
+    text-align: center;
 }
 
-.date-value {
-    font-size: 12px;
-    color: #1e293b;
-    font-weight: 700;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
-.date-divider {
-    width: 1px;
-    height: 32px;
-    background: linear-gradient(180deg, transparent 0%, #e2e8f0 50%, transparent 100%);
-    margin: 0 4px;
-    flex-shrink: 0;
-}
-
-/* Content Section */
-.kanban-content {
-    flex: 1;
-    padding: 28px;
-    min-height: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-    overflow-x: hidden;
-}
-
-/* Progress Section */
-.progress-section {
-    padding: 0 0 24px 0;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
-/* Kanban Board */
-.kanban-board {
-    padding: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
-.kanban-columns {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    min-height: 500px;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
-.kanban-column {
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-    position: relative;
+.project-content {
+    font-size: 13px;
+    color: #94a3b8;
+    max-width: 120px;
     overflow: hidden;
-    min-height: 450px;
-    max-height: 600px;
-    display: flex;
-    flex-direction: column;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.kanban-column:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+/* Hide mobile wrapper on desktop */
+.mobile-header-wrapper {
+    display: none;
 }
 
-.kanban-column::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--column-color), var(--column-color-light));
-}
-
-.not-started-column {
-    --column-color: #3b82f6;
-    --column-color-light: #60a5fa;
-}
-
-.pending-column {
-    --column-color: #f59e0b;
-    --column-color-light: #fbbf24;
-}
-
-.completed-column {
-    --column-color: #10b981;
-    --column-color-light: #34d399;
-}
-
-/* Drag and Drop Effects */
-.kanban-column.hovered {
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    border: 2px dashed #3b82f6;
-    transform: scale(1.01);
-    transition: all 0.2s ease;
-}
-
-.task-card.dragging {
-    opacity: 0.6;
-    transform: scale(1.01);
-    z-index: 1000;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
-    position: relative;
-    top: auto;
-    left: auto;
-}
-
-/* .ghost-task {
-    background: #fbbf24 !important;
-    border: 2px solid #f59e0b !important;
-    opacity: 1 !important;
-    z-index: 99999 !important;
-    position: fixed;
-    pointer-events: none;
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    max-width: 300px;
-    transition: none;
-    will-change: transform, left, top;
-} */
-
-/* .ghost-task .task-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #1e293b;
-    margin: 0 0 8px 0;
-}
-
-.ghost-task .task-members {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.ghost-task .member-avatar {
-    width: 20px;
-    height: 20px;
+.back-btn,
+.edit-btn,
+.view-btn {
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    background: #3b82f6;
-    color: white;
+    font-size: 1.1rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 8px;
-    font-weight: 600;
-} */
+    background: #f1f5f9;
+    color: #2563eb;
+    border: none;
+    box-shadow: 0 1px 4px #0001;
+    margin: 0 2px;
+    transition: background 0.18s, color 0.18s;
+}
 
-/* ----------- PROJECT DATES MOBILE OPTIMIZED ----------- */
+.back-btn {
+    color: #374151;
+}
+
+.edit-btn {
+    color: #2563eb;
+}
+
+.view-btn {
+    color: #10b981;
+}
+
+.back-btn:active,
+.edit-btn:active,
+.view-btn:active {
+    background: #e0e7ef;
+}
+
 @media (max-width: 768px) {
-    .kanban-columns {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        min-height: auto;
-        overflow: hidden;
-    }
-
-    .kanban-column {
-        min-height: 350px;
-        max-height: 400px;
-        margin-top: 10px;
-        margin-bottom: 10px;
-        padding-top: 16px;
-        padding-bottom: 16px;
-    }
-
-    .dates-section.project-dates-desktop {
-        display: none !important;
-    }
-
-    .project-dates-mobile {
-        display: block !important;
-        margin-bottom: 16px;
-        font-size: 1.15rem;
-    }
-
-    .project-dates-mobile .project-dates {
-        gap: 10px;
-        padding: 10px 0;
-    }
-
-    .project-dates-mobile .date-card {
-        padding: 10px 16px;
-        gap: 8px;
-        border-radius: 12px;
-        max-width: 140px;
-        min-width: 90px;
-    }
-
-    .project-dates-mobile .date-icon {
-        width: 24px;
-        height: 24px;
-        font-size: 14px;
-        border-radius: 8px;
-    }
-
-    .project-dates-mobile .date-label {
-        font-size: 12px;
-    }
-
-    .project-dates-mobile .date-value {
-        font-size: 15px;
-    }
-}
-
-@media (min-width: 769px) {
-    .project-dates-mobile {
-        display: none !important;
-    }
-}
-
-/* Responsive Design */
-@media (max-width: 1200px) {
-    .kanban-columns {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
-    }
-
     .kanban-container {
-        padding: 20px;
-    }
-}
-
-@media (max-width: 480px) {
-    .kanban-container {
-        padding: 8px;
+        height: calc(100vh - 62px);
     }
 
     .kanban-header {
-        top: 126px;
-    }
-
-    .header-content {
-        gap: 8px;
-        overflow: hidden;
-    }
-
-    .back-btn {
-        padding: 8px;
-        min-width: 36px;
-        height: 36px;
-        border-radius: 8px;
-    }
-
-    .back-btn i {
+        gap: 12px;
+        padding: 12px 16px;
+        min-height: auto;
         font-size: 12px;
+        flex-direction: column;
+        align-items: stretch;
+        position: relative;
+        top: 70px;
+        margin-bottom: 85px;
     }
 
-    .project-title {
-        font-size: 16px;
+    /* Hide desktop elements on mobile */
+    .back-btn,
+    .project-info,
+    .action-buttons,
+    .project-content {
+        display: none !important;
+    }
+
+    /* Show mobile layout */
+    .mobile-header-wrapper {
+        display: flex !important;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .mobile-top-row {
+        display: flex !important;
+        align-items: center;
+        gap: 12px;
+        justify-content: center;
+        width: 100%;
+        min-height: 40px;
+        position: relative;
+    }
+
+    .back-btn-mobile {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f1f5f9;
+        color: #374151;
+        border: none;
+        box-shadow: 0 1px 4px #0001;
+        margin: 0;
+        transition: background 0.18s, color 0.18s;
+        position: absolute;
+        left: 0;
+    }
+
+    .back-btn-mobile:active {
+        background: #e0e7ef;
+    }
+
+    .project-title-mobile {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
         gap: 6px;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
 
-    .project-title i {
-        font-size: 14px;
+    .project-title-mobile i {
+        color: #3b82f6;
+        font-size: 1.1rem;
     }
 
-    .project-dates {
-        gap: 4px;
-        overflow: hidden;
+    .mobile-dates {
+        font-size: 11px;
+        color: #64748b;
+        text-align: center;
     }
 
-    .date-card {
-        padding: 4px 6px;
-        gap: 3px;
-        border-radius: 6px;
-        max-width: 80px;
+    .mobile-actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
     }
 
-    .date-icon {
-        width: 14px;
-        height: 14px;
-        font-size: 6px;
-        border-radius: 3px;
-    }
-
-    .date-label {
-        font-size: 6px;
-    }
-
-    .date-value {
-        font-size: 9px;
+    .mobile-actions .edit-btn,
+    .mobile-actions .view-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 0.95rem;
+        margin: 0;
     }
 }
 
-.task-card {
-    background: white;
-    border-radius: 12px;
-    padding: 16px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-    cursor: grab;
-    min-height: 120px;
+/* Nút Add Column */
+.add-column-slot {
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-left: 16px;
+}
+
+.add-column-btn {
+    width: 170px;
+    min-width: 170px;
+    font-size: 1.1rem;
+    padding: 14px 0;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+    color: #fff;
+    font-weight: 700;
+    border: none;
+    box-shadow: 0 2px 8px #10b98122;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    position: relative;
+    z-index: 10;
+}
+
+.add-column-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    box-shadow: 0 4px 16px #10b98133;
+    transform: translateY(-2px) scale(1.04);
+}
+
+.add-column-btn i {
+    font-size: 1.3rem;
+}
+
+.kanban-content {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    /* Touch support for mobile */
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
+    height: calc(100vh - 182px);
+    min-height: 0;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden !important;
+    max-height: calc(100vh - 182px) !important;
+}
+
+/* Pure CSS Flexbox Approach - Clean and Simple */
+.kanban-grid-container {
+    width: 100%;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden !important;
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+    /* Tối ưu performance cho scroll */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: auto;
+    /* Nhanh hơn smooth */
+    /* Hardware acceleration */
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    /* Tối ưu thêm */
+    contain: layout style paint;
+    isolation: isolate;
+}
+
+.kanban-grid {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    min-width: max-content;
+    width: max-content;
+    height: 100%;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+}
+
+/* Webkit scrollbar styling */
+.kanban-grid-container::-webkit-scrollbar {
+    height: 10px;
+    background: #f1f5f9;
+}
+
+.kanban-grid-container::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 5px;
+}
+
+.kanban-grid-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+}
+
+.kanban-grid-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Complete button styles */
+.complete-btn {
+    background: #f3f4f6;
+    border: 2px solid #d1d5db;
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #6b7280;
+    margin-right: 8px;
+    position: relative;
+}
+
+.complete-btn:hover:not(:disabled) {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+    color: #374151;
+}
+
+.complete-btn .task-count {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #10b981;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+}
+
+.complete-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.kanban-column {
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+    height: 1px;
+    flex-shrink: 0;
+}
+
+.add-column-slot {
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+    height: fit-content;
+    flex-shrink: 0;
+    border-radius: 16px;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .kanban-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .kanban-column,
+    .add-column-slot {
+        width: 280px;
+        min-width: 280px;
+        max-width: 320px;
+        border-radius: 16px;
+        max-height: calc(100vh - 282px);
+    }
+
+    /* Mobile touch support */
+    .task-card {
+        touch-action: pan-x pan-y;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        cursor: grab;
+        pointer-events: auto;
+    }
+
+    .task-card:active {
+        cursor: grabbing;
+    }
+
+    .kanban-grid-container {
+        touch-action: pan-x;
+        -webkit-overflow-scrolling: touch;
+        pointer-events: auto;
+        /* Tối ưu cho scroll nhanh */
+        scroll-behavior: auto;
+        /* Thay đổi từ smooth sang auto để nhanh hơn */
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity;
+        /* Cải thiện performance cho scroll */
+        will-change: scroll-position;
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+    }
+
+    /* Ensure horizontal scroll works */
+    .kanban-grid {
+        touch-action: pan-x;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-align: start;
+        /* Cải thiện performance */
+        will-change: transform;
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+    }
+
+    /* Hide scrollbar on mobile but keep functionality */
+    .kanban-grid-container::-webkit-scrollbar {
+        height: 0;
+        background: transparent;
+    }
+
+    /* Mobile ghost element */
+    .mobile-ghost-task {
+        pointer-events: none !important;
+        touch-action: none !important;
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: flex !important;
+        z-index: 99999 !important;
+    }
+
+    /* Ensure task cards can receive touch events */
+    .task-card * {
+        pointer-events: auto;
+    }
+
+    /* Prevent text selection during drag */
+    .task-card {
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Ghost element animation */
+    .mobile-ghost-task {
+        animation: ghostFloat 0.3s ease-out;
+    }
+
+    @keyframes ghostFloat {
+        from {
+            opacity: 0;
+            transform: rotate(3deg) scale(0.8);
+        }
+
+        to {
+            opacity: 1;
+            transform: rotate(3deg) scale(0.95);
+        }
+    }
 }
 </style>

@@ -29,7 +29,9 @@ class ProjectRepository extends BaseRepository
             },
             'tasks.task_members.user',
             'task_progress',
-            'users'
+            'users',
+            'creator',
+            // boardColumns không cần eager load vì đã được lưu trong JSON field
         ])->where('slug', $slug)->first();
     }
 

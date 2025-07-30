@@ -9,6 +9,7 @@ export type ProjectInputType = {
   name: string;
   startDate: string;
   endDate: string;
+  content?: string;
   members?: number[];
 };
 export type ProjectResponseType = {
@@ -30,6 +31,7 @@ export function useCreateOrUpdateProject() {
         name: "",
         startDate: "",
         endDate: "",
+        content: "",
         members: [],
       };
 

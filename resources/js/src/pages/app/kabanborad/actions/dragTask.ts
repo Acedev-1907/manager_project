@@ -1,5 +1,4 @@
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
-import { taskStore } from "../store/kabanStore";
 import { getAvatarSrc } from "../../../../helper/avatar";
 import { emitForceCacheClear } from "../../../../helper/eventBus";
 import { getCurrentUserId } from "../../../../helper/getUserData";
@@ -7,16 +6,17 @@ import { getCurrentUserId } from "../../../../helper/getUserData";
 // Constants
 const DRAG_CONFIG = {
   threshold: 5,
-  directionThreshold: 3,
-  scrollThreshold: 50,
-  maxScrollSpeed: 8,
-  minScrollSpeed: 2,
-  speedMultiplier: 0.6,
-  transitionFactor: 0.7,
-  slowdownFactor: 0.8,
-  scrollInterval: 16, // ~60fps
   apiDebounceTime: 500,
+  // Auto-scroll constants
+  horizontalScrollThreshold: 150,
+  horizontalScrollSpeed: 15,
+  horizontalScrollInterval: 16, // ~60fps
 } as const;
+
+// Extend HTMLElement interface for cleanup function
+interface ExtendedHTMLElement extends HTMLElement {
+  _dropCleanup?: () => void;
+}
 
 // Optimistic UI update
 export function updateTaskOptimistically(
@@ -30,10 +30,17 @@ export function updateTaskOptimistically(
   const taskIndex = tasks.findIndex((t: any) => t.id === taskId);
 
   if (taskIndex !== -1) {
+    // Update task in place to prevent duplicates
     const updatedTask = { ...tasks[taskIndex] };
-    updatedTask.status = parseInt(newStatus);
+    const status = parseInt(newStatus);
+
+    // newStatus is the status value directly (0, 1, 2...)
+    updatedTask.status = status;
+    updatedTask.column_id = status + 1; // Map status to column ID for reference
     updatedTask.updated_at = new Date().toISOString();
-    tasks.splice(taskIndex, 1, updatedTask);
+
+    // Replace the task in place instead of splice
+    tasks[taskIndex] = updatedTask;
   }
 }
 
@@ -51,17 +58,12 @@ export function debouncedChangeTaskStatus(
   }
 
   updateTaskOptimistically(taskId, newStatus, projectData);
-  emitForceCacheClear(
-    projectId,
-    "task-status-changed-by-drag",
-    getCurrentUserId()
-  );
 
   apiCallTimeout = setTimeout(async () => {
     try {
       await changeTaskStatus(taskId, projectId, endPoint);
     } catch (error) {
-      console.error("Error in debounced API call:", error);
+      // Silent error handling
     }
   }, DRAG_CONFIG.apiDebounceTime);
 }
@@ -83,7 +85,7 @@ export async function changeTaskStatus(
       getCurrentUserId()
     );
   } catch (error) {
-    console.error("HTTP request failed:", error);
+    // Silent error handling
   }
 }
 
@@ -99,11 +101,7 @@ interface changeTaskInput {
   projectId: number;
 }
 
-export function useDragTask(
-  fn: (slug: string) => Promise<void>,
-  slug: string,
-  ProjectData?: any
-) {
+export function useDragTask(ProjectData?: any) {
   // Touch drag state
   let isDragging = false;
   let draggedElement: HTMLElement | null = null;
@@ -116,152 +114,189 @@ export function useDragTask(
   let originalOpacity = "";
   let ghostElement: HTMLElement | null = null;
   let ghostAnimationFrame: number | null = null;
+  let touchStartTime = 0;
 
-  // Auto-scroll state
-  let autoScrollInterval: number | null = null;
-  let autoScrollSpeed = 0;
-  let lastY = 0;
-  let dragDirection = 0; // -1: up, 0: none, 1: down
+  // Flag to prevent duplicate API calls
+  let hasProcessedDrop = false;
 
-  // Auto-scroll functions
-  function startAutoScroll() {
-    if (autoScrollInterval) return;
+  // Auto-scroll state for horizontal scrolling
+  let horizontalScrollInterval: number | null = null;
+  let horizontalScrollSpeed = 0;
+  let lastX = 0;
 
-    autoScrollInterval = setInterval(() => {
-      if (autoScrollSpeed !== 0) {
-        const currentScrollY = window.scrollY;
-        const newScrollY = currentScrollY + autoScrollSpeed;
-        window.scrollTo(0, newScrollY);
-      }
-    }, DRAG_CONFIG.scrollInterval);
-  }
-
-  function stopAutoScroll() {
-    if (autoScrollInterval) {
-      clearInterval(autoScrollInterval);
-      autoScrollInterval = null;
-      autoScrollSpeed = 0;
-    }
-  }
-
-  function updateAutoScroll(y: number) {
-    const windowHeight = window.innerHeight;
-    const scrollY = window.scrollY;
-    const documentHeight = document.documentElement.scrollHeight;
-
-    // Track drag direction
-    if (lastY !== 0) {
-      const deltaY = y - lastY;
-      if (Math.abs(deltaY) > DRAG_CONFIG.directionThreshold) {
-        dragDirection = deltaY > 0 ? 1 : -1;
-      }
-    }
-    lastY = y;
-
-    // Remove existing indicators
-    const existingIndicators = document.querySelectorAll(
-      ".auto-scroll-indicator"
-    );
-    existingIndicators.forEach((indicator) => indicator.remove());
-
-    // Calculate distances
-    const distanceFromTop = y;
-    const distanceFromBottom = windowHeight - y;
-
-    let shouldScroll = false;
-    let scrollDirection = 0;
-    let speed = 0;
-
-    // Scroll up when near top edge OR dragging up
-    if (distanceFromTop < DRAG_CONFIG.scrollThreshold || dragDirection === -1) {
-      if (scrollY > 0) {
-        shouldScroll = true;
-        scrollDirection = -1;
-        speed = DRAG_CONFIG.maxScrollSpeed * DRAG_CONFIG.speedMultiplier;
-      }
-    }
-    // Scroll down when near bottom edge OR dragging down
-    else if (
-      distanceFromBottom < DRAG_CONFIG.scrollThreshold ||
-      dragDirection === 1
-    ) {
-      if (scrollY < documentHeight - windowHeight) {
-        shouldScroll = true;
-        scrollDirection = 1;
-        speed = DRAG_CONFIG.maxScrollSpeed * DRAG_CONFIG.speedMultiplier;
-      }
-    }
-
-    if (shouldScroll) {
-      const targetSpeed = scrollDirection * speed;
-      autoScrollSpeed =
-        autoScrollSpeed * DRAG_CONFIG.transitionFactor +
-        targetSpeed * (1 - DRAG_CONFIG.transitionFactor);
-
-      if (!autoScrollInterval) {
-        startAutoScroll();
-      }
-
-      showAutoScrollIndicator(scrollDirection === -1 ? "top" : "bottom");
-    } else {
-      autoScrollSpeed *= DRAG_CONFIG.slowdownFactor;
-      if (Math.abs(autoScrollSpeed) < 0.1) {
-        stopAutoScroll();
-      }
-    }
-  }
-
-  function showAutoScrollIndicator(position: "top" | "bottom") {
-    const indicator = document.createElement("div");
-    indicator.className = `auto-scroll-indicator ${position}`;
-    indicator.textContent =
-      position === "top" ? "↑ Scroll Up" : "↓ Scroll Down";
-    document.body.appendChild(indicator);
-
-    setTimeout(() => {
-      if (indicator.parentNode) {
-        indicator.parentNode.removeChild(indicator);
-      }
-    }, 2000);
-  }
+  // Mouse drag state for auto-scroll without task
+  let isMouseDragging = false;
+  let mouseStartX = 0;
+  let mouseStartY = 0;
+  let isGrabbing = false;
+  let grabStartX = 0;
+  let grabStartY = 0;
+  let grabScrollLeft = 0;
+  let isMouseDown = false;
+  let mouseDownX = 0;
+  let mouseDownY = 0;
 
   // Drop listeners
-  const attachedColumns = new Set<HTMLElement>();
+  const attachedColumns = new Set<ExtendedHTMLElement>();
+
+  // Auto-scroll functions for horizontal scrolling
+  function startHorizontalScroll() {
+    if (horizontalScrollInterval) return;
+
+    horizontalScrollInterval = setInterval(() => {
+      if (horizontalScrollSpeed !== 0) {
+        let kanbanContainer = document.querySelector(".kanban-grid-container");
+        if (!kanbanContainer) {
+          kanbanContainer = document.querySelector(
+            '[class*="kanban-grid-container"]'
+          );
+        }
+        if (!kanbanContainer) {
+          kanbanContainer = document.querySelector('[class*="kanban"]');
+        }
+
+        if (kanbanContainer) {
+          const currentScrollLeft = kanbanContainer.scrollLeft;
+          const newScrollLeft = currentScrollLeft + horizontalScrollSpeed;
+          kanbanContainer.scrollLeft = newScrollLeft;
+        }
+      }
+    }, DRAG_CONFIG.horizontalScrollInterval);
+  }
+
+  function stopHorizontalScroll() {
+    if (horizontalScrollInterval) {
+      clearInterval(horizontalScrollInterval);
+      horizontalScrollInterval = null;
+      horizontalScrollSpeed = 0;
+    }
+  }
+
+  function updateHorizontalScroll(x: number) {
+    let kanbanContainer = document.querySelector(".kanban-grid-container");
+    if (!kanbanContainer) {
+      kanbanContainer = document.querySelector(
+        '[class*="kanban-grid-container"]'
+      );
+    }
+    if (!kanbanContainer) {
+      kanbanContainer = document.querySelector('[class*="kanban"]');
+    }
+
+    if (!kanbanContainer) {
+      horizontalScrollSpeed = 0;
+      return;
+    }
+
+    const containerRect = kanbanContainer.getBoundingClientRect();
+    const containerLeft = containerRect.left;
+    const containerRight = containerRect.right;
+    const containerWidth = containerRect.width;
+
+    // Check if we need to scroll left
+    if (x < containerLeft + DRAG_CONFIG.horizontalScrollThreshold) {
+      const distanceFromLeft =
+        containerLeft + DRAG_CONFIG.horizontalScrollThreshold - x;
+      horizontalScrollSpeed = -Math.min(
+        DRAG_CONFIG.horizontalScrollSpeed,
+        distanceFromLeft * 0.5
+      );
+    }
+    // Check if we need to scroll right
+    else if (x > containerRight - DRAG_CONFIG.horizontalScrollThreshold) {
+      const distanceFromRight =
+        x - (containerRight - DRAG_CONFIG.horizontalScrollThreshold);
+      horizontalScrollSpeed = Math.min(
+        DRAG_CONFIG.horizontalScrollSpeed,
+        distanceFromRight * 0.5
+      );
+    }
+    // No scroll needed
+    else {
+      horizontalScrollSpeed = 0;
+    }
+
+    // Start or stop scroll interval based on speed
+    if (horizontalScrollSpeed !== 0 && !horizontalScrollInterval) {
+      startHorizontalScroll();
+    } else if (horizontalScrollSpeed === 0 && horizontalScrollInterval) {
+      stopHorizontalScroll();
+    }
+  }
 
   function addDropListener(
-    targetColumn: HTMLElement,
+    targetColumn: ExtendedHTMLElement,
     endpoint: string,
     newStatus: number
   ) {
-    if (attachedColumns.has(targetColumn)) return;
+    if (attachedColumns.has(targetColumn)) {
+      return;
+    }
+
     attachedColumns.add(targetColumn);
 
-    targetColumn.addEventListener(
-      "dragover",
-      function (event) {
-        event.preventDefault();
-        targetColumn.classList.add("hovered");
-      },
-      { passive: false }
-    );
+    function handleDragOver(e: DragEvent) {
+      e.preventDefault();
+      e.stopPropagation();
 
-    targetColumn.addEventListener("dragleave", function () {
-      targetColumn.classList.remove("hovered");
-    });
+      if (!isDragging || !draggedElement) return;
 
-    targetColumn.addEventListener("drop", function (event) {
-      event.preventDefault();
-      targetColumn.classList.remove("hovered");
+      const rect = targetColumn.getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
 
-      const taskId = taskStore.draggedTaskId;
-      const projectId = taskStore.draggedProjectId;
+      // Check if mouse is within column bounds
+      if (
+        x >= rect.left &&
+        x <= rect.right &&
+        y >= rect.top &&
+        y <= rect.bottom
+      ) {
+        targetColumn.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+        targetColumn.style.borderColor = "#3b82f6";
+      } else {
+        targetColumn.style.backgroundColor = "";
+        targetColumn.style.borderColor = "";
+      }
+    }
 
-      if (taskId && projectId) {
-        const task = ProjectData?.value?.data?.tasks?.find(
-          (t: any) => t.id === taskId
-        );
+    function handleDragLeave(e: DragEvent) {
+      e.preventDefault();
+      e.stopPropagation();
 
-        if (task && task.status !== newStatus) {
+      const rect = targetColumn.getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
+
+      // Only remove highlight if mouse actually left the column
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        targetColumn.style.backgroundColor = "";
+        targetColumn.style.borderColor = "";
+      }
+    }
+
+    function handleDrop(e: DragEvent) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!isDragging || !draggedElement || hasProcessedDrop) return;
+
+      const rect = targetColumn.getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
+
+      // Check if drop is within column bounds
+      if (
+        x >= rect.left &&
+        x <= rect.right &&
+        y >= rect.top &&
+        y <= rect.bottom
+      ) {
+        const taskId = parseInt(draggedElement.dataset.taskId || "0");
+        const projectId = parseInt(draggedElement.dataset.projectId || "0");
+
+        if (taskId && projectId) {
+          hasProcessedDrop = true;
           debouncedChangeTaskStatus(
             taskId,
             projectId,
@@ -271,470 +306,896 @@ export function useDragTask(
           );
         }
       }
-      taskStore.clearDraggedTask();
-    });
 
-    // Touch drop listeners for mobile
-    targetColumn.addEventListener(
-      "touchend",
-      function (event) {
-        if (isDragging) {
-          event.preventDefault();
-          const touch = event.changedTouches[0];
-          const rect = targetColumn.getBoundingClientRect();
+      // Reset column styling
+      targetColumn.style.backgroundColor = "";
+      targetColumn.style.borderColor = "";
+    }
 
-          if (
-            touch.clientX >= rect.left &&
-            touch.clientX <= rect.right &&
-            touch.clientY >= rect.top &&
-            touch.clientY <= rect.bottom
-          ) {
-            targetColumn.classList.remove("hovered");
-            const taskId = taskStore.draggedTaskId;
-            const projectId = taskStore.draggedProjectId;
-            if (taskId && projectId) {
-              const task = ProjectData?.value?.data?.tasks?.find(
-                (t: any) => t.id === taskId
-              );
-              if (task && task.status !== newStatus) {
-                debouncedChangeTaskStatus(
-                  taskId,
-                  projectId,
-                  endpoint,
-                  newStatus.toString(),
-                  ProjectData
-                );
-              }
-            }
-            taskStore.clearDraggedTask();
-          }
-          cleanupDrag();
-        }
-      },
-      { passive: false }
-    );
+    targetColumn.addEventListener("dragover", handleDragOver);
+    targetColumn.addEventListener("dragleave", handleDragLeave);
+    targetColumn.addEventListener("drop", handleDrop);
+
+    // Store cleanup function
+    targetColumn._dropCleanup = () => {
+      targetColumn.removeEventListener("dragover", handleDragOver);
+      targetColumn.removeEventListener("dragleave", handleDragLeave);
+      targetColumn.removeEventListener("drop", handleDrop);
+      attachedColumns.delete(targetColumn);
+    };
   }
 
   function setupAllDropListeners() {
-    const notStartedColumn = document.querySelector(
-      ".not-started-column"
-    ) as HTMLElement;
-    const pendingColumn = document.querySelector(
-      ".pending-column"
-    ) as HTMLElement;
-    const completedColumn = document.querySelector(
-      ".completed-column"
-    ) as HTMLElement;
+    // Clean up existing listeners
+    attachedColumns.forEach((column) => {
+      if (column._dropCleanup) {
+        column._dropCleanup();
+      }
+    });
+    attachedColumns.clear();
 
-    if (notStartedColumn)
-      addDropListener(notStartedColumn, "task/pending_to_not_started", 0);
-    if (pendingColumn)
-      addDropListener(pendingColumn, "task/not_started_to_pending", 1);
-    if (completedColumn)
-      addDropListener(completedColumn, "task/not_started_to_completed", 2);
+    // Find all kanban columns
+    const columns = document.querySelectorAll(".kanban-column");
+    columns.forEach((column) => {
+      const columnElement = column as ExtendedHTMLElement;
+      const columnId = columnElement.dataset.columnId;
+      const columnStatus = columnElement.dataset.columnStatus;
 
-    setupTaskCardDragListeners();
+      if (columnId && columnStatus !== undefined) {
+        const endpoint = `task/transition_to_${columnStatus}`;
+        const newStatus = parseInt(columnStatus);
+        addDropListener(columnElement, endpoint, newStatus);
+      }
+    });
   }
 
   function setupTaskCardDragListeners() {
     const taskCards = document.querySelectorAll(".task-card");
-
     taskCards.forEach((card) => {
-      // Remove existing listeners
-      card.removeEventListener("dragstart", handleDragStart as EventListener);
-      card.removeEventListener("dragend", handleDragEnd as EventListener);
-      card.removeEventListener("touchstart", handleTouchStart as EventListener);
-      card.removeEventListener("touchmove", handleTouchMove as EventListener);
-      card.removeEventListener("touchend", handleTouchEnd as EventListener);
+      const cardElement = card as HTMLElement;
 
-      // Add new listeners
-      card.addEventListener("dragstart", handleDragStart as EventListener);
-      card.addEventListener("dragend", handleDragEnd as EventListener);
-      card.addEventListener("touchstart", handleTouchStart as EventListener, {
-        passive: false,
-      });
-      card.addEventListener("touchmove", handleTouchMove as EventListener, {
-        passive: false,
-      });
-      card.addEventListener("touchend", handleTouchEnd as EventListener, {
-        passive: false,
-      });
+      // Remove existing listeners first to prevent conflicts
+      cardElement.removeEventListener("dragstart", handleDragStart);
+      cardElement.removeEventListener("dragend", handleDragEnd);
+      cardElement.removeEventListener("touchstart", handleTouchStart);
+      cardElement.removeEventListener("touchmove", handleTouchMove);
+      cardElement.removeEventListener("touchend", handleTouchEnd);
+
+      // Add drag events for desktop
+      cardElement.addEventListener("dragstart", handleDragStart);
+      cardElement.addEventListener("dragend", handleDragEnd);
+
+      // Note: Touch events are handled by delegation in setupTouchDelegation
+      // to avoid conflicts and improve performance
     });
   }
 
-  function handleDragStart(event: Event) {
-    const dragEvent = event as DragEvent;
-    const target = dragEvent.target as HTMLElement;
-    const taskCard = target.closest(".task-card") as HTMLElement;
+  function setupTouchListeners() {
+    // Use delegation instead of individual listeners to avoid conflicts
+    // Individual listeners are removed to prevent double handling
+    const taskCards = document.querySelectorAll(".task-card");
 
-    if (taskCard) {
-      const taskId = parseInt(taskCard.dataset.taskId || "0");
-      const projectId = parseInt(taskCard.dataset.projectId || "0");
+    taskCards.forEach((card) => {
+      const cardElement = card as HTMLElement;
 
-      if (taskId && projectId) {
-        taskStore.setDraggedTask(taskId, projectId);
-        taskCard.classList.add("dragging");
-
-        const ghost = taskCard.cloneNode(true) as HTMLElement;
-        ghost.classList.add("ghost-task");
-        ghost.style.opacity = "0.5";
-        ghost.style.transform = "rotate(5deg)";
-        document.body.appendChild(ghost);
-
-        if (dragEvent.dataTransfer) {
-          dragEvent.dataTransfer.effectAllowed = "move";
-          const rect = ghost.getBoundingClientRect();
-          const offsetX = rect.width / 2;
-          const offsetY = rect.height / 2;
-          dragEvent.dataTransfer.setDragImage(ghost, offsetX, offsetY);
-        }
-      }
-    }
+      // Remove existing listeners to prevent conflicts
+      cardElement.removeEventListener("touchstart", handleTouchStart);
+      cardElement.removeEventListener("touchmove", handleTouchMove);
+      cardElement.removeEventListener("touchend", handleTouchEnd);
+    });
   }
 
-  function handleDragEnd(event: Event) {
+  function setupTouchDelegation() {
+    // Remove existing listeners
+    document.removeEventListener("touchstart", handleTouchStartDelegation);
+    document.removeEventListener("touchmove", handleTouchMoveDelegation);
+    document.removeEventListener("touchend", handleTouchEndDelegation);
+
+    // Add event delegation listeners
+    document.addEventListener("touchstart", handleTouchStartDelegation, {
+      passive: true,
+    });
+    document.addEventListener("touchmove", handleTouchMoveDelegation, {
+      passive: false,
+    });
+    document.addEventListener("touchend", handleTouchEndDelegation, {
+      passive: true,
+    });
+  }
+
+  function handleTouchStartDelegation(event: Event) {
     const target = event.target as HTMLElement;
-    const taskCard = target.closest(".task-card") as HTMLElement;
-    if (taskCard) {
-      taskCard.classList.remove("dragging");
-      const ghost = document.querySelector(".ghost-task");
-      if (ghost) ghost.remove();
-    }
-    taskStore.clearDraggedTask();
-  }
 
-  function handleTouchStart(event: Event) {
-    const touchEvent = event as TouchEvent;
-    const touch = touchEvent.touches[0];
+    // Find the closest task-card element
+    const taskCard = target.closest(".task-card");
+    if (!taskCard) {
+      return;
+    }
+
+    const touch = (event as TouchEvent).touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    currentX = startX;
+    currentY = startY;
+    touchStartTime = Date.now();
+
+    const taskId = parseInt((taskCard as HTMLElement).dataset.taskId || "0");
+    const projectId = parseInt(
+      (taskCard as HTMLElement).dataset.projectId || "0"
+    );
+
+    if (!taskId || !projectId) {
+      return;
+    }
+
+    // Create ghost element for mobile
+    createMobileGhost(startX, startY);
+
+    // Store the task card for later use
+    draggedElement = taskCard as HTMLElement;
 
     // Reset drag state
     isDragging = false;
-    startX = touch.clientX;
-    startY = touch.clientY;
+    hasProcessedDrop = false;
+  }
+
+  function handleTouchMoveDelegation(event: Event) {
+    if (!draggedElement) {
+      return;
+    }
+
+    const touch = (event as TouchEvent).touches[0];
     currentX = touch.clientX;
     currentY = touch.clientY;
 
-    // Initialize auto-scroll state
-    dragDirection = 0;
-    lastY = touch.clientY;
-    stopAutoScroll();
+    const distance = Math.sqrt(
+      Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2)
+    );
 
-    // Store the dragged element and set taskStore values
-    const target = event.target as HTMLElement;
-    const taskCard = target.closest(".task-card") as HTMLElement;
-    if (taskCard) {
-      draggedElement = taskCard;
-      const taskId = parseInt(taskCard.dataset.taskId || "0");
-      const projectId = parseInt(taskCard.dataset.projectId || "0");
+    if (distance > DRAG_CONFIG.threshold && !isDragging && draggedElement) {
+      const touchDuration = Date.now() - touchStartTime;
 
-      if (taskId && projectId) {
-        taskStore.setDraggedTask(taskId, projectId);
-      }
-    }
-  }
-
-  function handleTouchMove(event: Event) {
-    if (!draggedElement) return;
-
-    const touchEvent = event as TouchEvent;
-    const touch = touchEvent.touches[0];
-
-    if (!isDragging) {
-      const deltaX = Math.abs(touch.clientX - startX);
-      const deltaY = Math.abs(touch.clientY - startY);
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-      if (distance > DRAG_CONFIG.threshold) {
+      // Only start drag if touch duration is reasonable (not too short, not too long)
+      if (touchDuration > 50 && touchDuration < 2000) {
         isDragging = true;
-        event.preventDefault();
-
-        document.body.style.touchAction = "none";
-        document.body.style.overflow = "auto";
-
-        draggedElement.classList.add("dragging");
-        draggedElement.style.backgroundColor = "#eff6ff";
-        draggedElement.style.border = "2px solid #3b82f6";
-        draggedElement.style.boxShadow = "0 4px 16px rgba(59, 130, 246, 0.3)";
-        draggedElement.style.transform = "scale(1.02)";
-        draggedElement.style.opacity = "0.8";
-        draggedElement.style.zIndex = "1000";
-
-        createMobileGhost(touch.clientX, touch.clientY);
-        checkColumnHover(touch.clientX, touch.clientY);
+        hasProcessedDrop = false;
+        // Create ghost element immediately when starting drag
+        if (!ghostElement) {
+          createMobileGhost(currentX, currentY);
+        }
+        // Only prevent default when we start dragging
+        if (event.cancelable) {
+          event.preventDefault();
+        }
       }
-    } else {
-      event.preventDefault();
-      currentX = touch.clientX;
-      currentY = touch.clientY;
+    }
 
-      updateMobileGhost(currentX, currentY);
+    if (isDragging) {
+      // Ensure ghost element exists and is visible
+      if (!ghostElement) {
+        createMobileGhost(currentX, currentY);
+      } else {
+        updateMobileGhost(currentX, currentY);
+      }
+      updateHorizontalScroll(currentX);
       checkColumnHover(currentX, currentY);
-      updateAutoScroll(currentY);
     }
   }
 
-  function handleTouchEnd(event: Event) {
-    if (isDragging) {
-      event.preventDefault();
+  function handleTouchEndDelegation(event: Event) {
+    if (!isDragging || !draggedElement) {
+      cleanupDragVisuals();
+      return;
+    }
 
-      // Find which column we dropped on
+    const taskId = parseInt(draggedElement.dataset.taskId || "0");
+    const projectId = parseInt(draggedElement.dataset.projectId || "0");
+
+    if (taskId && projectId) {
+      // Find which column the task was dropped on
       const columns = document.querySelectorAll(".kanban-column");
-      let droppedColumn: HTMLElement | null = null;
-      let columnStatus = -1;
-      let columnEndpoint = "";
+      let droppedOnColumn = null;
 
-      columns.forEach((column) => {
-        const rect = column.getBoundingClientRect();
+      for (const column of columns) {
+        const columnElement = column as HTMLElement;
+        const rect = columnElement.getBoundingClientRect();
+
         if (
           currentX >= rect.left &&
           currentX <= rect.right &&
           currentY >= rect.top &&
           currentY <= rect.bottom
         ) {
-          droppedColumn = column as HTMLElement;
-
-          if (column.classList.contains("not-started-column")) {
-            columnStatus = 0;
-            columnEndpoint = "task/pending_to_not_started";
-          } else if (column.classList.contains("pending-column")) {
-            columnStatus = 1;
-            columnEndpoint = "task/not_started_to_pending";
-          } else if (column.classList.contains("completed-column")) {
-            columnStatus = 2;
-            columnEndpoint = "task/not_started_to_completed";
-          }
-        }
-      });
-
-      // Process the drop
-      if (droppedColumn && columnStatus !== -1) {
-        const taskId = taskStore.draggedTaskId;
-        const projectId = taskStore.draggedProjectId;
-
-        if (taskId && projectId) {
-          const task = ProjectData?.value?.data?.tasks?.find(
-            (t: any) => t.id === taskId
-          );
-
-          if (task && task.status !== columnStatus) {
-            debouncedChangeTaskStatus(
-              taskId,
-              projectId,
-              columnEndpoint,
-              columnStatus.toString(),
-              ProjectData
-            );
-          }
+          droppedOnColumn = columnElement;
+          break;
         }
       }
 
-      // Clean up
-      cleanupDragVisuals();
-      taskStore.clearDraggedTask();
+      if (droppedOnColumn && !hasProcessedDrop) {
+        const columnId = droppedOnColumn.dataset.columnId;
+        const columnStatus = droppedOnColumn.dataset.columnStatus;
+
+        if (columnId && columnStatus !== undefined) {
+          const endpoint = `task/transition_to_${columnStatus}`;
+          const newStatus = parseInt(columnStatus);
+          hasProcessedDrop = true;
+          debouncedChangeTaskStatus(
+            taskId,
+            projectId,
+            endpoint,
+            newStatus.toString(),
+            ProjectData
+          );
+        }
+      }
     }
+
+    cleanupDragVisuals();
+  }
+
+  function handleDragStart(event: Event) {
+    const target = event.target as HTMLElement;
+    if (!target.classList.contains("task-card")) return;
+
+    const taskId = parseInt(target.dataset.taskId || "0");
+    const projectId = parseInt(target.dataset.projectId || "0");
+
+    if (!taskId || !projectId) return;
+
+    isDragging = true;
+    draggedElement = target;
+    hasProcessedDrop = false;
+
+    // Store original styles
+    originalTransform = target.style.transform;
+    originalZIndex = target.style.zIndex;
+    originalOpacity = target.style.opacity;
+
+    // Apply drag styles
+    target.style.transform = "rotate(5deg) scale(1.05)";
+    target.style.zIndex = "9999";
+    target.style.opacity = "0.8";
+
+    // Reset grab mode
+    isGrabbing = false;
+    isMouseDragging = false;
+
+    // Set drag image
+    const dragEvent = event as DragEvent;
+    if (dragEvent.dataTransfer) {
+      dragEvent.dataTransfer.effectAllowed = "move";
+      dragEvent.dataTransfer.setDragImage(target, 0, 0);
+    }
+  }
+
+  function handleDragEnd(event: Event) {
+    const target = event.target as HTMLElement;
+    if (!target.classList.contains("task-card")) return;
+
+    isDragging = false;
+    draggedElement = null;
+
+    // Restore original styles
+    target.style.transform = originalTransform;
+    target.style.zIndex = originalZIndex;
+    target.style.opacity = originalOpacity;
+
+    // Reset all column highlights
+    const columns = document.querySelectorAll(".kanban-column");
+    columns.forEach((column) => {
+      const columnElement = column as HTMLElement;
+      columnElement.style.backgroundColor = "";
+      columnElement.style.borderColor = "";
+    });
+
+    // Stop horizontal scroll
+    stopHorizontalScroll();
+
+    // Reset flags
+    hasProcessedDrop = false;
+  }
+
+  function handleMouseMove(event: MouseEvent) {
+    if (!isDragging || !draggedElement) return;
+
+    currentX = event.clientX;
+    currentY = event.clientY;
+
+    // Update horizontal scroll
+    updateHorizontalScroll(currentX);
+
+    // Update ghost element position
+    if (ghostElement) {
+      updateMobileGhost(currentX, currentY);
+    }
+  }
+
+  function handleTouchStart(event: Event) {
+    const target = event.target as HTMLElement;
+
+    // Find the closest task-card element
+    const taskCard = target.closest(".task-card");
+    if (!taskCard) {
+      return;
+    }
+
+    const touch = (event as TouchEvent).touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    currentX = startX;
+    currentY = startY;
+    touchStartTime = Date.now();
+
+    const taskId = parseInt((taskCard as HTMLElement).dataset.taskId || "0");
+    const projectId = parseInt(
+      (taskCard as HTMLElement).dataset.projectId || "0"
+    );
+
+    if (!taskId || !projectId) {
+      return;
+    }
+
+    // Create ghost element for mobile
+    createMobileGhost(startX, startY);
+  }
+
+  function handleTouchMove(event: Event) {
+    if (!ghostElement) {
+      return;
+    }
+
+    const touch = (event as TouchEvent).touches[0];
+    currentX = touch.clientX;
+    currentY = touch.clientY;
+
+    const distance = Math.sqrt(
+      Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2)
+    );
+
+    if (distance > DRAG_CONFIG.threshold && !isDragging) {
+      isDragging = true;
+      const target = event.target as HTMLElement;
+      if (target.classList.contains("task-card")) {
+        draggedElement = target;
+        hasProcessedDrop = false;
+      }
+      // Only prevent default when we start dragging
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    }
+
+    if (isDragging) {
+      updateMobileGhost(currentX, currentY);
+      updateHorizontalScroll(currentX);
+      checkColumnHover(currentX, currentY);
+    }
+  }
+
+  function handleTouchEnd(event: Event) {
+    if (!isDragging || !draggedElement) {
+      cleanupDragVisuals();
+      return;
+    }
+
+    const taskId = parseInt(draggedElement.dataset.taskId || "0");
+    const projectId = parseInt(draggedElement.dataset.projectId || "0");
+
+    if (taskId && projectId) {
+      // Find which column the task was dropped on
+      const columns = document.querySelectorAll(".kanban-column");
+      let droppedOnColumn = null;
+
+      for (const column of columns) {
+        const columnElement = column as HTMLElement;
+        const rect = columnElement.getBoundingClientRect();
+
+        if (
+          currentX >= rect.left &&
+          currentX <= rect.right &&
+          currentY >= rect.top &&
+          currentY <= rect.bottom
+        ) {
+          droppedOnColumn = columnElement;
+          break;
+        }
+      }
+
+      if (droppedOnColumn && !hasProcessedDrop) {
+        const columnId = droppedOnColumn.dataset.columnId;
+        const columnStatus = droppedOnColumn.dataset.columnStatus;
+
+        if (columnId && columnStatus !== undefined) {
+          const endpoint = `task/transition_to_${columnStatus}`;
+          const newStatus = parseInt(columnStatus);
+          hasProcessedDrop = true;
+          debouncedChangeTaskStatus(
+            taskId,
+            projectId,
+            endpoint,
+            newStatus.toString(),
+            ProjectData
+          );
+        }
+      }
+    }
+
+    cleanupDragVisuals();
   }
 
   function checkColumnHover(x: number, y: number) {
     const columns = document.querySelectorAll(".kanban-column");
     columns.forEach((column) => {
-      const rect = column.getBoundingClientRect();
+      const columnElement = column as HTMLElement;
+      const rect = columnElement.getBoundingClientRect();
+
       if (
         x >= rect.left &&
         x <= rect.right &&
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        column.classList.add("hovered");
+        columnElement.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+        columnElement.style.borderColor = "#3b82f6";
       } else {
-        column.classList.remove("hovered");
+        columnElement.style.backgroundColor = "";
+        columnElement.style.borderColor = "";
       }
     });
   }
 
   function cleanupDragVisuals() {
     isDragging = false;
-    if (draggedElement) {
-      draggedElement.classList.remove("dragging");
-      draggedElement.style.transform = originalTransform;
-      draggedElement.style.zIndex = originalZIndex;
-      draggedElement.style.opacity = originalOpacity;
-      draggedElement.style.backgroundColor = "";
-      draggedElement.style.border = "";
-      draggedElement.style.boxShadow = "";
-      draggedElement = null;
-    }
+    draggedElement = null;
+    hasProcessedDrop = false;
+
+    // Reset all column highlights
+    const columns = document.querySelectorAll(".kanban-column");
+    columns.forEach((column) => {
+      const columnElement = column as HTMLElement;
+      columnElement.style.backgroundColor = "";
+      columnElement.style.borderColor = "";
+    });
+
+    // Remove ghost element
     if (ghostElement) {
       ghostElement.remove();
       ghostElement = null;
     }
-    if (ghostAnimationFrame) {
-      cancelAnimationFrame(ghostAnimationFrame);
-      ghostAnimationFrame = null;
-    }
 
-    document.querySelectorAll(".kanban-column").forEach((column) => {
-      column.classList.remove("hovered");
-    });
-
-    document.body.style.touchAction = "";
-    document.body.style.overflow = "";
-    stopAutoScroll();
+    // Stop horizontal scroll
+    stopHorizontalScroll();
   }
 
   function getMemberName(member: any) {
-    return (
-      member?.user?.name ||
-      member?.members?.name ||
-      member?.member?.name ||
-      member?.name ||
-      ""
-    );
+    return member?.name || member?.user?.name || "Unknown";
   }
 
   function getMemberAvatar(member: any) {
-    return (
-      member?.avatar ||
-      member?.user?.avatar ||
-      member?.members?.avatar ||
-      member?.member?.avatar ||
-      ""
-    );
+    return getAvatarSrc(member?.avatar || member?.user?.avatar);
   }
 
   function createMobileGhost(x: number, y: number) {
+    if (!draggedElement) {
+      return;
+    }
+
+    // Remove existing ghost
     if (ghostElement) {
       ghostElement.remove();
     }
+
+    // Create ghost element
     ghostElement = document.createElement("div");
-    ghostElement.classList.add("ghost-task");
-    ghostElement.style.position = "fixed";
-    ghostElement.style.zIndex = "99999";
-    ghostElement.style.pointerEvents = "none";
-    ghostElement.style.opacity = "1";
-    ghostElement.style.transition =
-      "left 0.15s cubic-bezier(0.4,0,0.2,1), top 0.15s cubic-bezier(0.4,0,0.2,1)";
-    ghostElement.style.willChange = "left, top";
-    ghostElement.style.background = "#e0f2fe";
-    ghostElement.style.border = "3px solid #3b82f6";
-    ghostElement.style.color = "#1e293b";
-    ghostElement.style.fontWeight = "bold";
-    ghostElement.style.fontSize = "18px";
-    ghostElement.style.width = "220px";
-    ghostElement.style.minHeight = "80px";
-    ghostElement.style.display = "flex";
-    ghostElement.style.flexDirection = "column";
-    ghostElement.style.alignItems = "flex-start";
-    ghostElement.style.justifyContent = "center";
-    ghostElement.style.borderRadius = "16px";
-    ghostElement.style.padding = "16px";
-    ghostElement.style.boxSizing = "border-box";
-
-    // Get task info
-    let taskName = "";
-    let taskDate = "";
-    let taskMembers: any[] = [];
-    if (draggedElement) {
-      const nameEl = draggedElement.querySelector(".task-title");
-      if (nameEl) taskName = nameEl.textContent || "";
-      const dateEl = draggedElement.querySelector(".task-date span");
-      if (dateEl) taskDate = dateEl.textContent || "";
-      const taskId = draggedElement.dataset.taskId;
-      let taskObj = null;
-      if (taskId && ProjectData?.value?.data?.tasks) {
-        taskObj = ProjectData.value.data.tasks.find((t: any) => t.id == taskId);
-      }
-      if (taskObj && Array.isArray(taskObj.task_members)) {
-        taskMembers = taskObj.task_members;
-      }
-    }
-
-    // Create ghost content
-    ghostElement.innerHTML = `
-      <div style="font-size:20px;font-weight:bold;margin-bottom:8px;">${taskName}</div>
-      <div style="font-size:14px;margin-bottom:8px;">${
-        taskDate ? "📅 " + taskDate : ""
-      }</div>
-      <div style="display:flex;gap:4px;">
-        ${taskMembers
-          .map((m: any) => {
-            const avatar = getAvatarSrc(getMemberAvatar(m), getMemberName(m));
-            const name = getMemberName(m);
-            if (avatar && !avatar.includes("ui-avatars.com")) {
-              return `<img src='${avatar}' style='width:28px;height:28px;border-radius:50%;border:2px solid #f59e0b;object-fit:cover;background:#fff;' alt='${name}' title='${name}' />`;
-            } else {
-              return `<span style='background:#fff;color:#f59e0b;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;border:2px solid #f59e0b;'>${
-                name ? name.charAt(0).toUpperCase() : "?"
-              }</span>`;
-            }
-          })
-          .join("")}
-      </div>
+    ghostElement.className = "mobile-ghost-task";
+    ghostElement.style.cssText = `
+      position: fixed;
+      top: ${y - 40}px;
+      left: ${x - 80}px;
+      width: 160px;
+      height: 80px;
+      background: #ffffff;
+      border: 2px solid #3b82f6;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(59, 130, 246, 0.25);
+      z-index: 99999;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      transform: rotate(3deg) scale(0.95);
+      transition: all 0.1s ease;
+      opacity: 1;
+      visibility: visible;
     `;
 
-    // Position ghost
-    const rect = ghostElement.getBoundingClientRect();
-    const offsetX = rect.width / 2;
-    const offsetY = rect.height / 2;
-    ghostElement.style.left = x - offsetX + "px";
-    ghostElement.style.top = y - offsetY + "px";
-    ghostElement.style.transform = "";
+    // Get task info
+    const taskId = parseInt(draggedElement.dataset.taskId || "0");
+    const taskName =
+      draggedElement.querySelector(".task-title")?.textContent || "Task";
+    const taskMembers = draggedElement.querySelectorAll(".member-avatar");
 
+    // Create ghost content
+    const ghostContent = document.createElement("div");
+    ghostContent.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: space-between;
+    `;
+
+    // Task title
+    const taskTitleElement = document.createElement("div");
+    taskTitleElement.textContent = taskName;
+    taskTitleElement.style.cssText = `
+      font-size: 14px;
+      font-weight: 600;
+      color: #1f2937;
+      line-height: 1.3;
+      margin-bottom: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    `;
+
+    // Task footer with date and members
+    const taskFooter = document.createElement("div");
+    taskFooter.style.cssText = `
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #6b7280;
+    `;
+
+    // Date
+    const dateElement = document.createElement("div");
+    dateElement.style.cssText = `
+        display: flex;
+      align-items: center;
+      gap: 4px;
+    `;
+    dateElement.innerHTML = `
+      <i class="fas fa-calendar" style="font-size: 10px;"></i>
+      <span>${new Date().toLocaleDateString()}</span>
+    `;
+
+    // Members
+    const membersElement = document.createElement("div");
+    membersElement.style.cssText = `
+      display: flex;
+      align-items: center;
+        gap: 2px;
+      `;
+
+    if (taskMembers.length > 0) {
+      const maxMembers = Math.min(taskMembers.length, 3);
+      for (let i = 0; i < maxMembers; i++) {
+        const memberDot = document.createElement("div");
+        memberDot.style.cssText = `
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #3b82f6;
+        `;
+        membersElement.appendChild(memberDot);
+      }
+
+      if (taskMembers.length > 3) {
+        const moreDot = document.createElement("div");
+        moreDot.style.cssText = `
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #e5e7eb;
+          font-size: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #6b7280;
+        `;
+        moreDot.textContent = "+";
+        membersElement.appendChild(moreDot);
+      }
+    } else {
+      const noMembers = document.createElement("div");
+      noMembers.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: #9ca3af;
+      `;
+      noMembers.innerHTML = `
+        <i class="fas fa-user-plus" style="font-size: 10px;"></i>
+        <span>Unassigned</span>
+      `;
+      membersElement.appendChild(noMembers);
+    }
+
+    taskFooter.appendChild(dateElement);
+    taskFooter.appendChild(membersElement);
+
+    ghostContent.appendChild(taskTitleElement);
+    ghostContent.appendChild(taskFooter);
+
+    ghostElement.appendChild(ghostContent);
     document.body.appendChild(ghostElement);
+
+    // Force ghost element to be visible
+    setTimeout(() => {
+      if (ghostElement) {
+        ghostElement.style.opacity = "1";
+        ghostElement.style.visibility = "visible";
+        ghostElement.style.display = "flex";
+        ghostElement.style.zIndex = "99999";
+      }
+    }, 10);
   }
 
   function updateGhostTaskColor(x: number, y: number) {
     if (!ghostElement) return;
+
     const columns = document.querySelectorAll(".kanban-column");
-    let found = false;
+    let isOverColumn = false;
+
     columns.forEach((column) => {
-      const rect = column.getBoundingClientRect();
+      const columnElement = column as HTMLElement;
+      const rect = columnElement.getBoundingClientRect();
+
       if (
         x >= rect.left &&
         x <= rect.right &&
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        found = true;
-        if (column.classList.contains("not-started-column") && ghostElement) {
-          ghostElement.style.background = "#e0f2fe";
-          ghostElement.style.border = "3px solid #3b82f6";
-        } else if (
-          column.classList.contains("pending-column") &&
-          ghostElement
-        ) {
-          ghostElement.style.background = "#fef9c3";
-          ghostElement.style.border = "3px solid #f59e0b";
-        } else if (
-          column.classList.contains("completed-column") &&
-          ghostElement
-        ) {
-          ghostElement.style.background = "#dcfce7";
-          ghostElement.style.border = "3px solid #10b981";
+        isOverColumn = true;
+
+        // Get column color from data attribute or CSS custom property
+        const columnColor =
+          columnElement.dataset.columnColor ||
+          getComputedStyle(columnElement).getPropertyValue("--column-color") ||
+          columnElement.style.getPropertyValue("--column-color");
+
+        // Use the actual column color if available
+        if (columnColor && columnColor !== "") {
+          ghostElement!.style.borderColor = columnColor;
+          ghostElement!.style.boxShadow = `0 8px 32px ${columnColor}40`;
+        } else {
+          // Fallback to default colors based on column key
+          const columnKey =
+            columnElement.dataset.columnKey || columnElement.className;
+
+          if (columnKey.includes("not-started") || columnKey.includes("0")) {
+            ghostElement!.style.borderColor = "#3b82f6";
+            ghostElement!.style.boxShadow =
+              "0 8px 32px rgba(59, 130, 246, 0.25)";
+          } else if (columnKey.includes("pending") || columnKey.includes("1")) {
+            ghostElement!.style.borderColor = "#f59e0b";
+            ghostElement!.style.boxShadow =
+              "0 8px 32px rgba(245, 158, 11, 0.25)";
+          } else if (
+            columnKey.includes("completed") ||
+            columnKey.includes("OK")
+          ) {
+            ghostElement!.style.borderColor = "#10b981";
+            ghostElement!.style.boxShadow =
+              "0 8px 32px rgba(16, 185, 129, 0.25)";
+          } else {
+            // Use a neutral color for custom columns
+            ghostElement!.style.borderColor = "#6b7280";
+            ghostElement!.style.boxShadow =
+              "0 8px 32px rgba(107, 114, 128, 0.25)";
+          }
         }
       }
     });
-    if (!found && ghostElement) {
-      ghostElement.style.background = "#e0f2fe";
-      ghostElement.style.border = "3px solid #3b82f6";
+
+    if (!isOverColumn && ghostElement) {
+      ghostElement.style.borderColor = "#3b82f6";
+      ghostElement.style.boxShadow = "0 8px 32px rgba(59, 130, 246, 0.25)";
     }
   }
 
   function updateMobileGhost(x: number, y: number) {
-    if (!ghostElement) return;
-    if (ghostAnimationFrame) cancelAnimationFrame(ghostAnimationFrame);
-    ghostAnimationFrame = requestAnimationFrame(() => {
-      if (!ghostElement) return;
-      const rect = ghostElement.getBoundingClientRect();
-      const offsetX = rect.width / 2;
-      const offsetY = rect.height / 2;
-      ghostElement.style.left = x - offsetX + "px";
-      ghostElement.style.top = y - offsetY + "px";
-      updateGhostTaskColor(x, y);
+    if (!ghostElement) {
+      createMobileGhost(x, y);
+      return;
+    }
+    ghostElement.style.top = `${y - 40}px`;
+    ghostElement.style.left = `${x - 80}px`;
+    ghostElement.style.opacity = "1";
+    ghostElement.style.visibility = "visible";
+    updateGhostTaskColor(x, y);
+  }
+
+  function setupMouseDragListeners() {
+    const kanbanContainer = document.querySelector(".kanban-grid-container");
+    if (!kanbanContainer) return;
+
+    kanbanContainer.addEventListener("contextmenu", handleContextMenu);
+    kanbanContainer.addEventListener(
+      "mousedown",
+      handleMouseDown as EventListener
+    );
+    kanbanContainer.addEventListener(
+      "mousemove",
+      handleMouseMoveForScroll as EventListener
+    );
+    kanbanContainer.addEventListener("mouseup", handleMouseUp as EventListener);
+    kanbanContainer.addEventListener(
+      "mouseleave",
+      handleMouseUp as EventListener
+    );
+  }
+
+  function handleContextMenu(event: Event) {
+    event.preventDefault();
+  }
+
+  function handleMouseDown(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+
+    // Skip if clicking on task card or interactive elements
+    if (
+      target.closest(".task-card") ||
+      target.closest("button") ||
+      target.closest("input") ||
+      target.closest(".task-menu") ||
+      target.closest(".title-edit-inline") ||
+      target.closest(".color-edit-inline")
+    ) {
+      return;
+    }
+
+    isMouseDown = true;
+    mouseDownX = event.clientX;
+    mouseDownY = event.clientY;
+    grabStartX = event.clientX;
+    grabStartY = event.clientY;
+
+    const kanbanContainer = document.querySelector(
+      ".kanban-grid-container"
+    ) as HTMLElement;
+    if (kanbanContainer) {
+      grabScrollLeft = kanbanContainer.scrollLeft;
+    }
+  }
+
+  function handleMouseMoveForScroll(event: MouseEvent) {
+    if (!isMouseDown) return;
+
+    const deltaX = event.clientX - mouseDownX;
+    const deltaY = event.clientY - mouseDownY;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    // Only start grabbing if mouse moved enough and not over task cards
+    if (distance > 5 && !isGrabbing) {
+      const target = event.target as HTMLElement;
+
+      if (!target.closest(".task-card")) {
+        isGrabbing = true;
+        isMouseDragging = true;
+
+        const kanbanContainer = document.querySelector(
+          ".kanban-grid-container"
+        ) as HTMLElement;
+        if (kanbanContainer) {
+          kanbanContainer.style.cursor = "grabbing";
+          kanbanContainer.style.userSelect = "none";
+        }
+      }
+    }
+
+    if (isGrabbing) {
+      const kanbanContainer = document.querySelector(
+        ".kanban-grid-container"
+      ) as HTMLElement;
+      if (kanbanContainer) {
+        const deltaX = grabStartX - event.clientX;
+        const newScrollLeft = grabScrollLeft + deltaX;
+        kanbanContainer.scrollLeft = newScrollLeft;
+      }
+    }
+  }
+
+  function handleMouseUp(event: MouseEvent) {
+    if (isGrabbing) {
+      const kanbanContainer = document.querySelector(
+        ".kanban-grid-container"
+      ) as HTMLElement;
+      if (kanbanContainer) {
+        kanbanContainer.style.cursor = "";
+        kanbanContainer.style.userSelect = "";
+      }
+    }
+
+    isMouseDown = false;
+    isGrabbing = false;
+    isMouseDragging = false;
+  }
+
+  function setupHorizontalScrollTouch() {
+    const kanbanContainer = document.querySelector(".kanban-grid-container");
+    if (!kanbanContainer) return;
+
+    // Tối ưu: Sử dụng passive listeners để tăng performance
+    kanbanContainer.addEventListener("touchstart", handleScrollTouchStart, {
+      passive: true,
     });
+    kanbanContainer.addEventListener("touchmove", handleScrollTouchMove, {
+      passive: false, // Cần false để có thể preventDefault
+    });
+    kanbanContainer.addEventListener("touchend", handleScrollTouchEnd, {
+      passive: true,
+    });
+  }
+
+  function handleScrollTouchStart(event: Event) {
+    // Only handle if not touching a task card
+    const target = event.target as HTMLElement;
+    if (target.closest(".task-card")) {
+      return;
+    }
+
+    const touch = (event as TouchEvent).touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+  }
+
+  let lastScrollTime = 0;
+  const SCROLL_THROTTLE = 16; // ~60fps
+
+  function handleScrollTouchMove(event: Event) {
+    // Only handle if not touching a task card and not dragging
+    const target = event.target as HTMLElement;
+    if (target.closest(".task-card") || isDragging) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastScrollTime < SCROLL_THROTTLE) {
+      return; // Throttle để tối ưu performance
+    }
+    lastScrollTime = now;
+
+    const touch = (event as TouchEvent).touches[0];
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+
+    // If horizontal movement is greater than vertical, allow scroll
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Only prevent default if the event is cancelable
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
+      const kanbanContainer = document.querySelector(
+        ".kanban-grid-container"
+      ) as HTMLElement;
+      if (kanbanContainer) {
+        // Đơn giản hóa: Scroll trực tiếp với tốc độ cao
+        const scrollSpeed = 2.0; // Giảm từ 4.0 xuống 2.0 để vừa phải
+        kanbanContainer.scrollLeft -= deltaX * scrollSpeed;
+
+        startX = touch.clientX;
+        startY = touch.clientY;
+      }
+    }
+  }
+
+  function handleScrollTouchEnd(event: Event) {
+    // Reset touch state when touch ends
+    startX = 0;
+    startY = 0;
+    lastScrollTime = 0;
   }
 
   return {
     setupAllDropListeners,
     setupTaskCardDragListeners,
+    setupTouchListeners,
+    setupTouchDelegation,
+    setupHorizontalScrollTouch,
+    setupMouseDragListeners,
   };
 }

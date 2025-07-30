@@ -18,6 +18,7 @@ class UpdateProjectRequest extends FormRequest
             'name' => 'required',
             'startDate' => 'required',
             'endDate' => 'required',
+            'content' => 'nullable|string',
         ];
     }
 }
