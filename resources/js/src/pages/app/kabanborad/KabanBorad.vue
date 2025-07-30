@@ -842,6 +842,12 @@ onUnmounted(() => {
     overflow: hidden !important;
     margin: 0;
     z-index: 1;
+    /* Tối ưu performance cho mobile */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 /* Disable vertical scrollbar for the entire page */
@@ -1162,6 +1168,12 @@ onUnmounted(() => {
     min-width: 0;
     overflow: hidden !important;
     max-height: calc(100vh - 182px) !important;
+    /* Tối ưu performance cho mobile */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 /* Pure CSS Flexbox Approach - Clean and Simple */
@@ -1176,15 +1188,17 @@ onUnmounted(() => {
     /* Tối ưu performance cho scroll */
     -webkit-overflow-scrolling: touch;
     scroll-behavior: auto;
-    /* Nhanh hơn smooth */
     /* Hardware acceleration */
-    transform: translate3d(0, 0, 0);
-    -webkit-transform: translate3d(0, 0, 0);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
     /* Tối ưu thêm */
     contain: layout style paint;
     isolation: isolate;
+    /* Cải thiện performance cho mobile */
+    will-change: scroll-position;
+    overscroll-behavior-x: contain;
 }
 
 .kanban-grid {
@@ -1196,6 +1210,12 @@ onUnmounted(() => {
     height: 100%;
     align-items: flex-start;
     flex-wrap: nowrap;
+    /* Tối ưu performance cho mobile */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 /* Webkit scrollbar styling */
@@ -1287,9 +1307,20 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
     .kanban-grid {
-        grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
         gap: 12px;
         padding: 12px;
+        /* Tối ưu performance cho mobile */
+        touch-action: pan-x;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-align: start;
+        /* Cải thiện performance */
+        will-change: transform;
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        /* Tối ưu thêm cho mobile */
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        contain: layout style paint;
     }
 
     .kanban-column,
@@ -1299,6 +1330,12 @@ onUnmounted(() => {
         max-width: 320px;
         border-radius: 16px;
         max-height: calc(100vh - 282px);
+        /* Tối ưu performance cho mobile */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        will-change: transform;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
     }
 
     /* Mobile touch support */
@@ -1310,6 +1347,15 @@ onUnmounted(() => {
         user-select: none;
         cursor: grab;
         pointer-events: auto;
+        /* Tối ưu performance cho mobile */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        will-change: transform;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        /* Prevent text selection during drag */
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
     }
 
     .task-card:active {
@@ -1329,17 +1375,10 @@ onUnmounted(() => {
         will-change: scroll-position;
         transform: translateZ(0);
         -webkit-transform: translateZ(0);
-    }
-
-    /* Ensure horizontal scroll works */
-    .kanban-grid {
-        touch-action: pan-x;
-        -webkit-overflow-scrolling: touch;
-        scroll-snap-align: start;
-        /* Cải thiện performance */
-        will-change: transform;
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
+        /* Tối ưu thêm cho mobile */
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        contain: layout style paint;
     }
 
     /* Hide scrollbar on mobile but keep functionality */
@@ -1358,17 +1397,17 @@ onUnmounted(() => {
         visibility: visible !important;
         display: flex !important;
         z-index: 99999 !important;
+        /* Tối ưu performance cho mobile */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        will-change: transform;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
     }
 
     /* Ensure task cards can receive touch events */
     .task-card * {
         pointer-events: auto;
-    }
-
-    /* Prevent text selection during drag */
-    .task-card {
-        -webkit-touch-callout: none;
-        -webkit-tap-highlight-color: transparent;
     }
 
     /* Ghost element animation */
@@ -1386,6 +1425,63 @@ onUnmounted(() => {
             opacity: 1;
             transform: rotate(3deg) scale(0.95);
         }
+    }
+
+    /* Tối ưu thêm cho scroll mượt mà */
+    .kanban-grid-container {
+        /* Tối ưu cho iOS */
+        -webkit-overflow-scrolling: touch;
+        /* Tối ưu cho Android */
+        overscroll-behavior-x: contain;
+        overscroll-behavior-y: none;
+        /* Tối ưu performance */
+        scroll-behavior: auto;
+        /* Tối ưu cho touch */
+        touch-action: pan-x;
+        /* Tối ưu cho scroll */
+        scroll-snap-type: x proximity;
+        /* Tối ưu cho hardware acceleration */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        will-change: scroll-position;
+        /* Tối ưu cho rendering */
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        contain: layout style paint;
+    }
+
+    /* Tối ưu cho task cards */
+    .task-card {
+        /* Tối ưu cho touch */
+        touch-action: pan-x pan-y;
+        /* Tối ưu cho performance */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        will-change: transform;
+        /* Tối ưu cho rendering */
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        contain: layout style paint;
+        /* Tối ưu cho touch */
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+        /* Tối ưu cho user selection */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+
+    /* Tối ưu cho columns */
+    .kanban-column {
+        /* Tối ưu cho performance */
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+        will-change: transform;
+        /* Tối ưu cho rendering */
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        contain: layout style paint;
     }
 }
 </style>

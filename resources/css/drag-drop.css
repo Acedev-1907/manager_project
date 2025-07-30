@@ -158,4 +158,23 @@ body.dragging .kanban-content {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: auto;
   }
+
+  /* Mobile ghost element optimization */
+  .mobile-ghost-task {
+    pointer-events: none !important;
+    touch-action: none !important;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    z-index: 99999 !important;
+    /* Tối ưu performance cho mobile */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    contain: layout style paint;
+  }
 }

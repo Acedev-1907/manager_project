@@ -428,9 +428,6 @@ export function useDragTask(ProjectData?: any) {
       return;
     }
 
-    // Create ghost element for mobile
-    createMobileGhost(startX, startY);
-
     // Store the task card for later use
     draggedElement = taskCard as HTMLElement;
 
@@ -459,10 +456,12 @@ export function useDragTask(ProjectData?: any) {
       if (touchDuration > 50 && touchDuration < 2000) {
         isDragging = true;
         hasProcessedDrop = false;
-        // Create ghost element immediately when starting drag
+
+        // Create ghost element when starting drag
         if (!ghostElement) {
           createMobileGhost(currentX, currentY);
         }
+
         // Only prevent default when we start dragging
         if (event.cancelable) {
           event.preventDefault();
@@ -471,14 +470,21 @@ export function useDragTask(ProjectData?: any) {
     }
 
     if (isDragging) {
-      // Ensure ghost element exists and is visible
-      if (!ghostElement) {
-        createMobileGhost(currentX, currentY);
-      } else {
-        updateMobileGhost(currentX, currentY);
+      // Use requestAnimationFrame for smooth ghost movement
+      if (ghostAnimationFrame) {
+        cancelAnimationFrame(ghostAnimationFrame);
       }
-      updateHorizontalScroll(currentX);
-      checkColumnHover(currentX, currentY);
+
+      ghostAnimationFrame = requestAnimationFrame(() => {
+        // Ensure ghost element exists and is visible
+        if (!ghostElement) {
+          createMobileGhost(currentX, currentY);
+        } else {
+          updateMobileGhost(currentX, currentY);
+        }
+        updateHorizontalScroll(currentX);
+        checkColumnHover(currentX, currentY);
+      });
     }
   }
 
@@ -763,8 +769,21 @@ export function useDragTask(ProjectData?: any) {
       ghostElement = null;
     }
 
+    // Cancel animation frame
+    if (ghostAnimationFrame) {
+      cancelAnimationFrame(ghostAnimationFrame);
+      ghostAnimationFrame = null;
+    }
+
     // Stop horizontal scroll
     stopHorizontalScroll();
+
+    // Reset touch state
+    startX = 0;
+    startY = 0;
+    currentX = 0;
+    currentY = 0;
+    touchStartTime = 0;
   }
 
   function getMemberName(member: any) {
@@ -790,8 +809,8 @@ export function useDragTask(ProjectData?: any) {
     ghostElement.className = "mobile-ghost-task";
     ghostElement.style.cssText = `
       position: fixed;
-      top: ${y - 40}px;
-      left: ${x - 80}px;
+      top: 0;
+      left: 0;
       width: 160px;
       height: 80px;
       background: #ffffff;
@@ -803,10 +822,11 @@ export function useDragTask(ProjectData?: any) {
       display: flex;
       flex-direction: column;
       padding: 12px;
-      transform: rotate(3deg) scale(0.95);
-      transition: all 0.1s ease;
+      transform: translate(${x - 80}px, ${y - 40}px) rotate(3deg) scale(0.95);
+      transition: none;
       opacity: 1;
       visibility: visible;
+      will-change: transform;
     `;
 
     // Get task info
@@ -921,15 +941,13 @@ export function useDragTask(ProjectData?: any) {
     ghostElement.appendChild(ghostContent);
     document.body.appendChild(ghostElement);
 
-    // Force ghost element to be visible
-    setTimeout(() => {
-      if (ghostElement) {
-        ghostElement.style.opacity = "1";
-        ghostElement.style.visibility = "visible";
-        ghostElement.style.display = "flex";
-        ghostElement.style.zIndex = "99999";
-      }
-    }, 10);
+    // Force ghost element to be visible immediately
+    if (ghostElement) {
+      ghostElement.style.opacity = "1";
+      ghostElement.style.visibility = "visible";
+      ghostElement.style.display = "flex";
+      ghostElement.style.zIndex = "99999";
+    }
   }
 
   function updateGhostTaskColor(x: number, y: number) {
@@ -1001,8 +1019,11 @@ export function useDragTask(ProjectData?: any) {
       createMobileGhost(x, y);
       return;
     }
-    ghostElement.style.top = `${y - 40}px`;
-    ghostElement.style.left = `${x - 80}px`;
+
+    // Use transform for better performance instead of top/left
+    ghostElement.style.transform = `translate(${x - 80}px, ${
+      y - 40
+    }px) rotate(3deg) scale(0.95)`;
     ghostElement.style.opacity = "1";
     ghostElement.style.visibility = "visible";
     updateGhostTaskColor(x, y);
