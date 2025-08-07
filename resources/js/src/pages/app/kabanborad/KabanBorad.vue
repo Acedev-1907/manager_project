@@ -88,12 +88,6 @@ const isProjectCreator = computed(() => {
     return currentUserIdNum === creatorIdNum;
 });
 
-// Check if project is completed
-const isProjectCompleted = computed(() => {
-    const status = ProjectData.value?.data?.status;
-    return String(status) === 'OK' || Number(status) === 2; // Support both string and number
-});
-
 // Get completed tasks count
 const completedTasksCount = computed(() => {
     const tasks = ProjectData.value?.data?.tasks || [];
@@ -856,44 +850,6 @@ onUnmounted(() => {
     height: calc(105vh - 62px);
     overflow: hidden !important;
     margin-bottom: 20px;
-    z-index: 1;
-    /* Tối ưu performance cho mobile
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    will-change: transform;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden; */
-}
-
-/* Disable vertical scrollbar for the entire page */
-:deep(body) {
-    overflow-y: hidden !important;
-    height: 100vh !important;
-    position: fixed !important;
-    width: 100% !important;
-}
-
-/* Ensure no vertical scroll on all kanban elements */
-.kanban-container,
-.kanban-content,
-.kanban-grid-container {
-    overflow-y: hidden !important;
-}
-
-/* Force disable scroll on html element too */
-:deep(html) {
-    overflow-y: hidden !important;
-    height: 100vh !important;
-}
-
-/* Loading Page Overlay */
-:deep(.loading-overlay) {
-    position: absolute;
-    z-index: 9999;
-    inset: 0;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(4px);
-    border-radius: 16px;
 }
 
 @media (max-width: 768px) {
@@ -910,10 +866,6 @@ onUnmounted(() => {
         justify-content: center;
         z-index: 20000 !important;
     }
-}
-
-:deep(.loader) {
-    min-height: 100%;
 }
 
 /* Header Section */
@@ -1412,185 +1364,5 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-@media (max-width: 768px) {
-    .kanban-grid {
-        gap: 12px;
-        padding: 12px;
-        /* Tối ưu performance cho mobile */
-        touch-action: pan-x;
-        -webkit-overflow-scrolling: touch;
-        scroll-snap-align: start;
-        /* Cải thiện performance */
-        will-change: transform;
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        /* Tối ưu thêm cho mobile */
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        contain: layout style paint;
-    }
-
-    .kanban-column,
-    .add-column-slot {
-        width: 280px;
-        min-width: 280px;
-        max-width: 320px;
-        border-radius: 16px;
-        max-height: calc(100vh - 282px);
-        /* Tối ưu performance cho mobile */
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        will-change: transform;
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-    }
-
-    /* Mobile touch support */
-    .task-card {
-        touch-action: pan-x pan-y;
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        cursor: grab;
-        pointer-events: auto;
-        /* Tối ưu performance cho mobile */
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        will-change: transform;
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        /* Prevent text selection during drag */
-        -webkit-touch-callout: none;
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    .task-card:active {
-        cursor: grabbing;
-    }
-
-    .kanban-grid-container {
-        touch-action: pan-x;
-        -webkit-overflow-scrolling: touch;
-        pointer-events: auto;
-        /* Tối ưu cho scroll nhanh */
-        scroll-behavior: auto;
-        /* Thay đổi từ smooth sang auto để nhanh hơn */
-        overscroll-behavior-x: contain;
-        scroll-snap-type: x proximity;
-        /* Cải thiện performance cho scroll */
-        will-change: scroll-position;
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        /* Tối ưu thêm cho mobile */
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        contain: layout style paint;
-    }
-
-    /* Hide scrollbar on mobile but keep functionality */
-    .kanban-grid-container::-webkit-scrollbar {
-        height: 0;
-        background: transparent;
-    }
-
-    /* Mobile ghost element */
-    .mobile-ghost-task {
-        pointer-events: none !important;
-        touch-action: none !important;
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-        opacity: 1 !important;
-        visibility: visible !important;
-        display: flex !important;
-        z-index: 99999 !important;
-        /* Tối ưu performance cho mobile */
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        will-change: transform;
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-    }
-
-    /* Ensure task cards can receive touch events */
-    .task-card * {
-        pointer-events: auto;
-    }
-
-    /* Ghost element animation */
-    .mobile-ghost-task {
-        animation: ghostFloat 0.3s ease-out;
-    }
-
-    @keyframes ghostFloat {
-        from {
-            opacity: 0;
-            transform: rotate(3deg) scale(0.8);
-        }
-
-        to {
-            opacity: 1;
-            transform: rotate(3deg) scale(0.95);
-        }
-    }
-
-    /* Tối ưu thêm cho scroll mượt mà */
-    .kanban-grid-container {
-        /* Tối ưu cho iOS */
-        -webkit-overflow-scrolling: touch;
-        /* Tối ưu cho Android */
-        overscroll-behavior-x: contain;
-        overscroll-behavior-y: none;
-        /* Tối ưu performance */
-        scroll-behavior: auto;
-        /* Tối ưu cho touch */
-        touch-action: pan-x;
-        /* Tối ưu cho scroll */
-        scroll-snap-type: x proximity;
-        /* Tối ưu cho hardware acceleration */
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        will-change: scroll-position;
-        /* Tối ưu cho rendering */
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        contain: layout style paint;
-    }
-
-    /* Tối ưu cho task cards */
-    .task-card {
-        /* Tối ưu cho touch */
-        touch-action: pan-x pan-y;
-        /* Tối ưu cho performance */
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        will-change: transform;
-        /* Tối ưu cho rendering */
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        contain: layout style paint;
-        /* Tối ưu cho touch */
-        -webkit-touch-callout: none;
-        -webkit-tap-highlight-color: transparent;
-        /* Tối ưu cho user selection */
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-    }
-
-    /* Tối ưu cho columns */
-    .kanban-column {
-        /* Tối ưu cho performance */
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        will-change: transform;
-        /* Tối ưu cho rendering */
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        contain: layout style paint;
-    }
 }
 </style>

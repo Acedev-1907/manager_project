@@ -130,75 +130,78 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div v-if="visible" class="modal-overlay" @click="closeModal">
-    <div class="modal-content" @click.stop>
-      <div class="modal-header">
-        <h3 class="modal-title">
-          <i :class="isEditMode ? 'fas fa-edit' : 'fas fa-plus'"></i>
-          {{ modalTitle }}
-        </h3>
-        <button class="close-btn" @click="closeModal">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
+  <Teleport to="body">
+    <div v-if="visible" class="modal-backdrop" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">
+            <i :class="isEditMode ? 'fas fa-edit' : 'fas fa-plus'"></i>
+            {{ modalTitle }}
+          </h3>
+          <button class="close-btn" @click="closeModal">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
 
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Column Title</label>
-          <input v-model="columnTitle" type="text" class="form-input" placeholder="Enter column title..."
-            @keydown="handleKeydown" ref="titleInput" />
-          <div v-if="columnTitle && !isValid" class="error-message">
-            Column title is required and must be unique
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Column Title</label>
+            <input v-model="columnTitle" type="text" class="form-input" placeholder="Enter column title..."
+              @keydown="handleKeydown" ref="titleInput" />
+            <div v-if="columnTitle && !isValid" class="error-message">
+              Column title is required and must be unique
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Icon</label>
+            <div class="icon-grid">
+              <button v-for="icon in iconOptions" :key="icon.value" class="icon-option"
+                :class="{ active: selectedIcon === icon.value }" @click="selectedIcon = icon.value" type="button">
+                <i :class="icon.value"></i>
+                <span class="icon-label">{{ icon.label }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Color</label>
+            <div class="color-grid">
+              <button v-for="color in colorOptions" :key="color.value" class="color-option"
+                :class="{ active: selectedColor === color.value }" :style="{ backgroundColor: color.value }"
+                @click="selectedColor = color.value" type="button">
+                <i v-if="selectedColor === color.value" class="fas fa-check"></i>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Icon</label>
-          <div class="icon-grid">
-            <button v-for="icon in iconOptions" :key="icon.value" class="icon-option"
-              :class="{ active: selectedIcon === icon.value }" @click="selectedIcon = icon.value" type="button">
-              <i :class="icon.value"></i>
-              <span class="icon-label">{{ icon.label }}</span>
-            </button>
-          </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeModal">
+            Cancel
+          </button>
+          <button class="btn btn-primary" :disabled="!isValid" @click="addColumn">
+            {{ buttonText }}
+          </button>
         </div>
-
-        <div class="form-group">
-          <label class="form-label">Color</label>
-          <div class="color-grid">
-            <button v-for="color in colorOptions" :key="color.value" class="color-option"
-              :class="{ active: selectedColor === color.value }" :style="{ backgroundColor: color.value }"
-              @click="selectedColor = color.value" type="button">
-              <i v-if="selectedColor === color.value" class="fas fa-check"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" @click="closeModal">
-          Cancel
-        </button>
-        <button class="btn btn-primary" :disabled="!isValid" @click="addColumn">
-          {{ buttonText }}
-        </button>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
-.modal-overlay {
+.modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 999 !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
   padding: 20px;
 }
 

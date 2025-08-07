@@ -339,7 +339,7 @@ watch(showMemberModal, async (newValue) => {
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
-    z-index: 9999999 !important;
+    z-index: 999 !important;
     display: flex;
     align-items: center;
     justify-content: center;
