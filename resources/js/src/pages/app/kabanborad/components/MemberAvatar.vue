@@ -1,6 +1,6 @@
 <template>
     <div class="avatar">
-        <img v-if="avatarSrc" :src="avatarSrc" alt="avatar" />
+        <img v-if="avatarSrc" :src="avatarSrc" alt="avatar" draggable="false" @dragstart.prevent />
         <span v-else>{{ displayChar }}</span>
     </div>
 </template>
