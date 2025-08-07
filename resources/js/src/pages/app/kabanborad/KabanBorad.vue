@@ -853,16 +853,16 @@ onUnmounted(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    height: calc(100vh - 62px);
+    height: calc(105vh - 62px);
     overflow: hidden !important;
-    margin: 0;
+    margin-bottom: 20px;
     z-index: 1;
-    /* Tối ưu performance cho mobile */
+    /* Tối ưu performance cho mobile
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
     will-change: transform;
     backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
+    -webkit-backface-visibility: hidden; */
 }
 
 /* Disable vertical scrollbar for the entire page */

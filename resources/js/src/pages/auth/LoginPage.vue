@@ -29,7 +29,6 @@ async function submitLogin() {
             <div class="login-header">
                 <i class="bi bi-shield-lock-fill login-logo"></i>
                 <h2>Sign In</h2>
-                <p class="login-sub">Welcome back! Please login to your account.</p>
             </div>
             <form @submit.prevent="submitLogin">
                 <div class="form-group">
