@@ -19,7 +19,6 @@ import type { Member, MemberListResponse } from '../../../types/common';
 import { useResponsive } from '../../../helper/useResponsive';
 import { useErrorHandler } from '../../../helper/useErrorHandler';
 import SearchInput from '../../../components/SearchInput.vue';
-import { getCurrentUserId } from '../../../helper/getUserData';
 
 const tabs = ['Members', 'Sent Invitations', 'Received Invitations'];
 const activeTab = ref('Members');
@@ -27,6 +26,7 @@ const showAddModal = ref(false);
 const isLoading = ref(false);
 const searchLoading = ref(false);
 const searchQuery = ref('');
+const searchLoadingState = ref(false);
 const friendsList = ref<MemberListResponse>({ data: { data: [] } });
 const sentInvitations = ref<MemberListResponse>({ data: { data: [] } });
 const receivedInvitations = ref<MemberListResponse>({ data: { data: [] } });
@@ -121,7 +121,8 @@ function setTab(tab: string) {
 function handleSearchMembers(q: string) {
     searchQuery.value = q;
     searchLoading.value = true;
-    fetchMembers(friendsList, memberCacheRef, isLoading, q).finally(() => {
+    // Sử dụng searchLoadingState riêng cho search, không ảnh hưởng đến isLoading chính
+    fetchMembers(friendsList, memberCacheRef, searchLoadingState, q).finally(() => {
         searchLoading.value = false;
     });
 }
@@ -182,7 +183,7 @@ onMounted(() => {
             </div>
             <FabButton v-if="isMobile" @click="showAddModal = true" icon="bi-person-plus" />
             <AddMemberModal v-if="showAddModal" @close="showAddModal = false" @add="handleAddMember" />
-            <LoadingPage v-if="isLoading" />
+            <LoadingPage v-if="isLoading && !searchLoading" />
             <div v-else>
                 <MemberTable v-if="activeTab === 'Members'" :items="friendsList.data?.data || []" :loading="false"
                     @removeMember="handleRemoveMemberWrapper" />
@@ -340,68 +341,4 @@ onMounted(() => {
     font-weight: 500;
     margin-right: 0.5rem;
 }
-
-/* 
-.btn-success.btn-sm {
-    background: #16a34a;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 0.3rem 0.9rem;
-    font-size: 0.98rem;
-    margin-left: auto;
-}
-
-.btn-danger.btn-sm {
-    background: #ef4444;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 0.3rem 0.9rem;
-    font-size: 0.98rem;
-    margin-left: 0.5rem;
-}
-
-.action-btns {
-    display: flex;
-    gap: 0.7rem;
-    justify-content: flex-end;
-    margin-top: 0.5rem;
-} */
-
-/* .btn-accept {
-    background: #16a34a;
-    color: #fff;
-    border: none;
-    border-radius: 50%;
-    width: 38px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.3rem;
-    transition: background 0.15s;
-}
-
-.btn-accept:hover {
-    background: #22c55e;
-}
-
-.btn-decline {
-    background: #ef4444;
-    color: #fff;
-    border: none;
-    border-radius: 50%;
-    width: 38px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.3rem;
-    transition: background 0.15s;
-}
-
-.btn-decline:hover {
-    background: #b91c1c;
-} */
 </style>
