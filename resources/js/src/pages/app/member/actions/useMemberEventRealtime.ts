@@ -29,7 +29,7 @@ export function useMemberEventRealtime(handler: MemberEventHandler) {
   });
 }
 
-// Function to handle MemberEvent actions, can be reused in multiple places
+// Handle MemberEvent actions for real-time updates (UI always uses flat array for invitations)
 export function handleMemberEvent(
   e: MemberEventPayload,
   friendsList: Ref<any>,
@@ -37,20 +37,22 @@ export function handleMemberEvent(
   sentInvitations: Ref<any>,
   memberCacheRef?: Ref<{ [key: string]: any }>
 ) {
+  // Remove member from friends list if removed
   if (e.action === "removed") {
     if (friendsList.value && friendsList.value.data) {
-      if (!Array.isArray(friendsList.value.data.data)) {
+      if (!Array.isArray(friendsList.value.data.data))
         friendsList.value.data.data = [];
-      }
       friendsList.value.data.data = friendsList.value.data.data.filter(
         (member: { id: number }) => member.id !== e.byUser
       );
     }
   }
+
+  // Add invitation to received/sent on invitation_sent
   if (e.action === "invitation_sent") {
     const data = JSON.parse(localStorage.getItem("userData") || "{}");
     const userId = data.user?.id;
-    // If current user is receiver then update receivedInvitations
+    // Receiver: update receivedInvitations
     if (
       e.payload &&
       e.payload.invitation &&
@@ -58,20 +60,15 @@ export function handleMemberEvent(
       receivedInvitations.value &&
       receivedInvitations.value.data
     ) {
-      if (!Array.isArray(receivedInvitations.value.data.data)) {
-        receivedInvitations.value.data.data = [];
+      let arr = Array.isArray(receivedInvitations.value.data)
+        ? receivedInvitations.value.data
+        : receivedInvitations.value.data.data || [];
+      if (!arr.some((m: any) => m.id === e.payload.invitation.id)) {
+        arr = [e.payload.invitation, ...arr];
       }
-      const exists = receivedInvitations.value.data.data.some(
-        (m: any) => m.id === e.payload.invitation.id
-      );
-      if (!exists) {
-        receivedInvitations.value.data.data = [
-          e.payload.invitation,
-          ...receivedInvitations.value.data.data,
-        ];
-      }
+      receivedInvitations.value.data = arr;
     }
-    // If current user is sender then update sentInvitations
+    // Sender: update sentInvitations
     if (
       e.payload &&
       e.payload.invitation &&
@@ -79,110 +76,113 @@ export function handleMemberEvent(
       sentInvitations.value &&
       sentInvitations.value.data
     ) {
-      if (!Array.isArray(sentInvitations.value.data.data)) {
-        sentInvitations.value.data.data = [];
+      let arr = Array.isArray(sentInvitations.value.data)
+        ? sentInvitations.value.data
+        : sentInvitations.value.data.data || [];
+      if (!arr.some((m: any) => m.id === e.payload.invitation.id)) {
+        arr = [e.payload.invitation, ...arr];
       }
-      const exists = sentInvitations.value.data.data.some(
-        (m: any) => m.id === e.payload.invitation.id
-      );
-      if (!exists) {
-        sentInvitations.value.data.data.unshift(e.payload.invitation);
-      }
+      sentInvitations.value.data = arr;
     }
   }
+
+  // Remove invitation from sent/received on invitation_declined
   if (e.action === "invitation_declined") {
-    // Remove invitation from sentInvitations local based on invitation_id
+    // Remove from sentInvitations
     if (
       e.payload &&
       e.payload.invitation_id &&
       sentInvitations.value &&
       sentInvitations.value.data
     ) {
-      if (!Array.isArray(sentInvitations.value.data.data)) {
-        sentInvitations.value.data.data = [];
-      }
-      sentInvitations.value.data.data = sentInvitations.value.data.data.filter(
+      let arr = Array.isArray(sentInvitations.value.data)
+        ? sentInvitations.value.data
+        : sentInvitations.value.data.data || [];
+      arr = arr.filter(
         (m: any) => String(m.id) !== String(e.payload.invitation_id)
       );
+      sentInvitations.value.data = arr;
     }
-    // Remove invitation from receivedInvitations local based on invitation_id (for receiver)
+    // Remove from receivedInvitations
     if (
       e.payload &&
       e.payload.invitation_id &&
       receivedInvitations.value &&
       receivedInvitations.value.data
     ) {
-      if (!Array.isArray(receivedInvitations.value.data.data)) {
-        receivedInvitations.value.data.data = [];
-      }
-      receivedInvitations.value.data.data =
-        receivedInvitations.value.data.data.filter(
-          (m: any) => String(m.id) !== String(e.payload.invitation_id)
-        );
+      let arr = Array.isArray(receivedInvitations.value.data)
+        ? receivedInvitations.value.data
+        : receivedInvitations.value.data.data || [];
+      arr = arr.filter(
+        (m: any) => String(m.id) !== String(e.payload.invitation_id)
+      );
+      receivedInvitations.value.data = arr;
     }
-    // showSuccess("Your invitation has been declined.");
   }
+
+  // Remove invitation from sent/received on invitation_cancelled
   if (e.action === "invitation_cancelled") {
-    // If invitation_id exists then remove from receivedInvitations local (prioritize correct invitation_id)
+    // Remove from receivedInvitations
     if (
       e.payload &&
       e.payload.invitation_id &&
       receivedInvitations.value &&
       receivedInvitations.value.data
     ) {
-      if (!Array.isArray(receivedInvitations.value.data.data)) {
-        receivedInvitations.value.data.data = [];
-      }
-      receivedInvitations.value.data.data =
-        receivedInvitations.value.data.data.filter(
-          (m: any) => String(m.id) !== String(e.payload.invitation_id)
-        );
+      let arr = Array.isArray(receivedInvitations.value.data)
+        ? receivedInvitations.value.data
+        : receivedInvitations.value.data.data || [];
+      arr = arr.filter(
+        (m: any) => String(m.id) !== String(e.payload.invitation_id)
+      );
+      receivedInvitations.value.data = arr;
     }
-    // If invitation_id exists then remove from sentInvitations local (prioritize correct invitation_id)
+    // Remove from sentInvitations
     if (
       e.payload &&
       e.payload.invitation_id &&
       sentInvitations.value &&
       sentInvitations.value.data
     ) {
-      if (!Array.isArray(sentInvitations.value.data.data)) {
-        sentInvitations.value.data.data = [];
-      }
-      sentInvitations.value.data.data = sentInvitations.value.data.data.filter(
+      let arr = Array.isArray(sentInvitations.value.data)
+        ? sentInvitations.value.data
+        : sentInvitations.value.data.data || [];
+      arr = arr.filter(
         (m: any) => String(m.id) !== String(e.payload.invitation_id)
       );
+      sentInvitations.value.data = arr;
     }
   }
+
+  // Handle invitation accepted: update friends list and remove invitations
   if (e.action === "invitation_accepted") {
     const data = JSON.parse(localStorage.getItem("userData") || "{}");
     const userId = data.user?.id;
 
-    // Always remove invitation from Received Invitations based on id === invitation_id
+    // Remove from receivedInvitations
     if (
       receivedInvitations.value &&
       receivedInvitations.value.data &&
       e.payload.invitation_id
     ) {
-      if (!Array.isArray(receivedInvitations.value.data.data)) {
-        receivedInvitations.value.data.data = [];
-      }
-      receivedInvitations.value.data.data =
-        receivedInvitations.value.data.data.filter(
-          (m: any) => String(m.id) !== String(e.payload.invitation_id)
-        );
+      let arr = Array.isArray(receivedInvitations.value.data)
+        ? receivedInvitations.value.data
+        : receivedInvitations.value.data.data || [];
+      arr = arr.filter(
+        (m: any) => String(m.id) !== String(e.payload.invitation_id)
+      );
+      receivedInvitations.value.data = arr;
     }
 
-    // If current user is receiver (the person receiving)
+    // If current user is receiver, add sender to friendsList
     if (
       e.payload &&
       e.payload.member &&
       String(userId) === String(e.payload.member.id)
     ) {
-      // 2. Add new member (sender) to friendsList if not already present
       if (friendsList.value && friendsList.value.data && e.byUser) {
-        if (!Array.isArray(friendsList.value.data.data)) {
+        if (!Array.isArray(friendsList.value.data.data))
           friendsList.value.data.data = [];
-        }
         const exists = friendsList.value.data.data.some(
           (m: any) => m.id === e.byUser
         );
@@ -196,31 +196,26 @@ export function handleMemberEvent(
         }
       }
     } else {
-      // This user is the sender (the person sending)
-      // 1. Remove all invitations with receiver_id === member.id or id === invitation_id from sentInvitations
+      // Sender: remove invitations and add member to friendsList
       if (sentInvitations.value && sentInvitations.value.data) {
-        if (!Array.isArray(sentInvitations.value.data.data)) {
-          sentInvitations.value.data.data = [];
-        }
-        const removeIds = new Set([String(e.payload.invitation_id)]);
-        const removeReceivers = new Set([String(e.payload.member.id)]);
-        sentInvitations.value.data.data =
-          sentInvitations.value.data.data.filter(
-            (m: any) =>
-              !removeIds.has(String(m.id)) &&
-              !removeReceivers.has(String(m.receiver_id))
-          );
+        let arr = Array.isArray(sentInvitations.value.data)
+          ? sentInvitations.value.data
+          : sentInvitations.value.data.data || [];
+        arr = arr.filter(
+          (m: any) =>
+            String(m.id) !== String(e.payload.invitation_id) &&
+            String(m.receiver_id) !== String(e.payload.member.id)
+        );
+        sentInvitations.value.data = arr;
       }
-      // 2. Add new member to friendsList if not already present
       if (
         e.payload &&
         e.payload.member &&
         friendsList.value &&
         friendsList.value.data
       ) {
-        if (!Array.isArray(friendsList.value.data.data)) {
+        if (!Array.isArray(friendsList.value.data.data))
           friendsList.value.data.data = [];
-        }
         const exists = friendsList.value.data.data.some(
           (m: any) => m.id === e.payload.member.id
         );
@@ -228,7 +223,7 @@ export function handleMemberEvent(
           friendsList.value.data.data.unshift(e.payload.member);
         }
       }
-      // 3. Add new member to memberCache if available
+      // Optionally update memberCache if needed
       if (memberCacheRef && memberCacheRef.value) {
         const cacheKey = `member_page_`;
         if (!memberCacheRef.value[cacheKey]) {
@@ -242,5 +237,5 @@ export function handleMemberEvent(
       }
     }
   }
-  // Handle other actions if needed
+  // Add more event handlers if needed
 }

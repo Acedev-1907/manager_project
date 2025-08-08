@@ -17,7 +17,7 @@ export function showErrorResponse(err: unknown) {
   } else if (typeof err === "object" && err && "message" in err) {
     showError((err as any).message);
   } else {
-    showError("Đã xảy ra lỗi!");
+    showError(err as string);
   }
 }
 

@@ -65,20 +65,29 @@ const tabIcons = {
 };
 
 async function handleAddMember(friendCode: string, cb: (err: string | null) => void) {
+    let errorMsg = '';
     const result = await withErrorHandling(
         async () => {
-            await makeHttpReq<{ friend_code: string }, any>('member-invitations/send', 'POST', { friend_code: friendCode });
+            const res = await makeHttpReq<{ friend_code: string }, any>('member-invitations/send', 'POST', { friend_code: friendCode });
+            // If API returns error in response, throw to trigger error handler
+            if (res && res.error) {
+                errorMsg = typeof res.error === 'string' ? res.error : (res.error.message || 'Add failed');
+                throw new Error(errorMsg);
+            }
             return true;
         },
-        'Failed to send invitation'
+        'Failed to send invitation',
+        { showPopup: false }
     );
 
     if (result) {
         cb(null);
         showAddModal.value = false;
         showSuccess('Invitation sent!');
+        // After sending invitation, fetch sent invitations again
+        await fetchSentInvitations(sentInvitations, isLoading);
     } else {
-        cb('Add failed');
+        cb(errorMsg || 'Add failed');
     }
 }
 
@@ -138,10 +147,12 @@ function setTab(tab: string) {
         } else {
             fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value);
         }
-    } else if (tab === 'Sent Invitations' && !hasFetched.value['sent']) {
+    } else if (tab === 'Sent Invitations') {
+        // Luôn fetch lại khi chuyển sang tab Sent Invitations
         fetchSentInvitations(sentInvitations, isLoading);
         hasFetched.value['sent'] = true;
-    } else if (tab === 'Received Invitations' && !hasFetched.value['received']) {
+    } else if (tab === 'Received Invitations') {
+        // Luôn fetch lại khi chuyển sang tab Received Invitations
         fetchReceivedInvitations(receivedInvitations, isLoading);
         hasFetched.value['received'] = true;
     }
