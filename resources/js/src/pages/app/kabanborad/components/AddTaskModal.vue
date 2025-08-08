@@ -139,18 +139,27 @@ watch(() => props.visible, (newVal) => {
                     <form @submit.prevent="submitTask">
                         <div class="modal-body">
                             <div class="mb-3">
-                                <BaseInput v-model="taskStore.taskInput.name" placeholder="Task Name" />
+                                <label class="form-label" for="task-name-input">
+                                    <i class="fas fa-tasks"></i>
+                                    Task Name
+                                </label>
+                                <BaseInput v-model="taskStore.taskInput.name" placeholder="Task Name"
+                                    id="task-name-input" />
                                 <div v-if="v$.name.$error" class="error-message">
                                     <i class="fas fa-exclamation-circle"></i>
                                     {{ v$.name.$errors[0].$message }}
                                 </div>
                             </div>
                             <div class="mb-3">
+                                <label class="form-label" for="task-content-input">
+                                    <i class="fas fa-align-left"></i>
+                                    Task Content (optional)
+                                </label>
                                 <textarea v-model="taskStore.taskInput.content" class="form-control" rows="3"
-                                    placeholder="Task Content (optional)"></textarea>
+                                    placeholder="Task Content (optional)" id="task-content-input"></textarea>
                             </div>
                             <div class="form-group mb-2">
-                                <label class="form-label">Select Members</label>
+                                <label class="form-label" for="task-member-search">Select Members</label>
                                 <div class="selected-members-minimal">
                                     <i class="bi bi-people-fill"></i>
                                     <span v-for="(id, idx) in selectedMembers.slice(0, 2)" :key="id"
@@ -189,7 +198,7 @@ watch(() => props.visible, (newVal) => {
                                 </div>
                                 <div class="members-list-minimal">
                                     <input v-model="searchQuery" type="text" class="form-control mb-2"
-                                        placeholder="Search members..." />
+                                        placeholder="Search members..." id="task-member-search" />
                                     <div v-if="filteredMembers.length > 0" class="user-card-list">
                                         <div v-for="member in filteredMembers" :key="member.id" class="user-card">
                                             <img :src="getAvatarSrc(member.avatar, member.name)" class="user-avatar"

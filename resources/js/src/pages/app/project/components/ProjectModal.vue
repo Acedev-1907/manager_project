@@ -27,33 +27,45 @@
                     <form @submit.prevent="submitProject">
                         <div class="modal-body">
                             <div class="mb-3">
+                                <label class="form-label" for="project-name-input">
+                                    <i class="fas fa-folder"></i>
+                                    Project Name
+                                </label>
                                 <BaseInput v-model="projectInput.name" placeholder="Project Name"
-                                    prefix-icon="fas fa-folder" />
+                                    prefix-icon="fas fa-folder" id="project-name-input" />
                                 <div v-if="errors.name" class="text-danger error-message">{{ errors.name }}</div>
                             </div>
                             <div class="form-group row mb-3" style="gap: 0.5rem;">
                                 <div class="col">
+                                    <label class="form-label" for="project-start-date">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        Start Date
+                                    </label>
                                     <DateInput v-model="projectInput.startDate" placeholder="Start Date"
-                                        prefix-icon="fas fa-calendar-alt" />
+                                        prefix-icon="fas fa-calendar-alt" id="project-start-date" />
                                     <div v-if="errors.startDate" class="text-danger error-message">{{ errors.startDate
-                                    }}
-                                    </div>
+                                        }}</div>
                                 </div>
                                 <div class="col">
+                                    <label class="form-label" for="project-end-date">
+                                        <i class="fas fa-calendar-check"></i>
+                                        End Date
+                                    </label>
                                     <DateInput v-model="projectInput.endDate" placeholder="End Date"
-                                        prefix-icon="fas fa-calendar-check" :min="projectInput.startDate" />
+                                        prefix-icon="fas fa-calendar-check" :min="projectInput.startDate"
+                                        id="project-end-date" />
                                     <div v-if="errors.endDate" class="text-danger error-message">{{ errors.endDate }}
                                     </div>
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">
+                                <label class="form-label" for="project-description">
                                     <i class="fas fa-align-left"></i>
                                     Project Description
                                 </label>
                                 <textarea v-model="projectInput.content" class="form-control"
                                     placeholder="Enter project description..." rows="4"
-                                    style="resize: vertical; min-height: 100px;"></textarea>
+                                    style="resize: vertical; min-height: 100px;" id="project-description"></textarea>
                                 <div v-if="errors.content" class="text-danger error-message">{{ errors.content }}</div>
                             </div>
                             <div class="form-group mb-2">
@@ -107,9 +119,10 @@
                     <div class="member-modal-body">
                         <!-- Search Box -->
                         <div class="member-search-box">
+                            <label for="project-member-search" class="visually-hidden">Search members</label>
                             <i class="fas fa-search"></i>
                             <input v-model="searchQuery" type="text" placeholder="Search members..."
-                                @focus="(event) => (event.target as HTMLInputElement)?.select()" ref="searchInput" />
+                                @focus="(event) => (event.target as HTMLInputElement)?.select()" ref="searchInput" id="project-member-search" />
                         </div>
 
                         <!-- Members List -->
@@ -443,6 +456,16 @@ watch(searchQuery, (newQuery) => {
 </script>
 
 <style scoped>
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    border: 0;
+}
 .modal-backdrop {
     position: fixed;
     top: 0;
