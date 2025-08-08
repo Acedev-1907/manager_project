@@ -19,7 +19,9 @@ class MemberController extends Controller
     {
         $user = $request->user();
         $query = $request->get('query');
-        $contacts = $this->memberService->getContacts($user, $query);
+        $perPage = $request->get('per_page');
+        $page = $request->get('page');
+        $contacts = $this->memberService->getContacts($user, $query, $perPage, $page);
         return response(['data' => $contacts], 200);
     }
 

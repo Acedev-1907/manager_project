@@ -198,7 +198,7 @@ const showAvailable = ref(false);
 const showAll = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);
 const showMemberModal = ref(false);
-// Thêm biến errors để lưu lỗi các trường
+// Add errors variable to store field errors
 const errors = ref<{ name?: string; startDate?: string; endDate?: string; content?: string }>({});
 
 let closeTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -216,17 +216,17 @@ onMounted(async () => {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
     currentUserId.value = userData.id;
 
-    // Khởi tạo selectedMembers từ project data
+    // Initialize selectedMembers from project data
     if (props.projectInput.members && Array.isArray(props.projectInput.members)) {
-        // Nếu có trường members là array
+        // If there is a members field as an array
         selectedMembers.value = props.projectInput.members.filter((id: number) => id !== props.projectInput.creator?.id);
     } else if (props.projectInput.users && Array.isArray(props.projectInput.users)) {
-        // Nếu có trường users là array (thường dùng cho edit mode)
+        // If there is a users field as an array (usually for edit mode)
         selectedMembers.value = props.projectInput.users
             .filter((user: any) => user.id !== props.projectInput.creator?.id)
             .map((user: any) => user.id);
     } else if (props.projectInput.project_users && Array.isArray(props.projectInput.project_users)) {
-        // Nếu có trường project_users là array
+        // If there is a project_users field as an array
         selectedMembers.value = props.projectInput.project_users
             .filter((user: any) => user.id !== props.projectInput.creator?.id)
             .map((user: any) => user.id);
@@ -246,7 +246,7 @@ onUnmounted(() => {
 function toggleMember(id: number) {
     if (selectedMembers.value.includes(id)) {
         selectedMembers.value = selectedMembers.value.filter(m => m !== id);
-        // Nếu xóa xong không còn user nào, tự động đóng popup
+        // If after deleting there are no users left, automatically close the popup
         if (selectedMembers.value.length === 0) {
             showAll.value = false;
         }
@@ -255,7 +255,7 @@ function toggleMember(id: number) {
     }
 }
 
-// Hàm validate các trường bắt buộc
+// Function to validate required fields
 function validate() {
     errors.value = {};
     if (!props.projectInput.name || !props.projectInput.name.trim()) {
@@ -277,8 +277,8 @@ function submitProject() {
 
 const filteredMembers = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase();
-    // Lọc bỏ creator khỏi danh sách chọn member
-    return (memberData.value?.data?.data || [])
+    // Filter out creator from member selection list
+    return (memberData.value?.data || [])
         .filter(m => m.id !== currentUserId.value && m.id !== props.projectInput.creator?.id)
         .filter(m =>
             m.name.toLowerCase().includes(keyword) ||
@@ -287,7 +287,7 @@ const filteredMembers = computed(() => {
 });
 
 function getMemberById(id: number) {
-    let user = (memberData.value?.data?.data || []).find(m => m.id === id);
+    let user = (memberData.value?.data || []).find(m => m.id === id);
     if (!user && props.projectInput.users) {
         user = props.projectInput.users.find((u: any) => u.id === id);
     }
@@ -306,7 +306,7 @@ function clearAllMembers() {
     selectedMembers.value = [];
 }
 
-// Tự động clear ngày kết thúc nếu ngày bắt đầu mới > ngày kết thúc cũ
+// Automatically clear end date if new start date > old end date
 watch(() => projectStore.projectInput.startDate, (newStart) => {
     if (projectStore.projectInput.endDate && newStart && projectStore.projectInput.endDate < newStart) {
         projectStore.projectInput.endDate = '';

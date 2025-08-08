@@ -12,25 +12,62 @@ export async function fetchMembers(
   memberCache: Ref<{ [key: string]: GetMemberType }>,
   isLoading: Ref<boolean>,
   query = "",
-  force = false
+  page = 1,
+  force = false,
+  append = false
 ) {
-  const cacheKey = `member_page_${query}`;
-  if (!force && memberCache.value[cacheKey]) {
+  const cacheKey = `member_page_${query}_${page}`;
+  if (!force && memberCache.value[cacheKey] && !append) {
     friendsList.value = memberCache.value[cacheKey];
     isLoading.value = false;
     return;
   }
-  isLoading.value = true;
+
+  if (append) {
+    isLoading.value = false;
+  } else {
+    isLoading.value = true;
+  }
+
   try {
-    const data = await makeHttpReq<undefined, GetMemberType>(
-      `members?query=${query}`,
+    const perPage = 52;
+
+    const response = await makeHttpReq<undefined, any>(
+      `members?query=${query}&page=${page}&per_page=${perPage}`,
       "GET"
     );
-    friendsList.value = data;
+    // If response has nested data, extract correct MemberListResponse type
+    let data: GetMemberType;
+    if (response && response.data && Array.isArray(response.data.data)) {
+      // Laravel resource format { data: { data: [], ...paging... } }
+      data = response.data;
+    } else {
+      data = response;
+    }
+
+    if (append && Array.isArray(friendsList.value.data)) {
+      // Remove duplicate members by id
+      const existingIds = new Set(friendsList.value.data.map((m: any) => m.id));
+      const newMembers = (data.data || []).filter(
+        (m: any) => !existingIds.has(m.id)
+      );
+      friendsList.value = {
+        ...data,
+        data: [...friendsList.value.data, ...newMembers],
+      };
+    } else {
+      friendsList.value = data;
+    }
+
     memberCache.value[cacheKey] = data;
     localStorage.setItem("memberCache", JSON.stringify(memberCache.value));
   } catch (e) {}
-  isLoading.value = false;
+
+  if (append) {
+    isLoading.value = false;
+  } else {
+    isLoading.value = false;
+  }
 }
 
 export async function fetchSentInvitations(
@@ -49,12 +86,12 @@ export async function fetchSentInvitations(
     } else if (res && res.data && Array.isArray(res.data.data)) {
       arr = res.data.data;
     }
-    sentInvitations.value.data.data = arr.map((inv: any) => ({
+    sentInvitations.value.data = arr.map((inv: any) => ({
       ...inv,
       id: inv.id || inv.invitation_id,
     }));
   } catch (e) {
-    sentInvitations.value.data.data = [];
+    sentInvitations.value.data = [];
   }
   isLoading.value = false;
 }
@@ -75,12 +112,12 @@ export async function fetchReceivedInvitations(
     } else if (res && res.data && Array.isArray(res.data.data)) {
       arr = res.data.data;
     }
-    receivedInvitations.value.data.data = arr.map((inv: any) => ({
+    receivedInvitations.value.data = arr.map((inv: any) => ({
       ...inv,
       id: inv.id || inv.invitation_id,
     }));
   } catch (e) {
-    receivedInvitations.value.data.data = [];
+    receivedInvitations.value.data = [];
   }
   isLoading.value = false;
 }
@@ -104,15 +141,7 @@ export async function handleRemoveMember(
     await makeHttpReq<undefined, any>(`members/${member.id}`, "DELETE");
     memberCache.value = {};
     localStorage.removeItem("memberCache");
-    await fetchMembers(
-      friendsList,
-      memberCache,
-      isLoading,
-      searchQuery.value,
-      true
-    );
+    await fetchMembers(friendsList, memberCache, isLoading, searchQuery.value);
     showSuccess("Removed from contact list");
   }
 }
-
-// Có thể tách tiếp các handleAddMember, handleAcceptInvitation, handleDeclineInvitation, handleCancelInvitation tương tự nếu muốn.

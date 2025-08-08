@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, computed, type Ref } from 'vue';
+import { ref, onMounted, onUnmounted, computed, type Ref } from 'vue';
 import FabButton from '../../../components/FabButton.vue';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import MemberTable from './components/MemberTable.vue';
@@ -27,15 +27,27 @@ const isLoading = ref(false);
 const searchLoading = ref(false);
 const searchQuery = ref('');
 const searchLoadingState = ref(false);
-const friendsList = ref<MemberListResponse>({ data: { data: [] } });
-const sentInvitations = ref<MemberListResponse>({ data: { data: [] } });
-const receivedInvitations = ref<MemberListResponse>({ data: { data: [] } });
+const friendsList = ref<MemberListResponse>({ data: [], total: 0, current_page: 1, last_page: 1, per_page: 10 });
+const sentInvitations = ref<MemberListResponse>({ data: [], total: 0, current_page: 1, last_page: 1, per_page: 10 });
+const receivedInvitations = ref<MemberListResponse>({ data: [], total: 0, current_page: 1, last_page: 1, per_page: 10 });
 const memberCacheRef = ref<{ [key: string]: MemberListResponse }>({}) as Ref<{ [key: string]: MemberListResponse }>;
 const hasFetched = ref<{ [key: string]: boolean }>({});
+const currentPage = ref(1);
+const loadedPages = new Set<number>();
+const totalPages = ref(1);
+const totalItems = ref(0);
+const isLoadingMore = ref(false);
+const hasMoreData = ref(true);
+const allMembers = ref<Member[]>([]);
+
 
 const { state } = useResponsive();
 const isMobile = computed(() => state.value.isMobile);
 const { withErrorHandling } = useErrorHandler();
+
+onMounted(() => {
+    setTab('Members');
+});
 
 const tabIcons = {
     'Members': 'bi-people',
@@ -65,8 +77,8 @@ async function handleAcceptInvitation(id: number) {
     const result = await withErrorHandling(
         async () => {
             await makeHttpReq<undefined, any>(`member-invitations/${id}/accept`, 'POST');
-            if (Array.isArray(receivedInvitations.value.data?.data)) {
-                receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+            if (Array.isArray(receivedInvitations.value.data)) {
+                receivedInvitations.value.data = receivedInvitations.value.data.filter((inv: any) => String(inv.id) !== String(id));
             }
             return true;
         },
@@ -82,8 +94,8 @@ async function handleDeclineInvitation(id: number) {
     const result = await withErrorHandling(
         async () => {
             await makeHttpReq<undefined, any>(`member-invitations/${id}/decline`, 'POST');
-            if (Array.isArray(receivedInvitations.value.data?.data)) {
-                receivedInvitations.value.data.data = receivedInvitations.value.data.data.filter((inv: any) => String(inv.id) !== String(id));
+            if (Array.isArray(receivedInvitations.value.data)) {
+                receivedInvitations.value.data = receivedInvitations.value.data.filter((inv: any) => String(inv.id) !== String(id));
             }
             return true;
         },
@@ -108,7 +120,9 @@ async function handleCancelInvitation(id: number) {
 function setTab(tab: string) {
     activeTab.value = tab;
     if (tab === 'Members') {
-        fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value);
+        currentPage.value = 1; // Reset to first page when switching tab
+        hasMoreData.value = true; // Reset infinite scroll state
+        fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value);
     } else if (tab === 'Sent Invitations' && !hasFetched.value['sent']) {
         fetchSentInvitations(sentInvitations, isLoading);
         hasFetched.value['sent'] = true;
@@ -121,8 +135,10 @@ function setTab(tab: string) {
 function handleSearchMembers(q: string) {
     searchQuery.value = q;
     searchLoading.value = true;
-    // Sử dụng searchLoadingState riêng cho search, không ảnh hưởng đến isLoading chính
-    fetchMembers(friendsList, memberCacheRef, searchLoadingState, q).finally(() => {
+    currentPage.value = 1; // Reset to first page when searching
+    hasMoreData.value = true; // Reset infinite scroll state
+    // Use a separate searchLoadingState for search, does not affect main isLoading
+    fetchMembers(friendsList, memberCacheRef, searchLoadingState, q, currentPage.value).finally(() => {
         searchLoading.value = false;
     });
 }
@@ -137,8 +153,85 @@ function handleRemoveMemberWrapper(member: Member) {
     );
 }
 
+// Removed pagination functions - now using infinite scroll
+
+// Update pagination info when data changes
+function updatePaginationInfo() {
+    if (friendsList.value.data) {
+        totalPages.value = (friendsList.value.data as any).last_page || 1;
+        totalItems.value = (friendsList.value.data as any).total || 0;
+    }
+}
+
+// Load more members for infinite scroll
+async function loadMoreMembers() {
+    if (isLoadingMore.value || !hasMoreData.value) return;
+
+    const total = friendsList.value.total || 0;
+    const loaded = Array.isArray(friendsList.value.data) ? friendsList.value.data.length : 0;
+    const lastPage = friendsList.value.last_page || 1;
+    const perPage = friendsList.value.per_page || 52;
+    // If all data is loaded, do not call API again
+    if (loaded >= total && total > 0) {
+        hasMoreData.value = false;
+        return;
+    }
+
+    const nextPage = Math.floor(loaded / perPage) + 1;
+    if (nextPage > lastPage || loadedPages.has(nextPage)) {
+        hasMoreData.value = false;
+        return;
+    }
+
+    isLoadingMore.value = true;
+    try {
+        const beforeCount = Array.isArray(friendsList.value.data) ? friendsList.value.data.length : 0;
+        await fetchMembers(friendsList, memberCacheRef, isLoadingMore, searchQuery.value, nextPage, false, true);
+        const afterCount = Array.isArray(friendsList.value.data) ? friendsList.value.data.length : 0;
+        const addedCount = afterCount - beforeCount;
+        if (addedCount < perPage || nextPage >= lastPage) {
+            hasMoreData.value = false;
+        }
+        if (addedCount > 0) {
+            loadedPages.add(nextPage);
+            currentPage.value = nextPage;
+        }
+    } catch (error) {
+        console.error('Error loading more members:', error);
+    } finally {
+        isLoadingMore.value = false;
+    }
+}
+
+
+
+// Debounce util
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (...args: Parameters<T>) => void {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    return function (this: unknown, ...args: Parameters<T>) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+// Infinite scroll: listen to window scroll (debounced)
+const handleWindowScroll = debounce(() => {
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const clientHeight = window.innerHeight;
+    const scrollHeight = document.documentElement.scrollHeight;
+    // Only call API when scrolled near the end of the current list (95%)
+    if (scrollTop + clientHeight >= scrollHeight * 0.95 && hasMoreData.value && !isLoadingMore.value) {
+        loadMoreMembers();
+    }
+}, 200);
+
 onMounted(() => {
-    fetchMembers(friendsList, memberCacheRef, isLoading);
+    hasMoreData.value = true; // Reset infinite scroll state
+    loadedPages.clear();
+    fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value).then(() => {
+        updatePaginationInfo();
+        loadedPages.add(1);
+    });
     fetchSentInvitations(sentInvitations, isLoading);
     fetchReceivedInvitations(receivedInvitations, isLoading);
     const data = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -156,6 +249,12 @@ onMounted(() => {
                 );
             });
     }
+    // Listen to window scroll event
+    window.addEventListener('scroll', handleWindowScroll);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('scroll', handleWindowScroll);
 });
 </script>
 <template>
@@ -185,18 +284,32 @@ onMounted(() => {
             <AddMemberModal v-if="showAddModal" @close="showAddModal = false" @add="handleAddMember" />
             <LoadingPage v-if="isLoading && !searchLoading" />
             <div v-else>
-                <MemberTable v-if="activeTab === 'Members'" :items="friendsList.data?.data || []" :loading="false"
-                    @removeMember="handleRemoveMemberWrapper" />
+                <div v-if="activeTab === 'Members'" class="members-container">
+                    <MemberTable :items="Array.isArray(friendsList.data) ? friendsList.data : []"
+                        :loading="isLoading && friendsList.data.length === 0"
+                        @removeMember="handleRemoveMemberWrapper" />
+
+                    <!-- Infinite scroll loading indicator -->
+                    <div v-if="isLoadingMore" class="loading-more">
+                        <div class="loading-spinner"></div>
+                        <span>Loading more members...</span>
+                    </div>
+
+                    <!-- End of list indicator -->
+                    <div v-if="!hasMoreData && Array.isArray(friendsList.data) && friendsList.data.length > 0"
+                        class="end-of-list">
+                        <span>No more members to load</span>
+                    </div>
+                </div>
+
                 <MemberTable v-if="activeTab === 'Sent Invitations'"
-                    :items="Array.isArray(sentInvitations.data?.data) ? sentInvitations.data.data : []"
-                    :loading="false">
+                    :items="Array.isArray(sentInvitations.data) ? sentInvitations.data : []" :loading="false">
                     <template #card="{ item }">
                         <SentInvitationCard :invitation="item" @cancel="handleCancelInvitation" />
                     </template>
                 </MemberTable>
                 <MemberTable v-if="activeTab === 'Received Invitations'"
-                    :items="Array.isArray(receivedInvitations.data?.data) ? receivedInvitations.data.data : []"
-                    :loading="false">
+                    :items="Array.isArray(receivedInvitations.data) ? receivedInvitations.data : []" :loading="false">
                     <template #card="{ item }">
                         <InvitationCard :invitation="item" @accept="handleAcceptInvitation"
                             @decline="handleDeclineInvitation" />
@@ -218,6 +331,7 @@ onMounted(() => {
     box-shadow: 0 2px 16px rgba(34, 34, 59, 0.07);
     padding: 2.2rem 2.2rem 2.5rem 2.2rem;
     margin-top: 1.2rem;
+    min-height: 80vh;
 }
 
 .page-title {
@@ -318,6 +432,65 @@ onMounted(() => {
         padding: 0.5rem 0.5rem 0.2rem 0.5rem;
     }
 
+    .pagination-controls {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .pagination-info {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+}
+
+/* Infinite Scroll Styles */
+.members-container {
+    /* Bỏ max-height và overflow để không cuộn trong card */
+    scroll-behavior: smooth;
+}
+
+.loading-more {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #e9ecef;
+    border-top: 2px solid #2563eb;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 0.5rem;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.end-of-list {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+@media (max-width: 600px) {
     .create-btn {
         display: none !important;
     }

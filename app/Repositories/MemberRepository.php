@@ -15,20 +15,22 @@ class MemberRepository extends BaseRepository
     /**
      * Get all accepted members (friendship) of a user. Only members with accepted invitation are in this table.
      */
-    public function getContacts($userId, $query = null)
+    public function getContacts($userId, $query = null, $perPage = null, $page = 1)
     {
+        $perPage = $perPage ?? config('constant_view.MEMBER_PER_PAGE');
         $contacts = $this->model->with('member')
             ->where('user_id', $userId)
             ->where('member_id', '!=', $userId)
-            ->orderByDesc('id'); // Order by newest added member first
+            ->orderByDesc('id'); // Sort by newest added member first
         if (!empty($query)) {
             $contacts = $contacts->whereHas('member', function ($q) use ($query) {
                 $q->where('name', 'like', "%$query%")
                     ->orWhere('email', 'like', "%$query%");
             });
         }
-        $paginated = $contacts->paginate(6);
-        // Map data so each item has avatar, name, email, id
+        $paginated = $contacts->paginate($perPage, ['*'], 'page', $page);
+
+        // Map member info directly into the collection
         $paginated->getCollection()->transform(function ($item) {
             return [
                 'id' => $item->member->id ?? null,
@@ -37,6 +39,7 @@ class MemberRepository extends BaseRepository
                 'avatar' => $item->member->avatar ?? '',
             ];
         });
+
         return $paginated;
     }
 
@@ -57,6 +60,7 @@ class MemberRepository extends BaseRepository
 
     public function deleteMember($member_id, $userId)
     {
+        // Remove member relationship in both directions
         $deleted = $this->model->where(function ($q) use ($userId, $member_id) {
             $q->where('user_id', $userId)->where('member_id', $member_id);
         })->orWhere(function ($q) use ($userId, $member_id) {

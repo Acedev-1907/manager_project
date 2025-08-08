@@ -88,7 +88,7 @@ async function submitProject() {
                         <div class="mt-3">
                             <label class="form-label">Invite Members</label>
                             <select v-model="selectedMembers" multiple class="form-select">
-                                <option v-for="memberObj in memberData.data?.data || []" :key="memberObj.id"
+                                <option v-for="memberObj in memberData.data || []" :key="memberObj.id"
                                     :value="memberObj.id">
                                     {{ memberObj.name }} ({{ memberObj.email }})
                                 </option>

@@ -31,11 +31,11 @@ export interface Member {
 }
 
 export interface MemberListResponse {
-  data: {
-    data: Member[];
-    total?: number;
-    current_page?: number;
-  };
+  data: Member[];
+  total: number;
+  current_page: number;
+  last_page: number;
+  per_page: number;
 }
 
 // Invitation types

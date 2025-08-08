@@ -8,7 +8,13 @@ export type GetMemberType = MemberListResponse;
 
 export function useGetMembers() {
   const loading = ref(false);
-  const memberData = ref<MemberListResponse>({ data: { data: [] } });
+  const memberData = ref<MemberListResponse>({
+    data: [],
+    total: 0,
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+  });
   async function getMembers(
     page: number = 1,
     query: string = "",

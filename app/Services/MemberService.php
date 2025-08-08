@@ -14,9 +14,9 @@ class MemberService
         $this->memberRepo = $memberRepo;
     }
 
-    public function getContacts($user, $query = null)
+    public function getContacts($user, $query = null, $perPage = 52, $page = 1)
     {
-        return $this->memberRepo->getContacts($user->id, $query);
+        return $this->memberRepo->getContacts($user->id, $query, $perPage, $page);
     }
 
     public function addMember($user, $memberId)
