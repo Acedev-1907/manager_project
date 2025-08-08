@@ -31,12 +31,11 @@ export async function fetchMembers(
 
   try {
     const perPage = 52;
-
     const response = await makeHttpReq<undefined, any>(
       `members?query=${query}&page=${page}&per_page=${perPage}`,
       "GET"
     );
-    // If response has nested data, extract correct MemberListResponse type
+    // Nếu response có nested data, lấy đúng kiểu MemberListResponse
     let data: GetMemberType;
     if (response && response.data && Array.isArray(response.data.data)) {
       // Laravel resource format { data: { data: [], ...paging... } }
@@ -46,28 +45,32 @@ export async function fetchMembers(
     }
 
     if (append && Array.isArray(friendsList.value.data)) {
-      // Remove duplicate members by id
+      // Loại bỏ member trùng id
       const existingIds = new Set(friendsList.value.data.map((m: any) => m.id));
       const newMembers = (data.data || []).filter(
         (m: any) => !existingIds.has(m.id)
       );
-      friendsList.value = {
+      const mergedData = {
         ...data,
         data: [...friendsList.value.data, ...newMembers],
       };
+      friendsList.value = mergedData;
+      // Luôn cập nhật cache cho page 1 với toàn bộ danh sách đã merge
+      const firstPageKey = `member_page_${query}_1`;
+      memberCache.value[firstPageKey] = mergedData;
+      memberCache.value[cacheKey] = mergedData;
     } else {
       friendsList.value = data;
+      memberCache.value[cacheKey] = data;
     }
-
-    memberCache.value[cacheKey] = data;
     localStorage.setItem("memberCache", JSON.stringify(memberCache.value));
-  } catch (e) {}
-
-  if (append) {
-    isLoading.value = false;
-  } else {
-    isLoading.value = false;
+  } catch (e) {
+    // Ghi log lỗi để dễ debug
+    console.error("Lỗi khi fetchMembers:", e);
   }
+
+  // Luôn set lại isLoading về false
+  isLoading.value = false;
 }
 
 export async function fetchSentInvitations(
@@ -91,6 +94,8 @@ export async function fetchSentInvitations(
       id: inv.id || inv.invitation_id,
     }));
   } catch (e) {
+    // Ghi log lỗi để dễ debug
+    console.error("Lỗi khi fetchSentInvitations:", e);
     sentInvitations.value.data = [];
   }
   isLoading.value = false;
@@ -117,6 +122,8 @@ export async function fetchReceivedInvitations(
       id: inv.id || inv.invitation_id,
     }));
   } catch (e) {
+    // Ghi log lỗi để dễ debug
+    console.error("Lỗi khi fetchReceivedInvitations:", e);
     receivedInvitations.value.data = [];
   }
   isLoading.value = false;

@@ -31,6 +31,15 @@ const friendsList = ref<MemberListResponse>({ data: [], total: 0, current_page: 
 const sentInvitations = ref<MemberListResponse>({ data: [], total: 0, current_page: 1, last_page: 1, per_page: 10 });
 const receivedInvitations = ref<MemberListResponse>({ data: [], total: 0, current_page: 1, last_page: 1, per_page: 10 });
 const memberCacheRef = ref<{ [key: string]: MemberListResponse }>({}) as Ref<{ [key: string]: MemberListResponse }>;
+// Restore cache from localStorage if available
+const cacheFromStorage = localStorage.getItem('memberCache');
+if (cacheFromStorage) {
+    try {
+        memberCacheRef.value = JSON.parse(cacheFromStorage);
+    } catch (e) {
+        memberCacheRef.value = {};
+    }
+}
 const hasFetched = ref<{ [key: string]: boolean }>({});
 const currentPage = ref(1);
 const loadedPages = new Set<number>();
@@ -122,7 +131,13 @@ function setTab(tab: string) {
     if (tab === 'Members') {
         currentPage.value = 1; // Reset to first page when switching tab
         hasMoreData.value = true; // Reset infinite scroll state
-        fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value);
+        const cacheKey = `member_page_${searchQuery.value}_${currentPage.value}`;
+        if (memberCacheRef.value[cacheKey]) {
+            friendsList.value = memberCacheRef.value[cacheKey];
+            isLoading.value = false;
+        } else {
+            fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value);
+        }
     } else if (tab === 'Sent Invitations' && !hasFetched.value['sent']) {
         fetchSentInvitations(sentInvitations, isLoading);
         hasFetched.value['sent'] = true;
@@ -228,10 +243,17 @@ const handleWindowScroll = debounce(() => {
 onMounted(() => {
     hasMoreData.value = true; // Reset infinite scroll state
     loadedPages.clear();
-    fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value).then(() => {
-        updatePaginationInfo();
-        loadedPages.add(1);
-    });
+    const cacheKey = `member_page_${searchQuery.value}_${currentPage.value}`;
+    const cached = memberCacheRef.value[cacheKey];
+    if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
+        friendsList.value = cached;
+        isLoading.value = false;
+    } else {
+        fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value).then(() => {
+            updatePaginationInfo();
+            loadedPages.add(1);
+        });
+    }
     fetchSentInvitations(sentInvitations, isLoading);
     fetchReceivedInvitations(receivedInvitations, isLoading);
     const data = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -282,7 +304,7 @@ onUnmounted(() => {
             </div>
             <FabButton v-if="isMobile" @click="showAddModal = true" icon="bi-person-plus" />
             <AddMemberModal v-if="showAddModal" @close="showAddModal = false" @add="handleAddMember" />
-            <LoadingPage v-if="isLoading && !searchLoading" />
+            <LoadingPage v-if="isLoading && (!friendsList.data || friendsList.data.length === 0) && !searchLoading" />
             <div v-else>
                 <div v-if="activeTab === 'Members'" class="members-container">
                     <MemberTable :items="Array.isArray(friendsList.data) ? friendsList.data : []"
