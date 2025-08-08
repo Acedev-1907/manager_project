@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\MemberService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class MemberController extends Controller
 {
@@ -18,11 +19,17 @@ class MemberController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = $request->get('query');
-        $perPage = $request->get('per_page');
-        $page = $request->get('page');
-        $contacts = $this->memberService->getContacts($user, $query, $perPage, $page);
-        return response(['data' => $contacts], 200);
+        $query = $request->get('query', '');
+        $perPage = min((int) $request->get('per_page', 52), 52); // Limit max 52 items per page
+        $page = max((int) $request->get('page', 1), 1); // Ensure page >= 1
+
+        try {
+            $contacts = $this->memberService->getContacts($user, $query, $perPage, $page);
+            return response(['data' => $contacts], 200);
+        } catch (\Exception $e) {
+            Log::error('Error fetching members: ' . $e->getMessage());
+            return response(['error' => 'Failed to fetch members'], 500);
+        }
     }
 
     public function store(Request $req)

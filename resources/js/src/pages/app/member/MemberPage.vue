@@ -178,7 +178,7 @@ function updatePaginationInfo() {
     }
 }
 
-// Load more members for infinite scroll
+// Optimize loadMoreMembers function
 async function loadMoreMembers() {
     if (isLoadingMore.value || !hasMoreData.value) return;
 
@@ -186,7 +186,8 @@ async function loadMoreMembers() {
     const loaded = Array.isArray(friendsList.value.data) ? friendsList.value.data.length : 0;
     const lastPage = friendsList.value.last_page || 1;
     const perPage = friendsList.value.per_page || 52;
-    // If all data is loaded, do not call API again
+
+    // Check if all data is loaded
     if (loaded >= total && total > 0) {
         hasMoreData.value = false;
         return;
@@ -204,23 +205,24 @@ async function loadMoreMembers() {
         await fetchMembers(friendsList, memberCacheRef, isLoadingMore, searchQuery.value, nextPage, false, true);
         const afterCount = Array.isArray(friendsList.value.data) ? friendsList.value.data.length : 0;
         const addedCount = afterCount - beforeCount;
+
         if (addedCount < perPage || nextPage >= lastPage) {
             hasMoreData.value = false;
         }
+
         if (addedCount > 0) {
             loadedPages.add(nextPage);
             currentPage.value = nextPage;
         }
     } catch (error) {
         console.error('Error loading more members:', error);
+        // Don't set hasMoreData = false when error so user can retry
     } finally {
         isLoadingMore.value = false;
     }
 }
 
-
-
-// Debounce util
+// Optimize debounce function with TypeScript
 function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (...args: Parameters<T>) => void {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return function (this: unknown, ...args: Parameters<T>) {
@@ -229,16 +231,19 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): (..
     };
 }
 
-// Infinite scroll: listen to window scroll (debounced)
+// Optimize scroll handler with throttle
 const handleWindowScroll = debounce(() => {
+    if (!hasMoreData.value || isLoadingMore.value) return;
+
     const scrollTop = window.scrollY || document.documentElement.scrollTop;
     const clientHeight = window.innerHeight;
     const scrollHeight = document.documentElement.scrollHeight;
-    // Only call API when scrolled near the end of the current list (95%)
-    if (scrollTop + clientHeight >= scrollHeight * 0.95 && hasMoreData.value && !isLoadingMore.value) {
+
+    // Only call API when scrolled to 90% of the page
+    if (scrollTop + clientHeight >= scrollHeight * 0.9) {
         loadMoreMembers();
     }
-}, 200);
+}, 300); // Increase delay to reduce number of calls
 
 onMounted(() => {
     hasMoreData.value = true; // Reset infinite scroll state

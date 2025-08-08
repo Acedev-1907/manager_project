@@ -6,7 +6,7 @@ const userMemberStore = defineStore("member", {
     memberInput: {} as MemberInputType,
     edit: false,
     memberListCache: null as any, // cache member list
-    lastFetched: null as number | null, // thời gian fetch gần nhất
+    lastFetched: null as number | null, // Last fetch time
   }),
   actions: {
     setMemberListCache(data: any) {

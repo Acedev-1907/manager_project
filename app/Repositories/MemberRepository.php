@@ -18,19 +18,26 @@ class MemberRepository extends BaseRepository
     public function getContacts($userId, $query = null, $perPage = null, $page = 1)
     {
         $perPage = $perPage ?? config('constant_view.MEMBER_PER_PAGE');
-        $contacts = $this->model->with('member')
-            ->where('user_id', $userId)
-            ->where('member_id', '!=', $userId)
-            ->orderByDesc('id'); // Sort by newest added member first
+
+        // Optimize query by selecting only necessary fields
+        $contacts = $this->model->select('members.id', 'members.user_id', 'members.member_id', 'members.created_at')
+            ->with(['member' => function ($query) {
+                $query->select('id', 'name', 'email', 'avatar');
+            }])
+            ->where('members.user_id', $userId)
+            ->where('members.member_id', '!=', $userId)
+            ->orderByDesc('members.id'); // Sort by newest added member first
+
         if (!empty($query)) {
             $contacts = $contacts->whereHas('member', function ($q) use ($query) {
-                $q->where('name', 'like', "%$query%")
-                    ->orWhere('email', 'like', "%$query%");
+                $q->where('name', 'like', "%{$query}%")
+                    ->orWhere('email', 'like', "%{$query}%");
             });
         }
+
         $paginated = $contacts->paginate($perPage, ['*'], 'page', $page);
 
-        // Map member info directly into the collection
+        // Map member info directly into the collection - optimized transform
         $paginated->getCollection()->transform(function ($item) {
             return [
                 'id' => $item->member->id ?? null,

@@ -3,7 +3,15 @@
     <div class="card-content">
       <div class="card-header">
         <slot name="avatar">
-          <img :src="avatarSrc" class="avatar" alt="avatar" />
+          <!-- Use optimized avatar with skeleton loading -->
+          <div class="avatar-container">
+            <div v-if="isAvatarLoading" class="avatar-skeleton"></div>
+            <img v-else :src="avatarSrc" class="avatar" :class="{ 'avatar-loaded': avatarLoaded }" alt="avatar"
+              @load="handleAvatarLoad" @error="handleAvatarError" />
+            <div v-if="showAvatarFallback" class="avatar-fallback">
+              {{ fallbackText }}
+            </div>
+          </div>
         </slot>
         <div class="card-info">
           <slot name="title">
@@ -23,13 +31,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { getAvatarSrc } from '../helper/avatar';
+import { computed, ref, watch } from 'vue';
+import { getAvatarSrc, isAvatarLoading as checkAvatarLoading } from '../helper/avatar';
 
 interface Props {
   title?: string;
   avatar?: string;
   name?: string;
+  userId?: number;
   variant?: 'default' | 'member' | 'invitation' | 'sent-invitation';
   size?: 'sm' | 'md' | 'lg';
 }
@@ -39,8 +48,25 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md'
 });
 
+const avatarLoaded = ref(false);
+const showAvatarFallback = ref(false);
+
 const avatarSrc = computed(() => {
-  return getAvatarSrc(props.avatar, props.name || props.title || '');
+  return getAvatarSrc(props.avatar, props.userId);
+});
+
+const isAvatarLoading = computed(() => {
+  return checkAvatarLoading(props.avatar, props.userId);
+});
+
+const fallbackText = computed(() => {
+  if (props.name) {
+    return props.name.charAt(0).toUpperCase();
+  }
+  if (props.userId) {
+    return `U${props.userId}`;
+  }
+  return 'U';
 });
 
 const cardClass = computed(() => {
@@ -48,6 +74,22 @@ const cardClass = computed(() => {
     [`card-${props.variant}`]: true,
     [`card-${props.size}`]: true
   };
+});
+
+function handleAvatarLoad() {
+  avatarLoaded.value = true;
+  showAvatarFallback.value = false;
+}
+
+function handleAvatarError() {
+  showAvatarFallback.value = true;
+  avatarLoaded.value = false;
+}
+
+// Reset avatar state when avatar changes
+watch(() => props.avatar, () => {
+  avatarLoaded.value = false;
+  showAvatarFallback.value = false;
 });
 </script>
 
@@ -82,13 +124,62 @@ const cardClass = computed(() => {
   height: 100%;
 }
 
-.avatar {
+.avatar-container {
+  position: relative;
   width: 38px;
   height: 38px;
   border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   object-fit: cover;
   border: 2px solid #e0e7ff;
-  flex-shrink: 0;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.avatar.avatar-loaded {
+  opacity: 1;
+}
+
+.avatar-skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 50%;
+  border: 2px solid #e0e7ff;
+}
+
+.avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 50%;
+  border: 2px solid #e0e7ff;
+  text-transform: uppercase;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .card-info {
@@ -146,4 +237,4 @@ const cardClass = computed(() => {
 .card-lg .card-title {
   font-size: 1.25rem;
 }
-</style> 
+</style>

@@ -25,7 +25,7 @@ const rules = {
 
 const v$ = useVuelidate(rules, taskStore.taskInput);
 const selectedMembers = ref<number[]>([]);
-const { /* loading, */ createTask } = useCreateTask();
+const { loading, createTask } = useCreateTask();
 const currentUser = ref<{ id: number; name: string; email: string } | null>(null);
 
 // Compute project members, always include current user
@@ -88,6 +88,9 @@ function closeModal() {
 }
 
 async function submitTask() {
+    // Prevent spam clicking
+    if (loading.value) return;
+
     if (!Array.isArray(taskStore.taskInput.memberIds)) {
         taskStore.taskInput.memberIds = [];
     }

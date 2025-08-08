@@ -46,6 +46,9 @@ function selectSuggestion(user: UserSuggestionType) {
 }
 
 function submit() {
+    // Prevent spam clicking
+    if (loading.value) return;
+
     errorMsg.value = '';
     if (!input.value) {
         errorMsg.value = 'Please enter friend code or select user';

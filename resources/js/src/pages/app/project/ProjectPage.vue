@@ -317,6 +317,9 @@ function openEditProject(project: ProjectType) {
 }
 
 async function handleSubmitProject(data: ProjectInputType) {
+    // Prevent spam clicking
+    if (loading.value) return;
+
     loading.value = true;
     projectStore.projectInput = {
         ...data,

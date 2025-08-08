@@ -26,6 +26,9 @@ watch(() => projectStore.projectInput.startDate, (newStartDate) => {
 });
 
 async function submitProject() {
+    // Prevent spam clicking
+    if (loading.value) return;
+
     const result = await v$.value.$validate();
     if (!result) return;
 

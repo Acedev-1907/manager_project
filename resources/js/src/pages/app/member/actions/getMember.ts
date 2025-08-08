@@ -22,13 +22,26 @@ export function useGetMembers() {
   ) {
     try {
       loading.value = true;
-      const data = await makeHttpReq<undefined, MemberListResponse>(
+      const response = await makeHttpReq<undefined, any>(
         `members?query=${query}&page=${page}`,
         "GET",
         undefined,
         { showGlobalLoading }
       );
       loading.value = false;
+
+      // Handle different response structures
+      let data: MemberListResponse;
+      if (response && response.data && Array.isArray(response.data.data)) {
+        // Laravel resource format { data: { data: [], ...paging... } }
+        data = response.data;
+      } else if (response && response.data) {
+        // Direct response format
+        data = response.data;
+      } else {
+        data = response;
+      }
+
       memberData.value = data;
     } catch (error) {
       loading.value = false;

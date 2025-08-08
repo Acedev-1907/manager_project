@@ -184,6 +184,9 @@ async function saveCroppedAvatar() {
     }, 'image/jpeg', 0.7);
 }
 async function updateUser() {
+    // Prevent spam clicking
+    if (loading.value) return;
+
     loading.value = true;
     errorMessage.value = '';
     successMessage.value = '';

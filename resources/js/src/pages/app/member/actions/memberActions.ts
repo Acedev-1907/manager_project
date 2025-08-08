@@ -17,60 +17,77 @@ export async function fetchMembers(
   append = false
 ) {
   const cacheKey = `member_page_${query}_${page}`;
+
+  // Check cache before calling API
   if (!force && memberCache.value[cacheKey] && !append) {
     friendsList.value = memberCache.value[cacheKey];
     isLoading.value = false;
     return;
   }
 
-  if (append) {
-    isLoading.value = false;
-  } else {
+  // Only set loading for first time, not for append
+  if (!append) {
     isLoading.value = true;
   }
 
   try {
     const perPage = 52;
     const response = await makeHttpReq<undefined, any>(
-      `members?query=${query}&page=${page}&per_page=${perPage}`,
+      `members?query=${encodeURIComponent(
+        query
+      )}&page=${page}&per_page=${perPage}`,
       "GET"
     );
-    // Nếu response có nested data, lấy đúng kiểu MemberListResponse
+
+    // Handle response data consistently
     let data: GetMemberType;
     if (response && response.data && Array.isArray(response.data.data)) {
       // Laravel resource format { data: { data: [], ...paging... } }
+      data = response.data;
+    } else if (response && response.data) {
+      // Direct response format
       data = response.data;
     } else {
       data = response;
     }
 
     if (append && Array.isArray(friendsList.value.data)) {
-      // Loại bỏ member trùng id
+      // Remove duplicate members efficiently
       const existingIds = new Set(friendsList.value.data.map((m: any) => m.id));
       const newMembers = (data.data || []).filter(
         (m: any) => !existingIds.has(m.id)
       );
-      const mergedData = {
-        ...data,
-        data: [...friendsList.value.data, ...newMembers],
-      };
-      friendsList.value = mergedData;
-      // Luôn cập nhật cache cho page 1 với toàn bộ danh sách đã merge
-      const firstPageKey = `member_page_${query}_1`;
-      memberCache.value[firstPageKey] = mergedData;
-      memberCache.value[cacheKey] = mergedData;
+
+      if (newMembers.length > 0) {
+        const mergedData = {
+          ...data,
+          data: [...friendsList.value.data, ...newMembers],
+        };
+        friendsList.value = mergedData;
+        // Always update cache for page 1 with complete merged list
+        const firstPageKey = `member_page_${query}_1`;
+        memberCache.value[firstPageKey] = mergedData;
+        memberCache.value[cacheKey] = mergedData;
+      }
     } else {
       friendsList.value = data;
       memberCache.value[cacheKey] = data;
     }
-    localStorage.setItem("memberCache", JSON.stringify(memberCache.value));
-  } catch (e) {
-    // Ghi log lỗi để dễ debug
-    console.error("Lỗi khi fetchMembers:", e);
-  }
 
-  // Luôn set lại isLoading về false
-  isLoading.value = false;
+    // Save cache to localStorage safely
+    try {
+      localStorage.setItem("memberCache", JSON.stringify(memberCache.value));
+    } catch (e) {
+      console.warn("Failed to save member cache to localStorage:", e);
+    }
+  } catch (e) {
+    // Log error for easier debugging
+    console.error("Error when fetchMembers:", e);
+    // Don't throw error to avoid app crash
+  } finally {
+    // Always set isLoading back to false
+    isLoading.value = false;
+  }
 }
 
 export async function fetchSentInvitations(
@@ -94,8 +111,8 @@ export async function fetchSentInvitations(
       id: inv.id || inv.invitation_id,
     }));
   } catch (e) {
-    // Ghi log lỗi để dễ debug
-    console.error("Lỗi khi fetchSentInvitations:", e);
+    // Log error for easier debugging
+    console.error("Error when fetchSentInvitations:", e);
     sentInvitations.value.data = [];
   }
   isLoading.value = false;
@@ -122,8 +139,8 @@ export async function fetchReceivedInvitations(
       id: inv.id || inv.invitation_id,
     }));
   } catch (e) {
-    // Ghi log lỗi để dễ debug
-    console.error("Lỗi khi fetchReceivedInvitations:", e);
+    // Log error for easier debugging
+    console.error("Error when fetchReceivedInvitations:", e);
     receivedInvitations.value.data = [];
   }
   isLoading.value = false;

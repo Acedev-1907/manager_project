@@ -74,9 +74,9 @@
                                         <div v-if="selectedMembers.length > 0" class="members-avatars-grid">
                                             <div v-for="(id, idx) in selectedMembers" :key="id"
                                                 class="member-avatar-item">
-                                                <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
-                                                    class="member-avatar" :alt="getMemberById(id)?.name"
-                                                    :title="getMemberById(id)?.name" />
+                                                <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name || '')"
+                                                    class="member-avatar" :alt="getMemberById(id)?.name || ''"
+                                                    :title="getMemberById(id)?.name || ''" />
                                             </div>
                                         </div>
                                     </div>
@@ -113,7 +113,7 @@
                         </div>
 
                         <!-- Members List -->
-                        <div class="member-modal-list">
+                        <div class="member-modal-list" @scroll="handleMemberModalScroll">
                             <div v-for="(memberObj, idx) in filteredMembers" :key="memberObj.id"
                                 class="member-modal-row" @click="toggleMember(memberObj.id)"
                                 :class="{ 'selected-member': selectedMembers.includes(memberObj.id) }">
@@ -133,7 +133,15 @@
                                     <i v-else class="fas fa-plus available"></i>
                                 </div>
                             </div>
-                            <div v-if="filteredMembers.length === 0" class="no-results">
+
+                            <!-- Loading indicator -->
+                            <div v-if="isLoadingMore" class="loading-more">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Loading more members...</span>
+                            </div>
+
+                            <!-- No results message -->
+                            <div v-if="filteredMembers.length === 0 && !isLoadingMore" class="no-results">
                                 <i class="fas fa-search"></i>
                                 <span>No members found</span>
                             </div>
@@ -150,9 +158,9 @@
                             </div>
                             <div class="selected-members-display">
                                 <div v-for="(id, idx) in selectedMembers" :key="id" class="member-tag">
-                                    <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
-                                        class="member-avatar" :alt="getMemberById(id)?.name" />
-                                    <span class="member-name">{{ getMemberById(id)?.name }}</span>
+                                    <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name || '')"
+                                        class="member-avatar" :alt="getMemberById(id)?.name || ''" />
+                                    <span class="member-name">{{ getMemberById(id)?.name || 'Unknown User' }}</span>
                                     <button type="button" class="remove-btn" @click.stop="toggleMember(id)">
                                         <i class="fas fa-times"></i>
                                     </button>
@@ -186,6 +194,7 @@ import DateInput from '../../../../components/DateInput.vue';
 import { useGetMembers } from '../../member/actions/getMember';
 import { projectStore } from '../store/projectStore';
 import { getAvatarSrc } from '../../../../helper/avatar';
+import { makeHttpReq } from '../../../../helper/makeHttpReq';
 
 const props = defineProps<{ isEdit: boolean, projectInput: any, loading: boolean }>()
 const emit = defineEmits(['close', 'submit'])
@@ -200,6 +209,13 @@ const searchInput = ref<HTMLInputElement | null>(null);
 const showMemberModal = ref(false);
 // Add errors variable to store field errors
 const errors = ref<{ name?: string; startDate?: string; endDate?: string; content?: string }>({});
+
+// Add infinite scroll variables
+const currentPage = ref(1);
+const isLoadingMore = ref(false);
+const hasMoreData = ref(true);
+const allMembers = ref<any[]>([]);
+const memberCache = ref<{ [key: string]: any }>({});
 
 let closeTimeout: ReturnType<typeof setTimeout> | null = null;
 function handleMouseLeave() {
@@ -271,24 +287,34 @@ function validate() {
 }
 
 function submitProject() {
+    // Prevent spam clicking
+    if (props.loading) return;
+
     if (!validate()) return;
     emit('submit', { ...props.projectInput, members: selectedMembers.value });
 }
 
 const filteredMembers = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase();
+
+    // Use allMembers for infinite scroll data
+    const members = allMembers.value || [];
+
     // Filter out creator from member selection list
-    return (memberData.value?.data || [])
+    return members
         .filter(m => m.id !== currentUserId.value && m.id !== props.projectInput.creator?.id)
         .filter(m =>
-            m.name.toLowerCase().includes(keyword) ||
-            m.email.toLowerCase().includes(keyword)
+            m.name?.toLowerCase().includes(keyword) ||
+            m.email?.toLowerCase().includes(keyword)
         );
 });
 
 function getMemberById(id: number) {
-    let user = (memberData.value?.data || []).find(m => m.id === id);
-    if (!user && props.projectInput.users) {
+    // Use allMembers for infinite scroll data
+    const members = allMembers.value || [];
+    let user = members.find(m => m.id === id);
+
+    if (!user && props.projectInput.users && Array.isArray(props.projectInput.users)) {
         user = props.projectInput.users.find((u: any) => u.id === id);
     }
     return user;
@@ -296,10 +322,85 @@ function getMemberById(id: number) {
 
 function openMemberModal() {
     showMemberModal.value = true;
+    // Reset pagination when opening modal
+    currentPage.value = 1;
+    hasMoreData.value = true;
+    allMembers.value = [];
+    loadMembers();
 }
 
 function closeMemberModal() {
     showMemberModal.value = false;
+    // Clear scroll timeout
+    if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = null;
+    }
+}
+
+// Function to load members with pagination
+async function loadMembers(page = 1, append = false) {
+    if (isLoadingMore.value || (!append && !hasMoreData.value)) return;
+
+    try {
+        isLoadingMore.value = true;
+        const response = await makeHttpReq<undefined, any>(
+            `members?query=${encodeURIComponent(searchQuery.value)}&page=${page}&per_page=52`,
+            "GET"
+        );
+
+        // Handle response data structure
+        let data: any;
+        if (response && response.data && Array.isArray(response.data.data)) {
+            data = response.data;
+        } else if (response && response.data) {
+            data = response.data;
+        } else {
+            data = response;
+        }
+
+        const newMembers = data.data || [];
+
+        if (append) {
+            // Remove duplicates when appending
+            const existingIds = new Set(allMembers.value.map((m: any) => m.id));
+            const uniqueNewMembers = newMembers.filter((m: any) => !existingIds.has(m.id));
+            allMembers.value = [...allMembers.value, ...uniqueNewMembers];
+        } else {
+            allMembers.value = newMembers;
+        }
+
+        // Check if there are more pages
+        hasMoreData.value = page < (data.last_page || 1) && newMembers.length > 0;
+        currentPage.value = page;
+
+    } catch (error) {
+        console.error('Error loading members:', error);
+    } finally {
+        isLoadingMore.value = false;
+    }
+}
+
+// Function to handle scroll in member modal with debouncing
+let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+function handleMemberModalScroll(event: Event) {
+    if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+    }
+
+    scrollTimeout = setTimeout(() => {
+        const target = event.target as HTMLElement;
+        if (!target) return;
+
+        const scrollTop = target.scrollTop;
+        const scrollHeight = target.scrollHeight;
+        const clientHeight = target.clientHeight;
+
+        // Load more when scrolled to 80% of the list
+        if (scrollTop + clientHeight >= scrollHeight * 0.8 && hasMoreData.value && !isLoadingMore.value) {
+            loadMembers(currentPage.value + 1, true);
+        }
+    }, 100); // Debounce for 100ms
 }
 
 function clearAllMembers() {
@@ -326,6 +427,17 @@ watch(showMemberModal, async (newValue) => {
     if (newValue) {
         await nextTick();
         searchInput.value?.focus();
+    }
+});
+
+// Watch for search query changes to reload members
+watch(searchQuery, (newQuery) => {
+    if (showMemberModal.value) {
+        // Reset pagination and reload with new search
+        currentPage.value = 1;
+        hasMoreData.value = true;
+        allMembers.value = [];
+        loadMembers(1, false);
     }
 });
 </script>
@@ -1848,80 +1960,6 @@ body.modal-open .kanban-container .modal-content {
         font-size: 0.7rem;
     }
 
-    .selected-badge {
-        width: 12px;
-        height: 12px;
-        font-size: 0.45rem;
-    }
-
-    .remove-btn {
-        width: 12px;
-        height: 12px;
-    }
-
-    .remove-btn i {
-        font-size: 0.6rem;
-    }
-
-    .empty-state {
-        font-size: 0.7rem;
-        padding: 6px;
-    }
-
-    .members-dropdown-inline {
-        max-height: 180px;
-    }
-
-    .search-box {
-        padding: 6px 8px;
-    }
-
-    .search-box input {
-        padding: 4px 6px 4px 24px;
-        font-size: 0.7rem;
-    }
-
-    .search-box i {
-        left: 16px;
-        font-size: 0.7rem;
-    }
-
-    .members-list {
-        max-height: 140px;
-    }
-
-    .member-row {
-        padding: 6px 8px;
-    }
-
-    .member-row .member-avatar {
-        width: 32px;
-        height: 32px;
-    }
-
-    .member-action {
-        width: 20px;
-        height: 20px;
-        margin-left: 6px;
-    }
-
-    .member-details .member-name {
-        font-size: 0.7rem;
-    }
-
-    .member-details .member-email {
-        font-size: 0.6rem;
-    }
-
-    .member-action {
-        width: 16px;
-        height: 16px;
-    }
-
-    .member-action i {
-        font-size: 0.6rem;
-    }
-
     .no-results {
         padding: 12px;
         font-size: 0.7rem;
@@ -1930,39 +1968,47 @@ body.modal-open .kanban-container .modal-content {
 
 /* Member Modal Styles */
 .member-modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(8px);
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
     z-index: 999999999 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    isolation: isolate;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    isolation: isolate !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .member-modal-dialog {
-    max-width: 650px;
-    width: 100%;
-    max-height: 85vh;
+    max-width: 650px !important;
+    width: 100% !important;
+    max-height: 85vh !important;
+    z-index: 1000000000 !important;
+    position: relative !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .member-modal-content {
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    max-height: 85vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
+    background: white !important;
+    border-radius: 20px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
     z-index: 1000000000 !important;
-    isolation: isolate;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    isolation: isolate !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .member-modal-header {
@@ -2077,6 +2123,31 @@ body.modal-open .kanban-container .modal-content {
 
 .member-modal-list::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+}
+
+.loading-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #6b7280;
+    font-size: 0.9rem;
+    gap: 8px;
+}
+
+.loading-more i {
+    font-size: 1rem;
+}
+
+.no-results {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    gap: 8px;
+    text-align: center;
 }
 
 .member-modal-row {
