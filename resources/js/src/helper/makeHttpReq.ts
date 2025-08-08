@@ -143,7 +143,7 @@ export function makeHttpReq<TInput, TResponse>(
     } catch (error: any) {
       // Handle network and other errors
       if (showGlobalLoading) hideLoading();
-      handleGeneralError(error);
+      // handleGeneralError(error);
       reject(error);
     }
   });

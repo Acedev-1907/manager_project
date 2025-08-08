@@ -44,18 +44,18 @@ export function isAuthError(error: any): boolean {
 }
 
 // Thêm function để xử lý lỗi chung
+// TODO: xử lý lỗi chung (nếu lỗi authentication, chuyển về login)
 export function handleGeneralError(error: any) {
   // Nếu là lỗi authentication, xử lý như auth error
-  if (isAuthError(error)) {
-    handleAuthError();
-    return;
-  }
-
-  // Nếu là lỗi network hoặc server, có thể cần reload hoặc chuyển về login
-  if (error?.name === "TypeError" || error?.message?.includes("fetch")) {
-    // Network error - có thể server down hoặc mất kết nối
-    localStorage.removeItem("userData");
-    router.push("/login");
-    return;
-  }
+  // if (isAuthError(error)) {
+  //   handleAuthError();
+  //   return;
+  // }
+  // // Nếu là lỗi network hoặc server, có thể cần reload hoặc chuyển về login
+  // if (error?.name === "TypeError" || error?.message?.includes("fetch")) {
+  //   // Network error - có thể server down hoặc mất kết nối
+  //   localStorage.removeItem("userData");
+  //   router.push("/login");
+  //   return;
+  // }
 }
