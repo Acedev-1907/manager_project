@@ -82,8 +82,10 @@
         <div class="greeting">Xin chào <b>{{ $user->name ?? $user->email }}</b>,</div>
         <div style="text-align:center; margin-bottom: 8px;">Cảm ơn bạn đã đăng ký tài khoản!</div>
         <div class="email-box">{{ $user->email }}</div>
-        <a class="verify-btn" target="_blank" href="{{ route('validEmail', ['token' => $user->remember_token]) }}">Xác
-            thực email</a>
+        <a class="verify-btn" target="_blank"
+            href="{{ route('validEmail', ['token' => $user->remember_token]) . '?redirect=' . urlencode(url('/app/login')) }}">
+            Xác thực email
+        </a>
         <div style="text-align:center; margin-top: 10px; color:#444; font-size:14px;">Nếu bạn không đăng ký tài khoản,
             vui lòng bỏ qua email này.</div>
         <div class="footer">&copy; {{ date('Y') }} Manager Project. All rights reserved.</div>

@@ -14,7 +14,7 @@ use App\Services\AuthService;
 use App\Mail\ResetPasswordMail;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
-
+    
 class AuthController extends Controller
 {
     public function register(RegisterRequest $request, AuthService $authService)
@@ -43,6 +43,42 @@ class AuthController extends Controller
             $user->save();
         }
         return redirect('/app/login');
+    }
+
+    public function verifyEmailApi(Request $request, string $token)
+    {
+        $user = User::where('remember_token', $token)->first();
+        if (!$user) {
+            $redirect = $request->query('redirect');
+            if ($redirect) {
+                return redirect($redirect)->with('email_verify', 'invalid');
+            }
+            return response()->json([
+                'success' => false,
+                'message' => 'Token không hợp lệ hoặc đã được sử dụng.',
+            ], 404);
+        }
+
+        $user->isValidEmail = User::IS_VALID_EMAIL;
+        $name = preg_replace('/[^a-zA-Z0-9]/', '', strtolower(\App\Models\User::remove_accents($user->name)));
+        $user->friend_code = $name . '-' . $user->id;
+        $user->save();
+
+        $redirect = $request->query('redirect');
+        if ($redirect) {
+            return redirect($redirect)->with('email_verify', 'success');
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Xác thực email thành công.',
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'isValidEmail' => (bool) $user->isValidEmail,
+                'friend_code' => $user->friend_code,
+            ],
+        ]);
     }
 
     public function login(LoginRequest $request, AuthService $authService)

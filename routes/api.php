@@ -86,3 +86,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
 });
+
+Route::get('/check_email/{token}', [AuthController::class, 'verifyEmailApi'])->name('validEmail');
