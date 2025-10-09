@@ -30,8 +30,8 @@ class MemberInvitationService
         ]);
         // Trước khi gửi notification, kiểm tra đã có notification 'sent' chưa đọc chưa
         $oldNoti = $receiver->notifications()
-            ->whereRaw("data->>'invitation_id' = ?", [$invitation->id])
-            ->whereRaw("data->>'type' = 'sent'")
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.invitation_id')) = ?", [$invitation->id])
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.type')) = 'sent'")
             ->whereNull('read_at')
             ->first();
         if (!$oldNoti) {
@@ -101,8 +101,8 @@ class MemberInvitationService
         $senderUser = User::find($invitation->sender_id);
         // Update notification cũ cho receiver
         $oldNoti = $receiverUser->notifications()
-            ->whereRaw("data->>'invitation_id' = ?", [$invitation->id])
-            ->whereRaw("data->>'type' = 'sent'")
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.invitation_id')) = ?", [$invitation->id])
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.type')) = 'sent'")
             ->first();
         if ($oldNoti) {
             $data = $oldNoti->data;
@@ -149,8 +149,8 @@ class MemberInvitationService
         $senderUser = User::find($invitation->sender_id);
         // Update notification cũ cho receiver
         $oldNoti = $receiverUser->notifications()
-            ->whereRaw("data->>'invitation_id' = ?", [$invitation->id])
-            ->whereRaw("data->>'type' = 'sent'")
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.invitation_id')) = ?", [$invitation->id])
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.type')) = 'sent'")
             ->first();
         if ($oldNoti) {
             $data = $oldNoti->data;
