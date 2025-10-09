@@ -66,6 +66,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/member-invitations/sent', 'sent');
         Route::post('/member-invitations/{id}/accept', 'accept');
         Route::post('/member-invitations/{id}/decline', 'decline');
+        // Allow GET aliases for clients that trigger actions via links
+        Route::get('/member-invitations/{id}/accept', 'accept');
+        Route::get('/member-invitations/{id}/decline', 'decline');
         Route::delete('/member-invitations/{id}/cancel', 'cancel');
     });
 
