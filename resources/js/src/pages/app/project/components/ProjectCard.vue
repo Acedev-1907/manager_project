@@ -8,6 +8,7 @@ import { getAvatarSrc } from '../../../../helper/avatar';
 const props = defineProps<{
     project: ProjectType;
     currentUserId: number | null;
+    isPinned?: boolean; // Thêm prop để biết project có đang pin không
 }>();
 
 const emit = defineEmits<{
@@ -42,9 +43,15 @@ function stopPropagation(e: Event) {
 </script>
 
 <template>
-    <div class="project-card clickable-card" @click="goToKaban">
+    <div class="project-card clickable-card" :class="{ 'pinned-project': isPinned }" @click="goToKaban">
         <div class="project-card-header">
-            <div class="project-title">{{ project.name }}</div>
+            <div class="project-title">
+                {{ project.name }}
+                <span v-if="isPinned" class="pinned-badge" title="This project is pinned">
+                    <i class="bi bi-pin-fill"></i>
+                    Pinned
+                </span>
+            </div>
         </div>
         <div class="project-meta-row">
             <span class="creator">Creator: <b>{{ project.creator?.name || 'N/A' }}</b></span>
@@ -79,8 +86,9 @@ function stopPropagation(e: Event) {
                 <i class="bi bi-pencil-square"></i>
             </button>
             <button @click.stop="stopPropagation($event); $emit('pinnedProject', project.id)" type="button"
-                class="btn action-btn action-btn-pin" title="Pin">
-                <i class="bi bi-pin-angle"></i>
+                class="btn action-btn action-btn-pin" :class="{ 'pinned-active': isPinned }" 
+                :title="isPinned ? 'Pinned (Click to pin again)' : 'Pin this project'">
+                <i :class="isPinned ? 'bi bi-pin-fill' : 'bi bi-pin-angle'"></i>
             </button>
             <RouterLink class="btn action-btn action-btn-view" :to="'/kaban?query=' + project.slug" title="View"
                 @click.stop="stopPropagation($event)">
@@ -128,6 +136,10 @@ function stopPropagation(e: Event) {
     font-size: 1.18rem;
     word-break: break-word;
     letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 /* Dates and creator on one row */
@@ -268,5 +280,62 @@ function stopPropagation(e: Event) {
 
 .clickable-card:hover {
     background: #f6faff;
+}
+
+/* Pinned badge */
+.pinned-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: white;
+    padding: 0.25rem 0.65rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+    animation: pulse-badge 2s ease-in-out infinite;
+}
+
+.pinned-badge i {
+    font-size: 0.85rem;
+}
+
+@keyframes pulse-badge {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* Pinned project highlight */
+.pinned-project {
+    border: 2px solid #fbbf24;
+    background: linear-gradient(to bottom, #fffbeb 0%, #ffffff 100%);
+    box-shadow: 0 4px 16px rgba(251, 191, 36, 0.15);
+}
+
+.pinned-project:hover {
+    box-shadow: 0 6px 24px rgba(251, 191, 36, 0.25);
+    border-color: #f59e0b;
+}
+
+/* Pin button active state */
+.action-btn-pin.pinned-active {
+    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    color: white;
+    border-color: #f59e0b;
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.4);
+}
+
+.action-btn-pin.pinned-active:hover {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    border-color: #d97706;
+    transform: rotate(45deg);
+    transition: all 0.3s ease;
 }
 </style>

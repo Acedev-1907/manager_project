@@ -2,16 +2,32 @@
 
 namespace App\Helpers;
 
+/**
+ * String Helper
+ * 
+ * Utility class cho các thao tác xử lý chuỗi
+ * Tối ưu performance với memoization pattern
+ */
 class StringHelper
 {
     /**
-     * Remove Vietnamese accents from a string
+     * Cache cho accent mapping
      * 
-     * @param string $str
-     * @return string
+     * @var array
      */
-    public static function removeAccents(string $str): string
+    private static array $accentMap = [];
+
+    /**
+     * Khởi tạo accent mapping
+     * 
+     * @return void
+     */
+    private static function initAccentMap(): void
     {
+        if (!empty(self::$accentMap)) {
+            return;
+        }
+
         $accents = [
             'a' => ['á', 'à', 'ả', 'ã', 'ạ', 'ă', 'ắ', 'ằ', 'ẳ', 'ẵ', 'ặ', 'â', 'ấ', 'ầ', 'ẩ', 'ẫ', 'ậ'],
             'e' => ['é', 'è', 'ẻ', 'ẽ', 'ẹ', 'ê', 'ế', 'ề', 'ể', 'ễ', 'ệ'],
@@ -21,13 +37,30 @@ class StringHelper
             'y' => ['ý', 'ỳ', 'ỷ', 'ỹ', 'ỵ'],
             'd' => ['đ'],
         ];
-        
+
         foreach ($accents as $nonAccent => $accentChars) {
-            $str = str_replace($accentChars, $nonAccent, $str);
-            $str = str_replace(array_map('mb_strtoupper', $accentChars), strtoupper($nonAccent), $str);
+            foreach ($accentChars as $char) {
+                self::$accentMap[$char] = $nonAccent;
+                self::$accentMap[mb_strtoupper($char)] = mb_strtoupper($nonAccent);
+            }
         }
-        
-        return $str;
+    }
+
+    /**
+     * Remove Vietnamese accents from a string
+     * Sử dụng strtr() thay vì str_replace() để tối ưu performance
+     * 
+     * @param string $str
+     * @return string
+     */
+    public static function removeAccents(string $str): string
+    {
+        if (empty($str)) {
+            return $str;
+        }
+
+        self::initAccentMap();
+        return strtr($str, self::$accentMap);
     }
 
     /**
@@ -42,5 +75,52 @@ class StringHelper
         $cleanName = preg_replace('/[^a-zA-Z0-9]/', '', strtolower(self::removeAccents($name)));
         return $cleanName . '-' . $id;
     }
+
+    /**
+     * Generate slug from string
+     * 
+     * @param string $str
+     * @param string $separator
+     * @return string
+     */
+    public static function slug(string $str, string $separator = '-'): string
+    {
+        $str = self::removeAccents($str);
+        $str = strtolower(trim($str));
+        $str = preg_replace('/[^a-z0-9]+/', $separator, $str);
+        $str = trim($str, $separator);
+        
+        return $str;
+    }
+
+    /**
+     * Truncate string với ellipsis
+     * 
+     * @param string $str
+     * @param int $length
+     * @param string $suffix
+     * @return string
+     */
+    public static function truncate(string $str, int $length = 100, string $suffix = '...'): string
+    {
+        if (mb_strlen($str) <= $length) {
+            return $str;
+        }
+
+        return mb_substr($str, 0, $length) . $suffix;
+    }
+
+    /**
+     * Sanitize HTML tags
+     * 
+     * @param string $str
+     * @param array $allowedTags
+     * @return string
+     */
+    public static function sanitize(string $str, array $allowedTags = []): string
+    {
+        return strip_tags($str, $allowedTags);
+    }
 }
+
 

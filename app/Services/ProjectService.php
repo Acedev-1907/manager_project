@@ -25,7 +25,7 @@ class ProjectService
     }
 
     /**
-     * Create a new project with members
+     * Create a new project with members (Legacy - array based)
      * 
      * @param array $fields Project data
      * @param \App\Models\User $user Creator user
@@ -60,6 +60,57 @@ class ProjectService
 
             // Handle additional members
             $members = $fields['members'] ?? [];
+            if (!empty($members) && is_array($members)) {
+                $members = array_diff($members, [$user->id]);
+                if (!empty($members)) {
+                    $this->repo->attachUsers($project, $members);
+                }
+            }
+
+            $allMembers = array_unique(array_merge($members, [$user->id]));
+
+            // Create task progress record for creator
+            TaskProgress::create([
+                'projectId' => $project->id,
+                'user_id' => $user->id,
+                'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
+                'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
+            ]);
+
+            // Broadcast events after transaction commit
+            DB::afterCommit(function () use ($project, $allMembers) {
+                $this->broadcastProjectEvents($project, $allMembers);
+            });
+
+            return ['message' => 'Project created', 'status' => 200];
+        });
+    }
+
+    /**
+     * Create a new project with DTO (New - recommended)
+     * 
+     * @param \App\DTOs\ProjectDTO $dto Project data transfer object
+     * @param \App\Models\User $user Creator user
+     * @return array
+     */
+    public function createProjectWithDTO(\App\DTOs\ProjectDTO $dto, $user): array
+    {
+        return DB::transaction(function () use ($dto, $user) {
+            $project = $this->repo->create([
+                'name' => $dto->name,
+                'startDate' => $dto->startDate,
+                'endDate' => $dto->endDate,
+                'content' => $dto->content,
+                'status' => $dto->status ?? \App\Models\Project::NOT_STARTED,
+                'slug' => $dto->slug ?? \App\Models\Project::createSlug($dto->name),
+                'creator_id' => $user->id,
+            ]);
+
+            // Attach creator to project
+            $this->repo->attachUsers($project, [$user->id]);
+
+            // Handle additional members from DTO
+            $members = $dto->members;
             if (!empty($members) && is_array($members)) {
                 $members = array_diff($members, [$user->id]);
                 if (!empty($members)) {

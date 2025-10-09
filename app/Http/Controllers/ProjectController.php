@@ -69,7 +69,24 @@ class ProjectController extends ApiController
     public function store(Request $request)
     {
         $user = $request->user();
-        $result = $this->service->createProject($request->all(), $user);
+        
+        try {
+            $projectDTO = \App\DTOs\ProjectDTO::fromArray($request->all());
+            
+            // Validate DTO
+            if (!$projectDTO->isValid()) {
+                return $this->setStatusCode(422)
+                    ->setReturnCode(self::ERROR_VALIDATION)
+                    ->respondWithError('Invalid project data');
+            }
+            
+            $result = $this->service->createProjectWithDTO($projectDTO, $user);
+            
+        } catch (\Exception $e) {
+            return $this->setStatusCode(422)
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError($e->getMessage());
+        }
 
         if (isset($result['errors'])) {
             return $this->setStatusCode($result['status'])

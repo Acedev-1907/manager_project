@@ -283,7 +283,12 @@ async function handlePinProject(projectId: number) {
     await getPinnedProjectForCache(); // Lấy dữ liệu project mới
     dashboardStore.setPinnedProject(pinnedProjectForCache.value); // Lưu vào cache
 
-    // Emit event để dashboard biết có project mới được ghim
+    // Set flag để Dashboard biết cần refresh khi activated
+    localStorage.setItem('dashboard_needs_refresh', 'true');
+    localStorage.setItem('dashboard_refresh_reason', 'project-pinned');
+    localStorage.setItem('dashboard_pinned_project_id', projectId.toString());
+
+    // Emit event (cho trường hợp Dashboard đã mounted)
     eventBus.emit('project-pinned', { projectId, project: pinnedProjectForCache.value });
 
     router.push('/dashboard');
@@ -415,7 +420,9 @@ onUnmounted(() => {
         <div v-if="!isLoading" class="project-card-grid">
             <template v-if="projectData?.data?.data && projectData.data.data.length > 0">
                 <ProjectCard v-for="project in projectData.data.data" :key="project.id" :project="project"
-                    :currentUserId="currentUserId" @editProject="openEditProject" @deleteProject="handleDeleteProject"
+                    :currentUserId="currentUserId" 
+                    :isPinned="pinnedProject?.id === project.id"
+                    @editProject="openEditProject" @deleteProject="handleDeleteProject"
                     @pinnedProject="handlePinProject"
                     @viewProjectDetail="(id) => $router.push('/kaban?query=' + project.slug)" />
             </template>

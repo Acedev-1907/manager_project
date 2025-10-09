@@ -17,6 +17,9 @@ class TaskController extends Controller
         $this->taskCommentService = $taskCommentService;
     }
 
+    /**
+     * Create task (Legacy - array based)
+     */
     public function createTask(Request $req)
     {
         $result = $this->taskService->createTask($req->all());
@@ -27,6 +30,36 @@ class TaskController extends Controller
             'message' => $result['message'],
             'task' => $result['task']
         ], $result['status']);
+    }
+
+    /**
+     * Create task with DTO (New - recommended)
+     */
+    public function createTaskWithDTO(Request $req)
+    {
+        try {
+            $taskDTO = \App\DTOs\TaskDTO::fromArray($req->all());
+            
+            // Validate DTO
+            if (empty($taskDTO->title) || empty($taskDTO->projectId)) {
+                return response(['error' => 'Title and projectId are required'], 422);
+            }
+            
+            // Use DTO in service
+            $result = $this->taskService->createTaskWithDTO($taskDTO);
+            
+            if (isset($result['errors'])) {
+                return response($result['errors'], $result['status']);
+            }
+            
+            return response([
+                'message' => $result['message'],
+                'task' => $result['task']
+            ], $result['status']);
+            
+        } catch (\Exception $e) {
+            return response(['error' => $e->getMessage()], 422);
+        }
     }
 
     public function transition(Request $req, string $transition)

@@ -16,7 +16,7 @@ class TaskService
     ) {}
 
     /**
-     * Create a new task and assign members
+     * Create a new task and assign members (Legacy - array based)
      */
     public function createTask(array $fields)
     {
@@ -34,7 +34,7 @@ class TaskService
             'projectId' => $fields['projectId'],
             'name' => $fields['name'],
             'content' => $fields['content'] ?? null,
-            'status' => Task::NOT_STARTED, // Keep status 0 as requested
+            'status' => Task::NOT_STARTED,
         ]);
 
         foreach ($fields['memberIds'] as $memberId) {
@@ -47,6 +47,42 @@ class TaskService
 
         return [
             'message' => 'Task created',
+            'status' => 200,
+            'task' => $task
+        ];
+    }
+
+    /**
+     * Create a new task with DTO (New - recommended)
+     * 
+     * @param \App\DTOs\TaskDTO $dto Task data transfer object
+     * @return array
+     */
+    public function createTaskWithDTO(\App\DTOs\TaskDTO $dto): array
+    {
+        // Create task using DTO properties (type-safe)
+        $task = $this->taskRepository->create([
+            'projectId' => $dto->projectId,
+            'name' => $dto->title, // DTO uses 'title', DB uses 'name'
+            'content' => $dto->description,
+            'status' => $dto->status ?? Task::NOT_STARTED,
+            'priority' => $dto->priority,
+            'dueDate' => $dto->dueDate,
+        ]);
+
+        // Assign members from DTO
+        if (!empty($dto->members) && is_array($dto->members)) {
+            foreach ($dto->members as $memberId) {
+                $this->taskMemberRepository->create([
+                    'projectId' => $dto->projectId,
+                    'taskId' => $task->id,
+                    'memberId' => $memberId
+                ]);
+            }
+        }
+
+        return [
+            'message' => 'Task created successfully',
             'status' => 200,
             'task' => $task
         ];

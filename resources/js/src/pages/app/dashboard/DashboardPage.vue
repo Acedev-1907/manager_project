@@ -161,6 +161,15 @@ const handlePinnedProjectData = async (hasValidCache: boolean) => {
         setupProjectListeners(project.value);
         // Increment chart key when loading cached data
         chartRenderKey.value += 1;
+        
+        // Debug log
+        console.log('Dashboard - Loaded from cache:', {
+            name: project.value?.name,
+            tasks: project.value?.tasks,
+            progress: project.value?.progress,
+            columnNames: project.value?.columnNames,
+            columnColors: project.value?.columnColors
+        });
 
         // Replay recent events if any
         if (project.value?.id) {
@@ -174,6 +183,15 @@ const handlePinnedProjectData = async (hasValidCache: boolean) => {
         dashboardStore.setPinnedProject(project.value);
         saveToCache('pinned_project', project.value);
         setupProjectListeners(project.value);
+
+        // Debug log
+        console.log('Dashboard - Loaded from API:', {
+            name: project.value?.name,
+            tasks: project.value?.tasks,
+            progress: project.value?.progress,
+            columnNames: project.value?.columnNames,
+            columnColors: project.value?.columnColors
+        });
 
         // Replay recent events if any
         if (project.value?.id) {
@@ -305,6 +323,51 @@ onMounted(async () => {
 
 // Handle component activation from keep-alive
 onActivated(async () => {
+    // Check if we need to refresh due to project pinning
+    const needsRefresh = localStorage.getItem('dashboard_needs_refresh');
+    const refreshReason = localStorage.getItem('dashboard_refresh_reason');
+    
+    if (needsRefresh === 'true') {
+        console.log('Dashboard activated: Needs refresh due to:', refreshReason);
+        
+        // Show loading while refreshing
+        isLoading.value = true;
+        
+        // Clear flags
+        localStorage.removeItem('dashboard_needs_refresh');
+        localStorage.removeItem('dashboard_refresh_reason');
+        localStorage.removeItem('dashboard_pinned_project_id');
+        
+        try {
+            // Force refresh
+            clearDashboardCache();
+            await getPinnedProject();
+            dashboardStore.setPinnedProject(project.value);
+            saveToCache('pinned_project', project.value);
+            setupProjectListeners(project.value);
+            
+            // Force chart re-render with delay to ensure DOM is ready
+            chartRenderKey.value += 1;
+            
+            // Wait a bit for charts to initialize
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            console.log('Dashboard - Refreshed after pin:', {
+                name: project.value?.name,
+                tasks: project.value?.tasks,
+                progress: project.value?.progress,
+                columnNames: project.value?.columnNames,
+                columnColors: project.value?.columnColors
+            });
+        } catch (error) {
+            console.error('Error refreshing dashboard after pin:', error);
+        } finally {
+            isLoading.value = false;
+        }
+        
+        return;
+    }
+    
     // Check for missed events while component was inactive
     const recentEvents = getRecentEvents();
     const relevantEvents = recentEvents.filter(
@@ -519,9 +582,9 @@ onUnmounted(() => {
                         <div class="dashboard-card">
                             <div class="card-header"><b>Tasks</b></div>
                             <div class="card-body">
-                                <div v-if="project.tasks">
+                                <div v-if="project.tasks && Array.isArray(project.tasks) && project.tasks.length > 0">
                                     <ApexDonut 
-                                        :key="`donut-${chartRenderKey}`"
+                                        :key="`donut-${chartRenderKey}-${project.id}`"
                                         :task="project.tasks"
                                         :columnNames="project.columnNames || ['pending', 'completed']"
                                         :columnColors="project.columnColors || ['#f59e0b', '#10b981']" />
@@ -540,9 +603,9 @@ onUnmounted(() => {
                                 <b>Task Progress</b>
                             </div>
                             <div class="card-body">
-                                <div v-if="project.progress > 0">
+                                <div v-if="project.progress !== undefined && project.progress !== null">
                                     <ApexRadialBar 
-                                        :key="`radial-${chartRenderKey}`"
+                                        :key="`radial-${chartRenderKey}-${project.id}`"
                                         :percent="project.progress" />
                                 </div>
                                 <div v-else>
