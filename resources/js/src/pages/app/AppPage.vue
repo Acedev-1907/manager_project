@@ -3,9 +3,19 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import NarBar from './components/NarBar.vue';
 import { useLogOutUser } from './actions/Logout';
 import { getUserData } from '../../helper/getUserData';
+import { clearCacheOnLogout } from '../../composables/useLocalStorage';
+import { clearPersistedStores } from '../../plugins/piniaPersist';
+import { useUserStore } from '../../state/userStore';
+import { useDashboardStore } from './dashboard/store/dashboardStore';
+import { useProjectStore } from './project/store/projectStore';
+import { useMemberStore } from './member/store/MemberStore';
 import eventBus from '../../helper/eventBus';
 
 const { logout, loading } = useLogOutUser()
+const userStore = useUserStore();
+const dashboardStore = useDashboardStore();
+const projectStore = useProjectStore();
+const memberStore = useMemberStore();
 
 const userData = getUserData()
 const isLoading = ref(true);
@@ -15,16 +25,25 @@ async function logoutUser() {
     if (typeof userId !== 'undefined') {
         try {
             await logout(userId)
-            localStorage.clear()
-            window.location.href = "/app/login"
         } catch (error) {
-            localStorage.clear()
-            window.location.href = "/app/login"
+            console.error('Logout error:', error);
         }
-    } else {
-        localStorage.clear()
-        window.location.href = "/app/login"
     }
+    
+    // Clear all stores
+    userStore.clearUser();
+    dashboardStore.clearAll();
+    projectStore.clearProjects();
+    memberStore.clearAll();
+    
+    // Clear persisted stores from localStorage
+    clearPersistedStores();
+    
+    // Clear other cache
+    clearCacheOnLogout();
+    
+    // Redirect to login
+    window.location.href = "/app/login"
 }
 
 const showLoading = () => { isLoading.value = true; };
@@ -49,9 +68,9 @@ onUnmounted(() => {
         <div class="admin-content">
             <router-view v-slot="{ Component, route }">
                 <transition name="fade" mode="out-in">
-                    <div :key="route.fullPath">
-                        <component :is="Component"></component>
-                    </div>
+                    <keep-alive :include="['MemberPage', 'ProjectPage', 'DashboardPage']">
+                        <component :is="Component" :key="route.path" />
+                    </keep-alive>
                 </transition>
             </router-view>
         </div>

@@ -1,9 +1,10 @@
 <template>
-    <apexchart height="155" type="pie" :options="options" :series="series"></apexchart>
+    <div :id="chartId" class="apex-chart-container"></div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import ApexCharts from 'apexcharts';
 
 export default defineComponent({
     name: 'ApexDonut',
@@ -12,61 +13,92 @@ export default defineComponent({
         columnNames: { type: Array, default: () => ['pending', 'completed'] },
         columnColors: { type: Array, default: () => ['#f59e0b', '#10b981'] },
     },
-    data() {
-        return {
-            options: {
-                title: {
-                    text: '',
-                    align: 'left',
-                },
-                chart: {
-                    id: 'apex-donut',
-                },
-                labels: this.$props.columnNames,
-                colors: this.$props.columnColors,
-                markers: {
-                    size: 5,
-                    hover: {
-                        sizeOffset: 6,
+    setup(props) {
+        const chartId = `chart-donut-${Math.random().toString(36).substr(2, 9)}`;
+        let chart: ApexCharts | null = null;
+
+        const createChart = () => {
+            // Destroy existing chart if any
+            if (chart) {
+                try {
+                    chart.destroy();
+                } catch (e) {
+                    // Silent catch
+                }
+                chart = null;
+            }
+
+            // Wait for DOM to be ready
+            nextTick(() => {
+                const element = document.getElementById(chartId);
+                if (!element) {
+                    console.warn('Chart element not found:', chartId);
+                    return;
+                }
+
+                const options = {
+                    series: props.task as number[],
+                    chart: {
+                        type: 'pie',
+                        height: 155,
                     },
-                },
+                    labels: props.columnNames as string[],
+                    colors: props.columnColors as string[],
+                    markers: {
+                        size: 5,
+                        hover: {
+                            sizeOffset: 6,
+                        },
+                    },
+                    legend: {
+                        position: 'bottom',
+                    },
+                };
+
+                try {
+                    chart = new ApexCharts(element, options);
+                    chart.render();
+                } catch (error) {
+                    console.error('Failed to create chart:', error);
+                }
+            });
+        };
+
+        // Watch for prop changes - recreate chart for reliable updates
+        watch(
+            () => [props.task, props.columnNames, props.columnColors],
+            () => {
+                // Always recreate chart when data changes
+                // This ensures proper rendering and avoids updateOptions issues
+                createChart();
             },
-            series: this.$props.task,
+            { deep: true }
+        );
+
+        onMounted(() => {
+            createChart();
+        });
+
+        onBeforeUnmount(() => {
+            if (chart) {
+                try {
+                    chart.destroy();
+                } catch (e) {
+                    // Silent catch
+                }
+                chart = null;
+            }
+        });
+
+        return {
+            chartId,
         };
     },
-    computed: {
-        // Computed property để reactive với prop changes
-        chartSeries() {
-            return this.task;
-        }
-    },
-    watch: {
-        // Watch prop changes để update chart
-        task: {
-            handler(newTasks) {
-                this.series = newTasks;
-            },
-            deep: true,
-            immediate: true
-        },
-        columnNames: {
-            handler(newNames) {
-                this.options.labels = newNames;
-            },
-            deep: true,
-            immediate: true
-        },
-        columnColors: {
-            handler(newColors) {
-                this.options.colors = newColors;
-            },
-            deep: true,
-            immediate: true
-        }
-    },
-    mounted() {
-        // Initialize series
-        this.series = this.task;
-    }
 });
 </script>
+
+<style scoped>
+.apex-chart-container {
+    min-height: 155px;
+}
+</style>

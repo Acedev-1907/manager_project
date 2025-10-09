@@ -1,6 +1,15 @@
 import { defineStore } from "pinia";
 
-const userProjectStore = defineStore("project", {
+export interface ProjectInput {
+  id: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  content: string;
+  members: number[];
+}
+
+export const useProjectStore = defineStore("project", {
   state: () => ({
     projectInput: {
       id: 0,
@@ -9,11 +18,21 @@ const userProjectStore = defineStore("project", {
       endDate: "",
       content: "",
       members: [] as number[],
-    },
+    } as ProjectInput,
     edit: false,
     projectList: null as any, // cache project list
     lastFetched: null as number | null, // thời gian fetch gần nhất
   }),
+  
+  getters: {
+    hasProjects: (state) => state.projectList !== null,
+    isCacheFresh: (state) => {
+      if (!state.lastFetched) return false;
+      const age = Date.now() - state.lastFetched;
+      return age < 5 * 60 * 1000; // 5 minutes
+    },
+  },
+  
   actions: {
     setProjects(data: any) {
       this.projectList = data;
@@ -22,6 +41,17 @@ const userProjectStore = defineStore("project", {
     clearProjects() {
       this.projectList = null;
       this.lastFetched = null;
+    },
+    resetProjectInput() {
+      this.projectInput = {
+        id: 0,
+        name: "",
+        startDate: "",
+        endDate: "",
+        content: "",
+        members: [],
+      };
+      this.edit = false;
     },
     async fetchProjectsFromServer(
       getProjects: (page?: number, query?: string) => Promise<void>,
@@ -33,6 +63,13 @@ const userProjectStore = defineStore("project", {
       this.lastFetched = Date.now();
     },
   },
+  
+  // Enable persistence - only cache projectList temporarily
+  persist: {
+    key: 'project-store',
+    paths: ['projectList', 'lastFetched'], // Don't persist projectInput (form data)
+  },
 });
 
-export const projectStore = userProjectStore();
+// Export as singleton for backward compatibility
+export const projectStore = useProjectStore();

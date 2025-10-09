@@ -80,7 +80,8 @@ class UserController extends ApiController
                 'thumbnail' => $result['thumbnail']
             ]);
         } catch (\Exception $e) {
-            return $this->respondWithError($e->getMessage(), null, 422);
+            return $this->setStatusCode(422)
+                ->respondWithError($e->getMessage());
         }
     }
 

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, onUnmounted, watch } from 'vue';
+import { onMounted, onActivated, ref, onUnmounted, watch } from 'vue';
 import { useGetPinnedProject } from './actions/GetPinnedProject';
 import ApexDonut from './components/ApexDonut.vue';
 import ApexRadialBar from './components/ApexRadialBar.vue';
@@ -11,11 +11,24 @@ import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
 import { createDebouncedFunction } from '../../../helper/utils';
 import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
 
+// Define component name for keep-alive
+defineOptions({
+    name: 'DashboardPage'
+});
+
 const { project, getPinnedProject } = useGetPinnedProject()
 const { countProject, getTotalProject } = useGetTotalProject()
 const isLoading = ref(true);
 const dashboardStore = useDashboardStore();
 const globalRealtime = useGlobalRealtimeSetup();
+
+// Key to force chart re-render when data changes
+const chartRenderKey = ref(0);
+
+// Flag to prevent duplicate refresh
+let isRefreshing = false;
+let lastRefreshTime = 0;
+const REFRESH_DEBOUNCE = 1000; // 1 second
 
 // Cache management
 const dashboardCache = ref<Record<string, any>>({});
@@ -67,6 +80,11 @@ const setupProjectListeners = (projectData: any) => {
 const saveToCache = (key: string, data: any) => {
     dashboardCache.value[key] = data;
     localStorage.setItem(`${key}_timestamp`, Date.now().toString());
+    
+    // Increment chart key to force re-render when pinned project changes
+    if (key === 'pinned_project') {
+        chartRenderKey.value += 1;
+    }
 };
 
 // Helper function to clear dashboard cache
@@ -88,6 +106,32 @@ const debouncedRefreshPinnedProject = createDebouncedFunction(async () => {
         // Silent error handling
     }
 }, 1000);
+
+// Refresh with duplicate prevention
+const refreshPinnedProjectOnce = async () => {
+    const now = Date.now();
+    
+    // Prevent duplicate calls within debounce window
+    if (isRefreshing || (now - lastRefreshTime) < REFRESH_DEBOUNCE) {
+        console.log('Dashboard: Skipping duplicate refresh');
+        return;
+    }
+    
+    isRefreshing = true;
+    lastRefreshTime = now;
+    
+    try {
+        clearDashboardCache();
+        await getPinnedProject();
+        dashboardStore.setPinnedProject(project.value);
+        saveToCache('pinned_project', project.value);
+        // chartRenderKey already incremented by saveToCache
+    } catch (error) {
+        console.error('Dashboard refresh error:', error);
+    } finally {
+        isRefreshing = false;
+    }
+};
 
 // Setup count project listener
 const setupCountProjectListener = () => {
@@ -115,6 +159,8 @@ const handlePinnedProjectData = async (hasValidCache: boolean) => {
         dashboardStore.setPinnedProject(cachedData);
         project.value = cachedData;
         setupProjectListeners(project.value);
+        // Increment chart key when loading cached data
+        chartRenderKey.value += 1;
 
         // Replay recent events if any
         if (project.value?.id) {
@@ -175,9 +221,8 @@ const setupEventListeners = () => {
         try {
             if (project.value?.id && eventData?.projectId === project.value.id) {
                 if (isCurrentUser(eventData.userId) && eventData.reason === 'task-status-changed-by-drag') {
-                    clearDashboardCache();
-                    await getPinnedProject();
-                    dashboardStore.setPinnedProject(project.value);
+                    // Use once to prevent duplicate calls
+                    await refreshPinnedProjectOnce();
                 } else {
                     debouncedRefreshPinnedProject();
                 }
@@ -198,6 +243,7 @@ const setupEventListeners = () => {
             }
         } catch (error) {
             // Silent error handling
+            console.error(error);
         }
     });
 
@@ -212,6 +258,7 @@ const setupEventListeners = () => {
             setupProjectListeners(project.value);
         } catch (error) {
             // Silent error handling
+            console.error(error);
         }
     });
 };
@@ -253,7 +300,26 @@ onMounted(async () => {
         if (isLoading.value === true) {
             isLoading.value = false;
         }
-    }, 5000);
+    }, 8000);
+});
+
+// Handle component activation from keep-alive
+onActivated(async () => {
+    // Check for missed events while component was inactive
+    const recentEvents = getRecentEvents();
+    const relevantEvents = recentEvents.filter(
+        (event: any) => 
+            event.type === 'force-cache-clear' && 
+            event.data?.projectId === project.value?.id &&
+            event.data?.reason === 'task-status-changed-by-drag'
+    );
+
+    // If there were task changes while we were away, refresh
+    if (relevantEvents.length > 0) {
+        console.log('Dashboard activated: Found missed task changes, refreshing...');
+        // Use once to prevent duplicate with event listener
+        await refreshPinnedProjectOnce();
+    }
 });
 
 onUnmounted(() => {
@@ -454,12 +520,17 @@ onUnmounted(() => {
                             <div class="card-header"><b>Tasks</b></div>
                             <div class="card-body">
                                 <div v-if="project.tasks">
-                                    <ApexDonut :task="project.tasks"
+                                    <ApexDonut 
+                                        :key="`donut-${chartRenderKey}`"
+                                        :task="project.tasks"
                                         :columnNames="project.columnNames || ['pending', 'completed']"
                                         :columnColors="project.columnColors || ['#f59e0b', '#10b981']" />
                                 </div>
                                 <div v-else>
-                                    <ApexDonut :task="[0, 0]" :columnNames="['pending', 'completed']"
+                                    <ApexDonut 
+                                        :key="`donut-empty-${chartRenderKey}`"
+                                        :task="[0, 0]" 
+                                        :columnNames="['pending', 'completed']"
                                         :columnColors="['#f59e0b', '#10b981']" />
                                 </div>
                             </div>
@@ -470,10 +541,14 @@ onUnmounted(() => {
                             </div>
                             <div class="card-body">
                                 <div v-if="project.progress > 0">
-                                    <ApexRadialBar :percent="project.progress" />
+                                    <ApexRadialBar 
+                                        :key="`radial-${chartRenderKey}`"
+                                        :percent="project.progress" />
                                 </div>
                                 <div v-else>
-                                    <ApexRadialBar :percent="0" />
+                                    <ApexRadialBar 
+                                        :key="`radial-empty-${chartRenderKey}`"
+                                        :percent="0" />
                                 </div>
                             </div>
                         </div>

@@ -6,6 +6,13 @@ export const useDashboardStore = defineStore("dashboard", {
     countProject: null as any,
     chartData: null as any,
   }),
+  
+  getters: {
+    hasPinnedProject: (state) => state.pinnedProject !== null,
+    hasChartData: (state) => state.chartData !== null,
+    projectCount: (state) => state.countProject?.count || 0,
+  },
+  
   actions: {
     setPinnedProject(data: any) {
       this.pinnedProject = data;
@@ -25,5 +32,16 @@ export const useDashboardStore = defineStore("dashboard", {
     clearChartData() {
       this.chartData = null;
     },
+    clearAll() {
+      this.pinnedProject = null;
+      this.countProject = null;
+      this.chartData = null;
+    },
+  },
+  
+  // Enable persistence with TTL (data will expire after 30 mins)
+  persist: {
+    key: 'dashboard-store',
+    paths: ['pinnedProject', 'countProject', 'chartData'],
   },
 });

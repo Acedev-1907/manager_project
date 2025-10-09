@@ -22,6 +22,11 @@ import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
 import { createDebouncedFunction } from '../../../helper/utils';
 import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
 
+// Define component name for keep-alive
+defineOptions({
+    name: 'ProjectPage'
+});
+
 const { getPinnedProject: getPinnedProjectForCache, project: pinnedProjectForCache } = useGetPinnedProject();
 
 const { getProjects, projectData } = useGetProject();

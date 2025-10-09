@@ -17,6 +17,7 @@ Route::controller(AuthController::class)->group(function () {
 
 Route::post('/check-reset-token', [AuthController::class, 'checkResetToken']);
 
+// Public proxy-image endpoint
 Route::get('/proxy-image', [App\Http\Controllers\UserController::class, 'proxyImage']);
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -29,7 +30,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user', 'show')->name('users.show');
         Route::put('/user', 'update')->name('users.update');
         Route::post('/user/upload-avatar', 'uploadAvatar');
-        Route::post('/proxy-image', 'proxyImage');
         Route::get('/users/all', 'all');
     });
 

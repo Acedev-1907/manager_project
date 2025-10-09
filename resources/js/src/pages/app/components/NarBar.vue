@@ -129,8 +129,8 @@ const userStore = useUserStore();
                         <span v-else class="avatar-circle">?</span>
                         <div class="user-info-block">
                             <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name }}</span>
-                            <span v-if="userStore.user.friend_code" class="friend-code-text">
-                                Friend code: {{ userStore.user.friend_code }}
+                            <span v-if="userStore.user?.friend_code" class="friend-code-text">
+                                Friend code: {{ userStore.user?.friend_code }}
                             </span>
                         </div>
                     </div>
@@ -200,9 +200,9 @@ const userStore = useUserStore();
                                 <span v-if="userStore.user?.name" class="custom-user-name">{{
                                     userStore.user.name
                                 }}</span>
-                                <span v-if="userStore.user.friend_code"
+                                <span v-if="userStore.user?.friend_code"
                                     style="color: #2563eb; font-size: 0.95em; display: block; line-height: 1.2; margin-left: 0; margin-top: 2px;">
-                                    Friend code: {{ userStore.user.friend_code }}
+                                    Friend code: {{ userStore.user?.friend_code }}
                                 </span>
                                 <span v-else class="custom-user-name">Unknown</span>
                             </div>

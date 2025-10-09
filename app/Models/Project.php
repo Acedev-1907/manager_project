@@ -19,7 +19,7 @@ class Project extends Model
   // Project status constants
   const NOT_STARTED = 0;
   const PENDING = 1;
-  const COMPLETED = 1;
+  const COMPLETED = 2;
 
   // Default column colors
   const DEFAULT_COLUMN_COLOR = '#3b82f6';

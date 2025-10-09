@@ -60,7 +60,7 @@ function setupNotificationListener(userId: string | number | null) {
 // Khởi tạo lắng nghe realtime khi user đăng nhập
 export function listenRealtime() {
   const userStore = useUserStore();
-  let userId: string | number | null = userStore.user?.id;
+  let userId: string | number | null = userStore.user?.id ?? null;
   if (!userId) {
     const userDataRaw = localStorage.getItem("userData");
     const userData = userDataRaw ? JSON.parse(userDataRaw) : {};

@@ -26,25 +26,6 @@ class AuthController extends Controller
         ], 201);
     }
 
-    public function generateRandomCode()
-    {
-        $code = Str::random(10) . time();
-        return $code;
-    }
-
-    public function validEmail($token)
-    {
-        $user = User::where('remember_token', $token)->first();
-        if ($user) {
-            $user->isValidEmail = User::IS_VALID_EMAIL;
-            // Sinh friend_code
-            $name = preg_replace('/[^a-zA-Z0-9]/', '', strtolower(\App\Models\User::remove_accents($user->name)));
-            $user->friend_code = $name . '-' . $user->id;
-            $user->save();
-        }
-        return redirect('/app/login');
-    }
-
     public function verifyEmailApi(Request $request, string $token)
     {
         $user = User::where('remember_token', $token)->first();
@@ -60,8 +41,7 @@ class AuthController extends Controller
         }
 
         $user->isValidEmail = User::IS_VALID_EMAIL;
-        $name = preg_replace('/[^a-zA-Z0-9]/', '', strtolower(\App\Models\User::remove_accents($user->name)));
-        $user->friend_code = $name . '-' . $user->id;
+        $user->friend_code = \App\Helpers\StringHelper::generateFriendCode($user->name, $user->id);
         $user->save();
 
         $redirect = $request->query('redirect');

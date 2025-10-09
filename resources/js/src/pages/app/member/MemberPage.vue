@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted, computed, type Ref } from 'vue';
+import { ref, onMounted, onUnmounted, onActivated, computed, type Ref } from 'vue';
 import FabButton from '../../../components/FabButton.vue';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import MemberTable from './components/MemberTable.vue';
@@ -19,6 +19,14 @@ import type { Member, MemberListResponse } from '../../../types/common';
 import { useResponsive } from '../../../helper/useResponsive';
 import { useErrorHandler } from '../../../helper/useErrorHandler';
 import SearchInput from '../../../components/SearchInput.vue';
+import { useMemberStore } from './store/MemberStore';
+
+// Define component name for keep-alive
+defineOptions({
+    name: 'MemberPage'
+});
+
+const memberStore = useMemberStore();
 
 const tabs = ['Members', 'Sent Invitations', 'Received Invitations'];
 const activeTab = ref('Members');
@@ -97,6 +105,8 @@ async function handleAcceptInvitation(id: number) {
             await makeHttpReq<undefined, any>(`member-invitations/${id}/accept`, 'POST');
             if (Array.isArray(receivedInvitations.value.data)) {
                 receivedInvitations.value.data = receivedInvitations.value.data.filter((inv: any) => String(inv.id) !== String(id));
+                // Update store
+                memberStore.setReceivedInvitations(receivedInvitations.value);
             }
             return true;
         },
@@ -114,6 +124,8 @@ async function handleDeclineInvitation(id: number) {
             await makeHttpReq<undefined, any>(`member-invitations/${id}/decline`, 'POST');
             if (Array.isArray(receivedInvitations.value.data)) {
                 receivedInvitations.value.data = receivedInvitations.value.data.filter((inv: any) => String(inv.id) !== String(id));
+                // Update store
+                memberStore.setReceivedInvitations(receivedInvitations.value);
             }
             return true;
         },
@@ -256,22 +268,59 @@ const handleWindowScroll = debounce(() => {
     }
 }, 300); // Increase delay to reduce number of calls
 
-onMounted(() => {
-    hasMoreData.value = true; // Reset infinite scroll state
+// Initialize data from store or fetch
+function initializeData() {
+    // Restore from store if available and fresh
+    if (memberStore.hasFriendsList && memberStore.isCacheFresh) {
+        friendsList.value = memberStore.friendsList!;
+        memberCacheRef.value = memberStore.memberCache;
+        searchQuery.value = memberStore.searchQuery;
+        currentPage.value = memberStore.currentPage;
+        isLoading.value = false;
+        return; // Don't fetch if cache is fresh
+    }
+
+    // Cache expired or no data - fetch
+    hasMoreData.value = true;
     loadedPages.clear();
     const cacheKey = `member_page_${searchQuery.value}_${currentPage.value}`;
     const cached = memberCacheRef.value[cacheKey];
+    
     if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
         friendsList.value = cached;
+        memberStore.setFriendsList(cached);
         isLoading.value = false;
     } else {
         fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value).then(() => {
+            if (friendsList.value) {
+                memberStore.setFriendsList(friendsList.value);
+            }
             updatePaginationInfo();
             loadedPages.add(1);
         });
     }
-    fetchSentInvitations(sentInvitations, isLoading);
-    fetchReceivedInvitations(receivedInvitations, isLoading);
+}
+
+onMounted(() => {
+    initializeData();
+    
+    // Restore invitations from store if available
+    if (memberStore.sentInvitations) {
+        sentInvitations.value = memberStore.sentInvitations;
+    } else {
+        fetchSentInvitations(sentInvitations, isLoading).then(() => {
+            memberStore.setSentInvitations(sentInvitations.value);
+        });
+    }
+    
+    if (memberStore.receivedInvitations) {
+        receivedInvitations.value = memberStore.receivedInvitations;
+    } else {
+        fetchReceivedInvitations(receivedInvitations, isLoading).then(() => {
+            memberStore.setReceivedInvitations(receivedInvitations.value);
+        });
+    }
+    
     const data = JSON.parse(localStorage.getItem('userData') || '{}');
     const userId = data.user.id;
 
@@ -287,11 +336,39 @@ onMounted(() => {
                 );
             });
     }
+    
     // Listen to window scroll event
     window.addEventListener('scroll', handleWindowScroll);
 });
 
+// Handle when component is activated from keep-alive
+onActivated(() => {
+    // Check if cache is still fresh, if not, refetch
+    if (!memberStore.isCacheFresh && friendsList.value) {
+        console.log('Cache expired, refetching members...');
+        fetchMembers(friendsList, memberCacheRef, isLoading, searchQuery.value, currentPage.value).then(() => {
+            if (friendsList.value) {
+                memberStore.setFriendsList(friendsList.value);
+            }
+        });
+    }
+});
+
 onUnmounted(() => {
+    // Save state to store before unmount
+    if (friendsList.value) {
+        memberStore.setFriendsList(friendsList.value);
+    }
+    if (sentInvitations.value) {
+        memberStore.setSentInvitations(sentInvitations.value);
+    }
+    if (receivedInvitations.value) {
+        memberStore.setReceivedInvitations(receivedInvitations.value);
+    }
+    memberStore.setMemberCache(memberCacheRef.value);
+    memberStore.setSearchQuery(searchQuery.value);
+    memberStore.setCurrentPage(currentPage.value);
+    
     window.removeEventListener('scroll', handleWindowScroll);
 });
 </script>

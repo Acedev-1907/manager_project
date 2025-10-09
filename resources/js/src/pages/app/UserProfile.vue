@@ -13,7 +13,7 @@ import { getAvatarSrc } from '../../helper/avatar';
 import { useCacheFetch } from '../../helper/useCacheFetch';
 
 const router = useRouter();
-const user = ref({ name: '', email: '', phone: '', avatar: '' });
+const user = ref({ id: 0, name: '', email: '', phone: '', avatar: '' });
 const loading = ref(false); // loading cho Save Changes
 const avatarLoading = ref(false); // loading cho modal crop avatar
 const successMessage = ref('');
@@ -94,7 +94,12 @@ async function fetchUser() {
             };
         }, (data) => {
             user.value = data;
-            userStore.setUser({ name: data.name, avatar: data.avatar, friend_code: data.friend_code });
+            userStore.setUser({ 
+                id: data.id,
+                name: data.name, 
+                avatar: data.avatar, 
+                friend_code: data.friend_code 
+            });
         });
     } catch (err: any) {
         errorMessage.value = err?.message || 'Failed to load user info.';
@@ -198,7 +203,12 @@ async function updateUser() {
         };
         const res = await makeHttpReq<typeof payload, any>('user', 'PUT', payload);
         successMessage.value = res.message || 'Profile updated successfully!';
-        userStore.setUser({ name: user.value.name, avatar: user.value.avatar, friend_code: res.data.friend_code || null });
+        userStore.setUser({ 
+            id: user.value.id,
+            name: user.value.name, 
+            avatar: user.value.avatar, 
+            friend_code: res.data.friend_code || null 
+        });
     } catch (err: any) {
         errorMessage.value = err?.message || 'Update failed.';
     } finally {
