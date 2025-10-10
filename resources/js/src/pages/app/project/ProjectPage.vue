@@ -266,7 +266,7 @@ async function handlePinProject(projectId: number) {
         try {
             const parsedCache = JSON.parse(dashboardCache);
             if (parsedCache && typeof parsedCache === 'object') {
-                // Clear pinned project cache
+                // Clear pinned project cache only, preserve count project cache
                 delete parsedCache['pinned_project'];
                 localStorage.setItem('dashboardCache', JSON.stringify(parsedCache));
                 localStorage.removeItem('pinned_project_timestamp');

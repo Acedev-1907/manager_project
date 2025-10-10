@@ -95,6 +95,15 @@ const clearDashboardCache = () => {
     localStorage.removeItem('count_project_timestamp');
 };
 
+// Helper function to clear only pinned project cache (preserve count project)
+const clearPinnedProjectCache = () => {
+    if (dashboardCache.value['pinned_project']) {
+        delete dashboardCache.value['pinned_project'];
+        localStorage.setItem('dashboardCache', JSON.stringify(dashboardCache.value));
+        localStorage.removeItem('pinned_project_timestamp');
+    }
+};
+
 // Debounced function to refresh pinned project
 const debouncedRefreshPinnedProject = createDebouncedFunction(async () => {
     try {
@@ -121,10 +130,12 @@ const refreshPinnedProjectOnce = async () => {
     lastRefreshTime = now;
     
     try {
-        clearDashboardCache();
+        // Only clear pinned project cache, preserve count project cache
+        clearPinnedProjectCache();
         await getPinnedProject();
         dashboardStore.setPinnedProject(project.value);
         saveToCache('pinned_project', project.value);
+        setupProjectListeners(project.value);
         // chartRenderKey already incremented by saveToCache
     } catch (error) {
         console.error('Dashboard refresh error:', error);
@@ -238,6 +249,13 @@ const setupEventListeners = () => {
     eventBus.on('force-cache-clear', async (eventData: any) => {
         try {
             if (project.value?.id && eventData?.projectId === project.value.id) {
+                console.log('Dashboard: Received force-cache-clear event:', {
+                    projectId: eventData.projectId,
+                    reason: eventData.reason,
+                    userId: eventData.userId,
+                    isCurrentUser: isCurrentUser(eventData.userId)
+                });
+                
                 if (isCurrentUser(eventData.userId) && eventData.reason === 'task-status-changed-by-drag') {
                     // Use once to prevent duplicate calls
                     await refreshPinnedProjectOnce();
@@ -246,6 +264,31 @@ const setupEventListeners = () => {
                 }
             }
         } catch (error) {
+            console.error('Dashboard: Error handling force-cache-clear:', error);
+        }
+    });
+
+    // Optimistic dashboard updates when dragging task
+    eventBus.on('dashboard-optimistic-update', (data: any) => {
+        try {
+            if (!data) return;
+            const currentPinnedId = project.value?.id;
+            if (!currentPinnedId || currentPinnedId !== data.projectId) return;
+
+            // Update tasks and progress immediately
+            if (Array.isArray(data.tasks)) {
+                project.value = {
+                    ...project.value,
+                    tasks: data.tasks,
+                    progress: typeof data.progress === 'number' ? data.progress : project.value?.progress
+                };
+                dashboardStore.setPinnedProject(project.value);
+                // Save to cache to keep UI consistent on navigation
+                saveToCache('pinned_project', project.value);
+                // Force chart re-render
+                chartRenderKey.value += 1;
+            }
+        } catch (_) {
             // Silent error handling
         }
     });
@@ -268,15 +311,22 @@ const setupEventListeners = () => {
     // Project pinned events
     eventBus.on('project-pinned', async (eventData: any) => {
         try {
-            // Clear cache và refresh pinned project data
-            clearDashboardCache();
+            console.log('Dashboard: Received project-pinned event:', eventData);
+            
+            // Clear only pinned project cache, preserve count project cache
+            clearPinnedProjectCache();
             await getPinnedProject();
             dashboardStore.setPinnedProject(project.value);
             saveToCache('pinned_project', project.value);
             setupProjectListeners(project.value);
+            
+            console.log('Dashboard: Project pinned successfully:', {
+                name: project.value?.name,
+                tasks: project.value?.tasks?.length || 0,
+                progress: project.value?.progress
+            });
         } catch (error) {
-            // Silent error handling
-            console.error(error);
+            console.error('Dashboard: Error handling project-pinned:', error);
         }
     });
 };
@@ -323,6 +373,8 @@ onMounted(async () => {
 
 // Handle component activation from keep-alive
 onActivated(async () => {
+    console.log('Dashboard activated');
+    
     // Check if we need to refresh due to project pinning
     const needsRefresh = localStorage.getItem('dashboard_needs_refresh');
     const refreshReason = localStorage.getItem('dashboard_refresh_reason');
@@ -339,8 +391,8 @@ onActivated(async () => {
         localStorage.removeItem('dashboard_pinned_project_id');
         
         try {
-            // Force refresh
-            clearDashboardCache();
+            // Force refresh - only clear pinned project cache
+            clearPinnedProjectCache();
             await getPinnedProject();
             dashboardStore.setPinnedProject(project.value);
             saveToCache('pinned_project', project.value);
@@ -368,18 +420,84 @@ onActivated(async () => {
         return;
     }
     
+    // Force charts to reflow after keep-alive activation
+    try {
+        // Nâng key để buộc ApexCharts remount trong mọi trường hợp
+        chartRenderKey.value += 1;
+        // Trì hoãn nhẹ rồi phát sự kiện resize để ApexCharts tính lại kích thước
+        setTimeout(() => {
+            try { window.dispatchEvent(new Event('resize')); } catch (e) { /* silent */ }
+        }, 60);
+    } catch (e) {
+        // Silent error handling
+    }
+
+    // Check if dashboard has valid data, if not, refresh
+    const hasValidPinnedProject = project.value && project.value.id && project.value.name;
+    const hasValidCountProject = dashboardStore.countProject && dashboardStore.countProject.count !== undefined;
+    
+    if (!hasValidPinnedProject || !hasValidCountProject) {
+        console.log('Dashboard activated: Missing data, refreshing...', {
+            hasValidPinnedProject,
+            hasValidCountProject,
+            pinnedProject: project.value,
+            countProject: dashboardStore.countProject
+        });
+        
+        // Show loading while refreshing
+        isLoading.value = true;
+        
+        try {
+            // Refresh both pinned project and count project
+            await handlePinnedProjectData(false); // Force refresh
+            await handleCountProjectData(false); // Force refresh
+        } catch (error) {
+            console.error('Error refreshing dashboard data:', error);
+        } finally {
+            isLoading.value = false;
+        }
+        
+        return;
+    }
+    
     // Check for missed events while component was inactive
-    const recentEvents = getRecentEvents();
-    const relevantEvents = recentEvents.filter(
-        (event: any) => 
-            event.type === 'force-cache-clear' && 
-            event.data?.projectId === project.value?.id &&
-            event.data?.reason === 'task-status-changed-by-drag'
-    );
+    const allRecentEvents = getRecentEvents();
+
+    // Determine pinned project id even if project not yet loaded
+    let pinnedProjectId: number | undefined = project.value?.id;
+    if (!pinnedProjectId) {
+        try {
+            // Try in-memory dashboardCache first
+            // @ts-ignore
+            const cachedPinned = dashboardCache?.value?.['pinned_project'];
+            if (cachedPinned?.id) pinnedProjectId = cachedPinned.id;
+            if (!pinnedProjectId) {
+                const dashCacheRaw = localStorage.getItem('dashboardCache');
+                if (dashCacheRaw) {
+                    const parsed = JSON.parse(dashCacheRaw || '{}');
+                    if (parsed?.pinned_project?.id) pinnedProjectId = parsed.pinned_project.id;
+                }
+            }
+        } catch (_) {
+            // Silent error handling
+        }
+    }
+
+    const relevantEvents = allRecentEvents.filter((event: any) => {
+        const isForce = event.type === 'force-cache-clear';
+        const isDrag = event.data?.reason === 'task-status-changed-by-drag';
+        const isSameProject = pinnedProjectId
+            ? event.data?.projectId === pinnedProjectId
+            : true; // if unknown project, accept any
+        return isForce && isDrag && isSameProject;
+    });
 
     // If there were task changes while we were away, refresh
     if (relevantEvents.length > 0) {
-        console.log('Dashboard activated: Found missed task changes, refreshing...');
+        console.log('Dashboard activated: Found missed task changes, refreshing...', {
+            pinnedProjectId,
+            recentCount: relevantEvents.length,
+        });
         // Use once to prevent duplicate with event listener
         await refreshPinnedProjectOnce();
     }
@@ -573,10 +691,10 @@ onUnmounted(() => {
                     </div>
                 </div>
             </div>
-            <template v-if="project?.name && project.name.trim() !== ''">
+            <template v-if="project && project.id && project.name && project.name.trim() !== ''">
                 <div class="priority-project-container">
                     <div class="priority-project-title">
-                        Your priority project: {{ project?.name }}
+                        Your priority project: {{ project.name }}
                     </div>
                     <div class="priority-project-row">
                         <div class="dashboard-card">

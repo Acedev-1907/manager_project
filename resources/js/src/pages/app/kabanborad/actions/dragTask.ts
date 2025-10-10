@@ -1,6 +1,7 @@
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { getAvatarSrc } from "../../../../helper/avatar";
 import { emitForceCacheClear } from "../../../../helper/eventBus";
+import eventBus from "../../../../helper/eventBus";
 import { getCurrentUserId } from "../../../../helper/getUserData";
 
 // Constants
@@ -41,6 +42,23 @@ export function updateTaskOptimistically(
 
     // Replace the task in place instead of splice
     tasks[taskIndex] = updatedTask;
+
+    // Emit optimistic update for dashboard immediately
+    try {
+      const allTasks = projectData.value.data.tasks || [];
+      const pending = allTasks.filter((t: any) => (t.status ?? 0) !== 3).length; // adjust if 3 is done else tune below
+      const completed = allTasks.filter((t: any) => (t.status ?? 0) === 3).length;
+      const total = pending + completed;
+      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      eventBus.emit("dashboard-optimistic-update", {
+        projectId: projectData.value.data.id,
+        tasks: [pending, completed],
+        progress,
+      });
+    } catch (e) {
+      // Silent error handling
+    }
   }
 }
 
