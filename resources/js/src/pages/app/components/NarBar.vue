@@ -1,11 +1,11 @@
 <script lang="ts" setup>
-import { ref, onMounted, onBeforeUnmount, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
 import { useUserStore } from '../../../state/userStore';
 import { getAvatarSrc } from '../../../helper/avatar';
 import BellNotification from './BellNotification.vue';
-import { notifications, notificationCount, listenRealtime, fetchNotifications } from '../../../state/notificationStore';
+import { listenRealtime, fetchNotifications } from '../../../state/notificationStore';
 import eventBus from '../../../helper/eventBus';
 
 const navigation = ref([

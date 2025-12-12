@@ -9,41 +9,48 @@ import { useUserStore } from '../../state/userStore';
 import { useDashboardStore } from './dashboard/store/dashboardStore';
 import { useProjectStore } from './project/store/projectStore';
 import { useMemberStore } from './member/store/MemberStore';
+import { useAuth } from '../../composables/useAuth';
 import eventBus from '../../helper/eventBus';
 
-const { logout, loading } = useLogOutUser()
+const { logout, loading } = useLogOutUser();
+const { handleLogout } = useAuth();
 const userStore = useUserStore();
 const dashboardStore = useDashboardStore();
 const projectStore = useProjectStore();
 const memberStore = useMemberStore();
 
-const userData = getUserData()
+const userData = getUserData();
 const isLoading = ref(true);
 
+/**
+ * Handle user logout
+ * Uses centralized logout handler
+ */
 async function logoutUser() {
-    const userId = userData?.user?.id
+    const userId = userData?.user?.id;
+    
+    // Call logout API if user ID exists
     if (typeof userId !== 'undefined') {
         try {
-            await logout(userId)
+            await logout(userId);
         } catch (error) {
-            console.error('Logout error:', error);
+            // Continue with logout even if API call fails
+            console.error('Logout API error:', error);
         }
     }
     
     // Clear all stores
-    userStore.clearUser();
-    dashboardStore.clearAll();
-    projectStore.clearProjects();
-    memberStore.clearAll();
+    const clearStores = () => {
+        userStore.clearUser();
+        dashboardStore.clearAll();
+        projectStore.clearProjects();
+        memberStore.clearAll();
+        clearPersistedStores();
+        clearCacheOnLogout();
+    };
     
-    // Clear persisted stores from localStorage
-    clearPersistedStores();
-    
-    // Clear other cache
-    clearCacheOnLogout();
-    
-    // Redirect to login
-    window.location.href = "/app/login"
+    // Use centralized logout handler
+    await handleLogout(clearStores);
 }
 
 const showLoading = () => { isLoading.value = true; };

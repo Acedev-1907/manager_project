@@ -1,8 +1,6 @@
 <script lang="ts" setup>
 import { onMounted, onActivated, ref, onUnmounted, watch } from 'vue';
 import { useGetPinnedProject } from './actions/GetPinnedProject';
-import ApexDonut from './components/ApexDonut.vue';
-import ApexRadialBar from './components/ApexRadialBar.vue';
 import { useGetTotalProject } from './actions/countProject';
 import LoadingPage from '../../../components/LoadingPage.vue';
 import { useDashboardStore } from '../dashboard/store/dashboardStore';
@@ -85,14 +83,6 @@ const saveToCache = (key: string, data: any) => {
     if (key === 'pinned_project') {
         chartRenderKey.value += 1;
     }
-};
-
-// Helper function to clear dashboard cache
-const clearDashboardCache = () => {
-    dashboardCache.value = {};
-    localStorage.setItem('dashboardCache', '{}');
-    localStorage.removeItem('pinned_project_timestamp');
-    localStorage.removeItem('count_project_timestamp');
 };
 
 // Helper function to clear only pinned project cache (preserve count project)
@@ -468,8 +458,7 @@ onActivated(async () => {
     if (!pinnedProjectId) {
         try {
             // Try in-memory dashboardCache first
-            // @ts-ignore
-            const cachedPinned = dashboardCache?.value?.['pinned_project'];
+        const cachedPinned = dashboardCache?.value?.['pinned_project'];
             if (cachedPinned?.id) pinnedProjectId = cachedPinned.id;
             if (!pinnedProjectId) {
                 const dashCacheRaw = localStorage.getItem('dashboardCache');
@@ -527,6 +516,37 @@ onUnmounted(() => {
     text-align: center;
 }
 
+.news-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1.5rem;
+    background: #f8fafc;
+    border-radius: 1rem;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+    max-width: 760px;
+    margin: 1rem auto 0 auto;
+    text-align: center;
+    gap: 0.35rem;
+}
+
+.news-icon {
+    font-size: 3rem;
+    color: #2563eb;
+    margin-bottom: 0.25rem;
+}
+
+.news-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.news-subtext {
+    color: #6b7280;
+    margin: 0;
+}
 
 
 .dashboard-card {
@@ -679,63 +699,11 @@ onUnmounted(() => {
 <template>
     <div class="dashboard-container">
         <LoadingPage :visible="isLoading" />
-        <h2 class="dashboard-title">Dashboard</h2>
-        <div class="dashboard-main-row">
-            <div class="dashboard-main-col">
-                <div class="total-projects-card">
-                    <div class="card-header">
-                        <b>Total Projects</b>
-                    </div>
-                    <div class="card-body">
-                        <div class="dashboard-number">{{ dashboardStore.countProject?.count }}</div>
-                    </div>
-                </div>
-            </div>
-            <template v-if="project && project.id && project.name && project.name.trim() !== ''">
-                <div class="priority-project-container">
-                    <div class="priority-project-title">
-                        Your priority project: {{ project.name }}
-                    </div>
-                    <div class="priority-project-row">
-                        <div class="dashboard-card">
-                            <div class="card-header"><b>Tasks</b></div>
-                            <div class="card-body">
-                                <div v-if="project.tasks && Array.isArray(project.tasks) && project.tasks.length > 0">
-                                    <ApexDonut 
-                                        :key="`donut-${chartRenderKey}-${project.id}`"
-                                        :task="project.tasks"
-                                        :columnNames="project.columnNames || ['pending', 'completed']"
-                                        :columnColors="project.columnColors || ['#f59e0b', '#10b981']" />
-                                </div>
-                                <div v-else>
-                                    <ApexDonut 
-                                        :key="`donut-empty-${chartRenderKey}`"
-                                        :task="[0, 0]" 
-                                        :columnNames="['pending', 'completed']"
-                                        :columnColors="['#f59e0b', '#10b981']" />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="dashboard-card">
-                            <div class="card-header">
-                                <b>Task Progress</b>
-                            </div>
-                            <div class="card-body">
-                                <div v-if="project.progress !== undefined && project.progress !== null">
-                                    <ApexRadialBar 
-                                        :key="`radial-${chartRenderKey}-${project.id}`"
-                                        :percent="project.progress" />
-                                </div>
-                                <div v-else>
-                                    <ApexRadialBar 
-                                        :key="`radial-empty-${chartRenderKey}`"
-                                        :percent="0" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </template>
+        <h2 class="dashboard-title">News & Updates (Coming Soon)</h2>
+        <div class="news-placeholder">
+            <i class="bi bi-newspaper news-icon"></i>
+            <p class="news-text">News feed sẽ hiển thị tại đây khi tính năng đăng bài được triển khai.</p>
+            <p class="news-subtext">Tạm thời, hãy quản lý dự án và xem thống kê trong trang Projects.</p>
         </div>
     </div>
 </template>

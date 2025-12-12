@@ -1,7 +1,5 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
-import { showError, showSuccess } from "../../../helper/alert";
-import { showErrorResponse } from "../../../helper/utils";
 
 export function useLogOutUser() {
   const loading = ref(false);
@@ -19,10 +17,10 @@ export function useLogOutUser() {
 
       loading.value = false;
       return true;
-    } catch (error) {
+    } catch (_error) {
       loading.value = false;
 
-      if ((error as Error).message == "Not authenticated") {
+      if ((_error as Error).message == "Not authenticated") {
         return true;
       }
 

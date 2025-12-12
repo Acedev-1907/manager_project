@@ -69,12 +69,17 @@ onUnmounted(() => {
 
 function close() { emit('close'); }
 
+function getTaskId() {
+    return props.task?.id ?? props.task?.task_id ?? null;
+}
+
 // Load danh sách comment khi mở modal hoặc đổi task
 async function loadComments() {
-    if (!props.task?.id) return;
+    const tid = getTaskId();
+    if (!tid) return;
     loadingComments.value = true;
     try {
-        comments.value = await getTaskComments(props.task.id);
+        comments.value = await getTaskComments(tid);
         await nextTick();
         scrollToBottom();
     } catch (e: any) {
@@ -88,6 +93,15 @@ watch(() => props.task, () => {
     comments.value = [];
     newComment.value = '';
     loadComments();
+});
+
+// Khi mở modal (visible true) thì load lại comments cho chắc chắn
+watch(() => props.visible, (visible) => {
+    if (visible) {
+        comments.value = [];
+        newComment.value = '';
+        loadComments();
+    }
 });
 
 // Theo dõi scroll để ẩn nút khi user tự cuộn xuống cuối
@@ -118,6 +132,11 @@ function scrollToBottom() {
 // Gửi comment mới
 async function sendComment() {
     if (!newComment.value.trim() || sendingComment.value) return;
+    const tid = getTaskId();
+    if (!props.task || !tid) {
+        showError('Task not found');
+        return;
+    }
     const tempId = 'temp-' + Date.now();
     const userData = JSON.parse(localStorage.getItem("userData") || '{}');
     const tempComment = {
@@ -136,17 +155,25 @@ async function sendComment() {
     newComment.value = '';
     sendingComment.value = true;
     try {
-        const comment = await addTaskComment(props.task.id, sendingText);
+        const comment = await addTaskComment(tid, sendingText);
         // Tìm và thay thế comment tạm bằng comment thật
-        const idx = comments.value.findIndex(c => c.id === tempId);
+        const idx = comments.value.findIndex(c => c && c.id === tempId);
         if (idx !== -1) {
-            comments.value[idx] = comment;
+            // Nếu API trả về comment hợp lệ, dùng comment đó; nếu không, giữ comment tạm và bỏ pending
+            if (comment && comment.id) {
+                comments.value[idx] = {
+                    ...comment,
+                    user: comment.user || tempComment.user,
+                };
+            } else {
+                comments.value[idx] = { ...tempComment, pending: false };
+            }
         }
         await nextTick();
         scrollToBottom();
     } catch (e: any) {
         // Nếu lỗi, xóa comment tạm
-        const idx = comments.value.findIndex(c => c.id === tempId);
+        const idx = comments.value.findIndex(c => c && c.id === tempId);
         if (idx !== -1) {
             comments.value.splice(idx, 1);
         }

@@ -72,9 +72,4 @@ export const useMemberStore = defineStore("member", {
     },
   },
   
-  // Enable persistence - cache for 5 minutes
-  persist: {
-    key: 'member-store',
-    paths: ['friendsList', 'sentInvitations', 'receivedInvitations', 'memberCache', 'lastFetched', 'searchQuery', 'currentPage'],
-  },
 });

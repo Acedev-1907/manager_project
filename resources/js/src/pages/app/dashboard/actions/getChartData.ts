@@ -41,7 +41,7 @@ export function useGetChartData() {
 
     window.Echo.private(`project.${currentProjectId}`).listen(
       "TrackCompletedAndPending",
-      (e: { tasks: Array<number> }) => {
+      () => {
         // Refresh data từ API để có thông tin cột mới nhất
         getChartData(currentProjectId!);
       }

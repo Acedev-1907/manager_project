@@ -9,12 +9,6 @@ interface ProjectEvent {
   userId?: number;
 }
 
-interface ProjectListener {
-  projectId: number;
-  channel: any;
-  listeners: string[];
-}
-
 class ProjectRealtimeManager {
   private listeners: Map<number, any> = new Map();
   private isInitialized: boolean = false;
@@ -73,9 +67,9 @@ class ProjectRealtimeManager {
             } else {
               // Silent error handling
             }
-          } catch (error) {
+          } catch (_error) {
             // Silent error handling
-            options.onError?.(error);
+            options.onError?.(_error);
           }
         });
         listeners.push("TrackCompletedAndPending");
@@ -96,9 +90,9 @@ class ProjectRealtimeManager {
             } else {
               // Silent error handling
             }
-          } catch (error) {
+          } catch (_error) {
             // Silent error handling
-            options.onError?.(error);
+            options.onError?.(_error);
           }
         });
         listeners.push("TrackProjectProgress");
@@ -113,9 +107,9 @@ class ProjectRealtimeManager {
 
       // Reset retry count for this project
       this.connectionRetries.set(projectId, 0);
-    } catch (error) {
+    } catch (_error) {
       // Silent error handling
-      this.handleConnectionError(projectId, error, options);
+      this.handleConnectionError(projectId, _error, options);
     }
   }
 
@@ -141,7 +135,7 @@ class ProjectRealtimeManager {
         window.Echo?.leave(`project.${projectId}`);
         this.listeners.delete(projectId);
         this.connectionRetries.delete(projectId); // Also delete retry count
-      } catch (error) {
+      } catch (_error) {
         // Silent error handling
       }
     }
@@ -191,17 +185,6 @@ class ProjectRealtimeManager {
 
   public resetErrorCount() {
     this.errorCount = 0;
-  }
-
-  private handleError(error: any) {
-    const now = Date.now();
-    if (now - this.lastErrorTime < 1000) {
-      // 1 second debounce
-      this.errorCount++;
-    } else {
-      this.errorCount = 1; // Reset count on new error
-    }
-    this.lastErrorTime = now;
   }
 
   private handleConnectionError(projectId: number, error: any, options: any) {

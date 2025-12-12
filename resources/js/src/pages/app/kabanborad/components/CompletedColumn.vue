@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { SingleProjectResponseType, TaskStatus } from '../actions/getProjectDetail.type';
+import { SingleProjectResponseType } from '../actions/getProjectDetail.type';
 import KabanColumnBase from './KabanColumnBase.vue';
 
 const props = defineProps<{ projectData: SingleProjectResponseType, menuState: any, setMenuState: any }>();

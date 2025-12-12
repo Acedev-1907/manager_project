@@ -531,7 +531,7 @@ function closeProjectViewModal() {
     showProjectViewModal.value = false;
 }
 
-const { setupAllDropListeners, setupTaskCardDragListeners, setupTouchListeners, setupTouchDelegation, setupHorizontalScrollTouch, setupMouseDragListeners } = useDragTask(ProjectData);
+const { setupAllDropListeners, setupTaskCardDragListeners, setupTouchDelegation, setupHorizontalScrollTouch, setupMouseDragListeners } = useDragTask(ProjectData);
 
 watch(() => ProjectData.value?.data?.tasks, () => {
     setTimeout(() => {

@@ -13,7 +13,7 @@ export default defineComponent({
     name: 'App',
     setup() {
         // Initialize global real-time manager
-        const globalRealtime = useAppGlobalRealtime();
+        useAppGlobalRealtime();
 
 
         const { setUser } = useUserStore();
@@ -24,7 +24,9 @@ export default defineComponent({
             try {
                 const userData = JSON.parse(userDataStr);
                 userId.value = userData.id || (userData.user && userData.user.id) || null;
-            } catch { }
+            } catch (err) {
+                // ignore parse error
+            }
         }
         // Khởi tạo lắng nghe Echo toàn cục với userId là ref
         useGlobalEchoListener(userId);
@@ -38,7 +40,9 @@ export default defineComponent({
                 try {
                     const userData = JSON.parse(userDataStr);
                     token = userData.token;
-                } catch { }
+                } catch (err) {
+                    // ignore parse error
+                }
             }
             if (token) {
                 try {
@@ -58,7 +62,8 @@ export default defineComponent({
                         friend_code: res.data.friend_code || null 
                     };
                     localStorage.setItem("userData", JSON.stringify(userData));
-                } catch {
+                } catch (err) {
+                    // ignore fetch error
                 }
             }
         });

@@ -1,5 +1,4 @@
 import { ref } from "vue";
-import { MemberType } from "../../member/actions/getMember";
 import { showError } from "../../../../helper/alert";
 import { taskStore } from "../store/kabanStore";
 

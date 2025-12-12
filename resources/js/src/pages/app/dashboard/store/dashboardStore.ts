@@ -39,9 +39,4 @@ export const useDashboardStore = defineStore("dashboard", {
     },
   },
   
-  // Enable persistence with TTL (data will expire after 30 mins)
-  persist: {
-    key: 'dashboard-store',
-    paths: ['pinnedProject', 'countProject', 'chartData'],
-  },
 });

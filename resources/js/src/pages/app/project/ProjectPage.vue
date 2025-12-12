@@ -1,8 +1,7 @@
 <script lang="ts" setup>
-import { onMounted, ref, watch, onUnmounted } from 'vue';
+import { onMounted, ref, watch, onUnmounted, computed } from 'vue';
 import { ProjectType, useGetProject } from './actions/GetProject';
 import ProjectCard from './components/ProjectCard.vue';
-import { useRouter } from 'vue-router';
 import { projectStore } from './store/projectStore';
 import { ProjectInputType, useCreateOrUpdateProject } from './actions/createtProject';
 import { usepinnendProject } from './actions/pinnendProject';
@@ -17,10 +16,7 @@ import SearchInput from '../../../components/SearchInput.vue';
 import { useDashboardStore } from '../dashboard/store/dashboardStore';
 import { useGetPinnedProject } from '../dashboard/actions/GetPinnedProject';
 import eventBus, { replayRecentEvents, getRecentEvents } from '../../../helper/eventBus';
-import { useProjectRealtime } from '../../../helper/useProjectRealtime';
-import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
-import { createDebouncedFunction } from '../../../helper/utils';
-import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
+import ApexDonut from '../dashboard/components/ApexDonut.vue';
 
 // Define component name for keep-alive
 defineOptions({
@@ -33,7 +29,6 @@ const { getProjects, projectData } = useGetProject();
 const isLoading = ref(true);
 const tableLoading = ref(false);
 const searchLoading = ref(false);
-const router = useRouter();
 const { pinnendProject } = usepinnendProject();
 const { getPinnedProject, project: pinnedProject } = useGetPinnedProject();
 const showProjectModal = ref(false);
@@ -41,6 +36,10 @@ const isEdit = ref(false);
 const loading = ref(false);
 const { createOrUpdate } = useCreateOrUpdateProject();
 const query = ref("");
+const totalProjects = computed(() => {
+    const list = projectData.value?.data?.data;
+    return Array.isArray(list) ? list.length : 0;
+});
 
 // Cache management
 const projectCache = ref<Record<string, any>>({});
@@ -58,11 +57,6 @@ try {
     projectCache.value = {};
 }
 
-// Initialize global real-time manager
-const globalRealtime = useGlobalRealtimeSetup();
-
-
-
 // Auto-save cache to localStorage
 watch(projectCache, (val) => {
     localStorage.setItem('projectCache', JSON.stringify(val));
@@ -73,23 +67,9 @@ const userDataRaw = localStorage.getItem('userData');
 const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
 const currentUserId = userData.id || (userData.user && userData.user.id) || null;
 
-// Function để setup listeners cho từng project với global real-time manager
+// Function stub: listeners đã được quản lý realtime qua eventBus/Echo
 async function setupProjectListeners() {
-    try {
-        const userProjects = projectData.value?.data?.data || [];
-
-        // Lấy danh sách projects đang được listen
-        const activeProjects = globalRealtime.getActiveProjectListeners();
-
-        // Chỉ setup cho projects chưa được listen
-        const projectsToSetup = userProjects.filter(p => !activeProjects.includes(p.id));
-
-        if (projectsToSetup.length > 0) {
-            globalRealtime.setupProjectListeners(projectsToSetup.map(p => p.id));
-        }
-    } catch (error) {
-        // Silent error handling
-    }
+    return;
 }
 
 // Page visibility listener để refresh khi user quay lại tab
@@ -141,36 +121,37 @@ onMounted(async () => {
         await fetchProjects(1, query.value, false, true);
     }
 
-    // Listen for force cache clear events
+    // Listen for force cache clear events (realtime, includes drag/drop)
     eventBus.on('force-cache-clear', async (eventData: any) => {
         try {
-            // Debug: Log current projects
             const currentProjectIds = projectData.value?.data?.data?.map(p => p.id) || [];
+            if (!eventData?.projectId || !currentProjectIds.includes(eventData.projectId)) return;
 
-            // Chỉ refresh nếu event liên quan đến project trong danh sách hiện tại
-            if (eventData?.projectId && currentProjectIds.includes(eventData.projectId)) {
-                // Nếu là optimistic update từ current user, refresh ngay lập tức
-                if (isCurrentUser(eventData.userId) && eventData.reason === 'task-status-changed-by-drag') {
-                    // Clear cache hoàn toàn và refresh ngay lập tức
-                    projectCache.value = {};
-                    localStorage.setItem('projectCache', '{}');
-                    // Clear tất cả timestamps
-                    Object.keys(localStorage).forEach(key => {
-                        if (key.includes('project_page_') && key.includes('_timestamp')) {
-                            localStorage.removeItem(key);
-                        }
-                    });
-                    await fetchProjects(1, query.value, false, true); // forceRefresh = true
-                } else if (!isCurrentUser(eventData.userId)) {
-                    // Chỉ clear cache cho project cụ thể, không clear toàn bộ
-                    const cacheKey = `project_page_1_${query.value}`;
-                    delete projectCache.value[cacheKey];
-                    localStorage.removeItem(`${cacheKey}_timestamp`);
-                    await fetchProjects(1, query.value, false, false); // Không force refresh
-                }
-            }
+            const isTaskStatusChange = String(eventData.reason || '').includes('task-status-changed');
+            if (!isTaskStatusChange) return;
+
+            // Refresh pinned project immediately (no localStorage)
+            await getPinnedProject();
+
+            // Nếu cần, refresh danh sách project hiện tại (không dùng localStorage cache)
+            await fetchProjects(1, query.value, false, true);
         } catch (error) {
-            // Silent error handling
+            // Silent
+        }
+    });
+
+    // Listen realtime events (Echo) to update pinned project for all members
+    eventBus.on('project-realtime-event', async (payload: any) => {
+        try {
+            const { type, data } = payload || {};
+            if (type !== 'task-status-changed') return;
+
+            const currentProjectIds = projectData.value?.data?.data?.map(p => p.id) || [];
+            if (!data?.projectId || !currentProjectIds.includes(data.projectId)) return;
+
+            await getPinnedProject();
+        } catch (_) {
+            // Silent
         }
     });
 
@@ -246,19 +227,23 @@ async function fetchProjects(page = 1, queryStr = "", showLoadingPage = true, fo
 }
 
 async function handlePinProject(projectId: number) {
+    try {
     // Kiểm tra xem project đã được ghim chưa
     await getPinnedProject();
 
-    // Nếu project đã được ghim rồi, chỉ chuyển qua dashboard (không clear cache)
+        // Nếu project đã được ghim rồi, chỉ refresh lại pinned project data
     if (pinnedProject.value && pinnedProject.value.id === projectId) {
-        router.push('/dashboard');
+            // Refresh pinned project để cập nhật UI
+            await getPinnedProject();
         return;
     }
 
     // Nếu project chưa được ghim, gọi API để ghim
     isLoading.value = true;
     await pinnendProject(projectId);
-    isLoading.value = false;
+        
+        // Refresh pinned project data
+        await getPinnedProject();
 
     // Clear dashboard cache để đảm bảo dữ liệu mới được load
     const dashboardCache = localStorage.getItem('dashboardCache');
@@ -290,8 +275,11 @@ async function handlePinProject(projectId: number) {
 
     // Emit event (cho trường hợp Dashboard đã mounted)
     eventBus.emit('project-pinned', { projectId, project: pinnedProjectForCache.value });
-
-    router.push('/dashboard');
+    } catch (error) {
+        console.error('Error pinning project:', error);
+    } finally {
+        isLoading.value = false;
+    }
 }
 
 async function handleDeleteProject(projectId: number) {
@@ -372,6 +360,45 @@ onMounted(async () => {
         isLoading.value = false;
     }
 
+    // Load pinned project for summary widgets
+    try {
+        await getPinnedProject();
+    } catch (error) {
+        // Silent error handling
+    }
+
+// Handle pending refresh flags from drag-and-drop updates (set in dragTask.ts)
+const checkPendingRefreshFlags = async () => {
+    try {
+        const needsRefresh = localStorage.getItem('dashboard_needs_refresh');
+        const reason = localStorage.getItem('dashboard_refresh_reason') || '';
+
+        if (needsRefresh === 'true' && reason.includes('task-status-changed')) {
+            // Clear cached pinned project in dashboard cache
+            const dashCacheRaw = localStorage.getItem('dashboardCache');
+            if (dashCacheRaw) {
+                const parsed = JSON.parse(dashCacheRaw || '{}');
+                delete parsed['pinned_project'];
+                localStorage.setItem('dashboardCache', JSON.stringify(parsed));
+                localStorage.removeItem('pinned_project_timestamp');
+            }
+
+            // Refresh pinned project data
+            await getPinnedProject();
+        }
+    } catch (_) {
+        // Silent
+    } finally {
+        // Clear flags
+        localStorage.removeItem('dashboard_needs_refresh');
+        localStorage.removeItem('dashboard_refresh_reason');
+        localStorage.removeItem('dashboard_pinned_project_id');
+    }
+};
+
+    // Handle pending refresh flags (from drag/drop)
+    await checkPendingRefreshFlags();
+
     // Setup listeners cho từng project sau khi đã load projects
     await setupProjectListeners();
 
@@ -396,6 +423,7 @@ onMounted(async () => {
 onUnmounted(() => {
     // Remove eventBus listeners
     eventBus.off('force-cache-clear');
+    eventBus.off('project-realtime-event');
     eventBus.off('project-progress-updated');
 
     // Remove page visibility listener
@@ -416,17 +444,78 @@ onUnmounted(() => {
             </div>
         </template>
         <LoadingPage v-if="isLoading" />
+        <div v-if="!isLoading" class="project-page-content">
+            <!-- Summary section (moved from Dashboard) -->
+            <div class="info-bar">
+                <div class="info-chip">
+                    <div class="chip-label">
+                        <i class="bi bi-folder2-open"></i>
+                        <span>Total Projects</span>
+                    </div>
+                    <div class="chip-value">{{ totalProjects }}</div>
+                </div>
+
+                <div class="info-chip" v-if="pinnedProject && pinnedProject.id">
+                    <div class="chip-label">
+                        <i class="bi bi-pie-chart-fill"></i>
+                        <span>Tasks</span>
+                        <span class="chip-pill">
+                            <i class="bi bi-pin-fill"></i> {{ pinnedProject.name }}
+                        </span>
+                    </div>
+                    <div class="chip-sub">{{ pinnedProject.tasks?.reduce((a,b)=>a+b,0) || 0 }} tasks</div>
+                </div>
+            </div>
+
+            <div class="chart-row" v-if="pinnedProject && pinnedProject.id">
+                <div class="chart-card">
+                    <div class="chart-title">Tasks Distribution</div>
+                    <div class="chart-body">
+                        <ApexDonut
+                            :task="pinnedProject.tasks || [0, 0]"
+                            :columnNames="pinnedProject.columnNames || ['Pending', 'Completed']"
+                            :columnColors="pinnedProject.columnColors || ['#f59e0b', '#10b981']" />
+                    </div>
+                </div>
+            </div>
+            <div v-else class="chart-empty">Pin một project để xem biểu đồ.</div>
+
         <!-- Project Card Grid -->
-        <div v-if="!isLoading" class="project-card-grid">
+            <div class="projects-section">
+                <div class="section-header">
+                    <h3 class="section-title">
+                        <i class="bi bi-kanban"></i>
+                        All Projects
+                    </h3>
+                    <span class="project-count-badge">{{ totalProjects }} projects</span>
+                </div>
+                
+                <div class="project-card-grid">
             <template v-if="projectData?.data?.data && projectData.data.data.length > 0">
-                <ProjectCard v-for="project in projectData.data.data" :key="project.id" :project="project"
+                        <ProjectCard 
+                            v-for="project in projectData.data.data" 
+                            :key="project.id" 
+                            :project="project"
                     :currentUserId="currentUserId" 
                     :isPinned="pinnedProject?.id === project.id"
-                    @editProject="openEditProject" @deleteProject="handleDeleteProject"
+                            @editProject="openEditProject" 
+                            @deleteProject="handleDeleteProject"
                     @pinnedProject="handlePinProject"
                     @viewProjectDetail="(id) => $router.push('/kaban?query=' + project.slug)" />
             </template>
-            <div v-else class="no-data-center">No data</div>
+                    <div v-else class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="bi bi-folder-x"></i>
+                        </div>
+                        <h3 class="empty-state-title">No Projects Found</h3>
+                        <p class="empty-state-message">Get started by creating your first project!</p>
+                        <button class="btn btn-primary empty-state-button" @click="openCreateProject">
+                            <i class="bi bi-plus-circle me-2"></i>
+                            Create Project
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="d-flex justify-content-center">
             <CustomPagination v-if="projectData?.data" :data="projectData.data" :loading="tableLoading"
@@ -443,40 +532,302 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.project-page-content {
+    padding: 0.5rem 0;
+}
+
+/* Summary Section */
+.info-bar {
+    margin: 0.75rem auto 1rem auto;
+    padding: 0.65rem 0.75rem;
+    max-width: 1220px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #f5f7fb 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 0.85rem;
+}
+
+.info-chip {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    padding: 0.6rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: none;
+}
+
+.info-chip:hover {
+    box-shadow: none;
+    transform: none;
+}
+.chip-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    color: #0b132a;
+    font-size: 0.95rem;
+}
+
+.chip-label i {
+    color: #3b82f6;
+    font-size: 1rem;
+}
+
+.chip-value {
+    font-weight: 800;
+    color: #0b132a;
+    font-size: 1.8rem;
+    line-height: 1.05;
+}
+
+.chip-sub {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.chip-pill {
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #7dd3fc;
+}
+
+.chart-row {
+    max-width: 1220px;
+    margin: 0.25rem auto 1rem auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0.6rem;
+}
+
+.chart-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.7rem;
+    padding: 0.7rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-height: 180px;
+}
+
+.chart-title {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.95rem;
+}
+
+.chart-body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 140px;
+}
+
+.chart-foot {
+    font-size: 0.88rem;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.chart-empty {
+    max-width: 1220px;
+    margin: 0.25rem auto 1rem auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 1px dashed #d1d5db;
+    border-radius: 0.7rem;
+    color: #6b7280;
+    font-weight: 600;
+    padding: 1rem;
+}
+
+/* Projects Section */
+.projects-section {
+    margin-top: 1.25rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding: 0 0.5rem;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.section-title i {
+    color: #6366f1;
+    font-size: 1.4rem;
+}
+
+.project-count-badge {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 1.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
 .project-card-grid {
     display: grid;
     grid-template-columns: repeat(1, 1fr);
-    gap: 1.2rem;
-    margin: 0 auto 0 auto;
-    max-width: 1100px;
-    padding: 0 0.5rem;
-    min-height: 220px;
-    /* Ensure enough height for centering 'No data' */
+    gap: 1rem;
+    margin: 0 auto;
+    max-width: 1200px;
+    padding: 0 0.35rem 0.8rem 0.35rem;
+    min-height: 240px;
 }
 
-@media (min-width: 600px) {
+@media (min-width: 640px) {
     .project-card-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
-@media (min-width: 992px) {
+@media (min-width: 1024px) {
     .project-card-grid {
         grid-template-columns: repeat(3, 1fr);
     }
 }
 
-.no-data-center {
+@media (max-width: 960px) {
+    .info-bar {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Empty State */
+.empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+    min-height: 400px;
+}
+
+.empty-state-icon {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 180px;
-    width: 100%;
-    font-size: 1.15rem;
-    color: #a0aec0;
-    font-weight: 500;
-    grid-column: 1 / -1;
-    /* Span all columns */
-    text-align: center;
+    margin-bottom: 1.5rem;
+    animation: float 3s ease-in-out infinite;
+}
+
+.empty-state-icon i {
+    font-size: 4rem;
+    color: #6366f1;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.empty-state-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.75rem;
+}
+
+.empty-state-message {
+    font-size: 1rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+    max-width: 400px;
+}
+
+.empty-state-button {
+    padding: 0.75rem 2rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transition: all 0.3s ease;
+}
+
+.empty-state-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .summary-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .summary-card {
+        padding: 1.25rem;
+    }
+    
+    .summary-number {
+        font-size: 2.5rem;
+    }
+    
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    
+    .section-title {
+        font-size: 1.25rem;
+    }
+    
+    .empty-state {
+        padding: 3rem 1rem;
+        min-height: 300px;
+    }
+    
+    .empty-state-icon {
+        width: 100px;
+        height: 100px;
+    }
+    
+    .empty-state-icon i {
+        font-size: 3rem;
+    }
+    
+    .empty-state-title {
+        font-size: 1.5rem;
+    }
 }
 </style>

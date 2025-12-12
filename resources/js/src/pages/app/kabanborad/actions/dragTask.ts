@@ -1,5 +1,4 @@
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
-import { getAvatarSrc } from "../../../../helper/avatar";
 import { emitForceCacheClear } from "../../../../helper/eventBus";
 import eventBus from "../../../../helper/eventBus";
 import { getCurrentUserId } from "../../../../helper/getUserData";
@@ -140,15 +139,10 @@ export function useDragTask(ProjectData?: any) {
   // Auto-scroll state for horizontal scrolling
   let horizontalScrollInterval: number | null = null;
   let horizontalScrollSpeed = 0;
-  let lastX = 0;
 
   // Mouse drag state for auto-scroll without task
-  let isMouseDragging = false;
-  let mouseStartX = 0;
-  let mouseStartY = 0;
   let isGrabbing = false;
   let grabStartX = 0;
-  let grabStartY = 0;
   let grabScrollLeft = 0;
   let isMouseDown = false;
   let mouseDownX = 0;
@@ -209,7 +203,6 @@ export function useDragTask(ProjectData?: any) {
     const containerRect = kanbanContainer.getBoundingClientRect();
     const containerLeft = containerRect.left;
     const containerRight = containerRect.right;
-    const containerWidth = containerRect.width;
 
     // Check if we need to scroll left
     if (x < containerLeft + DRAG_CONFIG.horizontalScrollThreshold) {
@@ -506,7 +499,7 @@ export function useDragTask(ProjectData?: any) {
     }
   }
 
-  function handleTouchEndDelegation(event: Event) {
+  function handleTouchEndDelegation() {
     if (!isDragging || !draggedElement) {
       cleanupDragVisuals();
       return;
@@ -582,7 +575,6 @@ export function useDragTask(ProjectData?: any) {
 
     // Reset grab mode
     isGrabbing = false;
-    isMouseDragging = false;
 
     // Set drag image
     const dragEvent = event as DragEvent;
@@ -617,21 +609,6 @@ export function useDragTask(ProjectData?: any) {
 
     // Reset flags
     hasProcessedDrop = false;
-  }
-
-  function handleMouseMove(event: MouseEvent) {
-    if (!isDragging || !draggedElement) return;
-
-    currentX = event.clientX;
-    currentY = event.clientY;
-
-    // Update horizontal scroll
-    updateHorizontalScroll(currentX);
-
-    // Update ghost element position
-    if (ghostElement) {
-      updateMobileGhost(currentX, currentY);
-    }
   }
 
   function handleTouchStart(event: Event) {
@@ -696,7 +673,7 @@ export function useDragTask(ProjectData?: any) {
     }
   }
 
-  function handleTouchEnd(event: Event) {
+  function handleTouchEnd() {
     if (!isDragging || !draggedElement) {
       cleanupDragVisuals();
       return;
@@ -804,14 +781,6 @@ export function useDragTask(ProjectData?: any) {
     touchStartTime = 0;
   }
 
-  function getMemberName(member: any) {
-    return member?.name || member?.user?.name || "Unknown";
-  }
-
-  function getMemberAvatar(member: any) {
-    return getAvatarSrc(member?.avatar || member?.user?.avatar);
-  }
-
   function createMobileGhost(x: number, y: number) {
     if (!draggedElement) {
       return;
@@ -848,7 +817,6 @@ export function useDragTask(ProjectData?: any) {
     `;
 
     // Get task info
-    const taskId = parseInt(draggedElement.dataset.taskId || "0");
     const taskName =
       draggedElement.querySelector(".task-title")?.textContent || "Task";
     const taskMembers = draggedElement.querySelectorAll(".member-avatar");
@@ -1090,7 +1058,6 @@ export function useDragTask(ProjectData?: any) {
     mouseDownX = event.clientX;
     mouseDownY = event.clientY;
     grabStartX = event.clientX;
-    grabStartY = event.clientY;
 
     const kanbanContainer = document.querySelector(
       ".kanban-grid-container"
@@ -1113,7 +1080,6 @@ export function useDragTask(ProjectData?: any) {
 
       if (!target.closest(".task-card")) {
         isGrabbing = true;
-        isMouseDragging = true;
 
         const kanbanContainer = document.querySelector(
           ".kanban-grid-container"
@@ -1137,7 +1103,7 @@ export function useDragTask(ProjectData?: any) {
     }
   }
 
-  function handleMouseUp(event: MouseEvent) {
+  function handleMouseUp() {
     if (isGrabbing) {
       const kanbanContainer = document.querySelector(
         ".kanban-grid-container"
@@ -1150,7 +1116,6 @@ export function useDragTask(ProjectData?: any) {
 
     isMouseDown = false;
     isGrabbing = false;
-    isMouseDragging = false;
   }
 
   function setupHorizontalScrollTouch() {
@@ -1222,7 +1187,7 @@ export function useDragTask(ProjectData?: any) {
     }
   }
 
-  function handleScrollTouchEnd(event: Event) {
+  function handleScrollTouchEnd() {
     // Reset touch state when touch ends
     startX = 0;
     startY = 0;

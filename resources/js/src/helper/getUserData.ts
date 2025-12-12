@@ -24,7 +24,9 @@ export function getUserData(): LoginResponseType | null {
 export function setUserData(userData: LoginResponseType): void {
   try {
     localStorage.setItem("userData", JSON.stringify(userData));
-  } catch (error) {}
+  } catch (error) {
+    // ignore storage errors
+  }
 }
 
 // Helper function để lấy current user ID

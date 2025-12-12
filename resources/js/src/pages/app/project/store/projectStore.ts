@@ -64,11 +64,6 @@ export const useProjectStore = defineStore("project", {
     },
   },
   
-  // Enable persistence - only cache projectList temporarily
-  persist: {
-    key: 'project-store',
-    paths: ['projectList', 'lastFetched'], // Don't persist projectInput (form data)
-  },
 });
 
 // Export as singleton for backward compatibility

@@ -3,8 +3,8 @@ import eventBus from "./eventBus";
 import { getCurrentUserId } from "./getUserData";
 
 let joinedUserChannel: string | number | null = null;
-let joinedProjectChannels: Set<number> = new Set();
-let joinedTaskChannels: Set<number> = new Set();
+const joinedProjectChannels: Set<number> = new Set();
+const joinedTaskChannels: Set<number> = new Set();
 
 export function useGlobalEchoListener(userId: Ref<string | number | null>) {
   const echoReady = ref(false);

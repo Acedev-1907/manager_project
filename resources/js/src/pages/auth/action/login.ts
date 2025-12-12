@@ -1,13 +1,13 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
 import { showError } from "../../../helper/alert";
-import router from "../../../router";
-import { useUserStore } from "../../../state/userStore";
+import { useAuth } from "../../../composables/useAuth";
 
 export type LoginUserType = {
   email: string;
   password: string;
 };
+
 export type LoginResponseType = {
   user: { email: string; id: number; name: string; avatar: string };
   message: string;
@@ -20,9 +20,13 @@ export const loginInput = ref<LoginUserType>({
   password: "",
 });
 
+/**
+ * Login composable
+ * Uses centralized auth handling
+ */
 export function useLoginUser() {
   const loading = ref(false);
-  const userStore = useUserStore();
+  const { handleLoginSuccess } = useAuth();
 
   async function login() {
     try {
@@ -35,38 +39,18 @@ export function useLoginUser() {
       );
 
       if (data && data.token && data.user) {
-        localStorage.setItem("userData", JSON.stringify(data));
-        // Khởi tạo lại Echo với token mới
-        const { initEcho } = await import("../../../../echo");
-        initEcho();
-        // Gọi API lấy user mới nhất
-        const userRes = await makeHttpReq<undefined, any>("user", "GET");
-        userStore.setUser({
-          id: userRes.data.id,
-          name: userRes.data.name,
-          avatar: userRes.data.avatar || "",
-          friend_code: userRes.data.friend_code || null,
-        });
-        router.push("/dashboard");
-
-        // Sau khi login thành công:
-        localStorage.removeItem("projectCache");
-        localStorage.removeItem("memberCache");
-
-        // Nếu dùng cache theo page:
-        Object.keys(localStorage).forEach((key) => {
-          if (
-            key.startsWith("project_page_") ||
-            key.startsWith("member_page_")
-          ) {
-            localStorage.removeItem(key);
-          }
-        });
+        // Use centralized login success handler
+        await handleLoginSuccess(data);
+      } else {
+        throw new Error("Invalid login response");
       }
     } catch (error: any) {
       loading.value = false;
       const message = error?.message || "Login failed!";
       showError(message);
+      throw error; // Re-throw for component handling
+    } finally {
+      loading.value = false;
     }
   }
 

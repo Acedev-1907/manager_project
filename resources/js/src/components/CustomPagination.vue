@@ -42,7 +42,6 @@ const lastPage = computed(() => props.data.last_page || 1);
 const total = computed(() => props.data.total || 0);
 const from = computed(() => props.data.from || 0);
 const to = computed(() => props.data.to || 0);
-const perPage = computed(() => props.data.per_page || 10);
 
 // Calculate page range for display
 const pageRange = computed(() => {

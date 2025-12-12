@@ -240,7 +240,7 @@ export function clearCacheOnLogout(): void {
 export function getLocalStorageUsage(): { used: number; total: number; percentage: number } {
   let totalSize = 0;
   for (const key in localStorage) {
-    if (localStorage.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
       totalSize += new Blob([localStorage.getItem(key) || '']).size;
     }
   }

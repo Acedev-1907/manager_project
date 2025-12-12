@@ -57,7 +57,7 @@ const handleSearch = async (searchQuery: string) => {
                         <td class="text-success">{{ project.creator?.name || 'N/A' }}</td>
                         <td>
                             <span v-if="project.users && project.users.length > 0">
-                                <span v-for="(user, uidx) in project.users.slice(0, 3)" :key="user.id"
+                                <span v-for="(user, _uidx) in project.users.slice(0, 3)" :key="user.id"
                                     class="badge bg-light text-dark me-1">
                                     {{ user.name }}
                                 </span>

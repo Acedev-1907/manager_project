@@ -1,4 +1,30 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { getUserData } from "../helper/getUserData";
+
+/**
+ * Check if user is authenticated
+ */
+function checkAuth(): boolean {
+  try {
+    const userData = getUserData();
+    return !!(userData?.token && userData?.user);
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Check if route is auth route (login, register, etc.)
+ */
+function isAuthRoute(path: string): boolean {
+  return (
+    path.startsWith("/auth") ||
+    path.includes("/login") ||
+    path.includes("/register") ||
+    path.includes("/reset-password") ||
+    path.includes("/change-password")
+  );
+}
 
 const router = createRouter({
   history: createWebHistory("/app"),
@@ -83,47 +109,25 @@ const router = createRouter({
   ],
 });
 
-// Navigation Guard Check login
+// Navigation Guard - Simplified and optimized
 router.beforeEach((to, from, next) => {
-  try {
-    const userData = localStorage.getItem("userData");
-    let token = null;
-    let isAuthenticated = false;
+  const isAuthenticated = checkAuth();
+  const isAuthPage = isAuthRoute(to.path);
 
-    // Safely parse userData
-    if (userData) {
-      try {
-        const parsedData = JSON.parse(userData);
-        token = parsedData?.token;
-        isAuthenticated = !!token;
-      } catch (parseError) {
-        // Silent error handling
-        // Clear invalid data
-        localStorage.removeItem("userData");
-        isAuthenticated = false;
-      }
-    }
-
-    if (
-      isAuthenticated &&
-      (to.path === "/login" || to.path === "/register" || to.path === "/auth")
-    ) {
-      next({ path: "/dashboard" });
-      return;
-    }
-
-    if (to.meta.requiresAuth && !isAuthenticated) {
-      next({ path: "/login" });
-      return;
-    }
-
-    // Các trường hợp khác - cho phép
-    next();
-  } catch (error) {
-    // Silent error handling
-    localStorage.removeItem("userData");
-    next({ path: "/login" });
+  // If authenticated and trying to access auth pages, redirect to dashboard
+  if (isAuthenticated && isAuthPage) {
+    next({ path: "/dashboard" });
+    return;
   }
+
+  // If route requires auth but user is not authenticated, redirect to login
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    next({ path: "/login" });
+    return;
+  }
+
+  // Allow navigation
+  next();
 });
 
 export default router;

@@ -10,7 +10,12 @@ export async function getTaskComments(taskId: number | string) {
     `tasks/${taskId}/comments`,
     "GET"
   );
-  return res?.comments || [];
+  // Hỗ trợ nhiều dạng trả về: {comments: []} hoặc {data: {comments: []}} hoặc mảng trực tiếp
+  if (Array.isArray(res)) return res;
+  if (Array.isArray((res as any)?.comments)) return (res as any).comments;
+  if (Array.isArray((res as any)?.data?.comments)) return (res as any).data.comments;
+  if (Array.isArray((res as any)?.data)) return (res as any).data;
+  return [];
 }
 
 /**
@@ -25,5 +30,8 @@ export async function addTaskComment(taskId: number | string, content: string) {
     "POST",
     { content }
   );
-  return res?.comment;
+  // Chuẩn hoá trả về comment
+  if ((res as any)?.comment) return (res as any).comment;
+  if ((res as any)?.data?.comment) return (res as any).data.comment;
+  return res;
 }

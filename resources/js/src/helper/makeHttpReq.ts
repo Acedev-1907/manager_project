@@ -1,11 +1,7 @@
 import { APP } from "../App/APP";
 import { getUserData } from "./getUserData";
 import eventBus from "./eventBus";
-import {
-  handleAuthError,
-  isAuthError,
-  handleGeneralError,
-} from "./authInterceptor";
+import { handleAuthError, isAuthError } from "./authInterceptor";
 
 // Request counter for loading state management
 let requestCount = 0;
@@ -50,7 +46,7 @@ interface RequestOptions {
  * @param options Request configuration options
  * @returns Promise with response data
  */
-export function makeHttpReq<TInput, TResponse>(
+export async function makeHttpReq<TInput, TResponse>(
   endpoint: string,
   verb: HttpVerbType,
   input?: TInput,
@@ -58,7 +54,6 @@ export function makeHttpReq<TInput, TResponse>(
 ): Promise<TResponse> {
   const { showGlobalLoading = true, timeout = 30000, headers = {} } = options;
 
-  return new Promise<TResponse>(async (resolve, reject) => {
     if (showGlobalLoading) {
       showLoading();
     }
@@ -72,7 +67,7 @@ export function makeHttpReq<TInput, TResponse>(
       let url = `${APP.apiBaseURL}/${endpoint}`;
 
       // Prepare fetch options
-      let fetchOptions: RequestInit = {
+    const fetchOptions: RequestInit = {
         method: verb,
         headers: {
           ...(authHeader && { Authorization: authHeader }),
@@ -107,44 +102,41 @@ export function makeHttpReq<TInput, TResponse>(
         if (contentType && contentType.includes("application/json")) {
           data = await response.json();
         } else {
-          data = await response.text();
-          // Handle HTML responses as authentication errors
+        // Non-JSON response - likely HTML redirect or error page
+        if (response.status === 401 || response.status === 403) {
           handleAuthError();
-          if (showGlobalLoading) hideLoading();
-          return reject(new Error("Not authenticated"));
+          throw new Error("Not authenticated");
+        }
+        throw new Error("Invalid response format");
         }
       } catch (e) {
-        // Handle parsing errors as authentication errors
+      if (response.status === 401 || response.status === 403) {
         handleAuthError();
-        if (showGlobalLoading) hideLoading();
-        return reject(new Error("Not authenticated"));
+        throw new Error("Not authenticated");
+      }
+      throw new Error("Failed to parse response");
       }
 
       // Handle non-successful responses
       if (!response.ok) {
-        if (
-          isAuthError({
+      const errorInfo = {
             status: response.status,
-            message: data?.message,
+        message: data?.message || data?.error?.message,
             response: { status: response.status, data },
-          })
-        ) {
-          handleAuthError();
-          if (showGlobalLoading) hideLoading();
-          return reject(data);
-        }
-        if (showGlobalLoading) hideLoading();
-        return reject(data);
-      }
+      };
 
-      // Success response
-      if (showGlobalLoading) hideLoading();
-      resolve(data);
-    } catch (error: any) {
-      // Handle network and other errors
-      if (showGlobalLoading) hideLoading();
-      // handleGeneralError(error);
-      reject(error);
+      if (isAuthError(errorInfo)) {
+          handleAuthError();
+        throw data || errorInfo;
+        }
+
+      throw data || errorInfo;
     }
-  });
+
+    return data;
+  } finally {
+    if (showGlobalLoading) {
+      hideLoading();
+    }
+  }
 }

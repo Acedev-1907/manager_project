@@ -52,9 +52,4 @@ export const useUserStore = defineStore("user", {
     },
   },
   
-  // Enable persistence
-  persist: {
-    key: 'user-store',
-    paths: ['user', 'avatar'], // Only persist user and avatar, not cache
-  },
 });

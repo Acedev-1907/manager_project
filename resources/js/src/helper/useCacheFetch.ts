@@ -1,5 +1,3 @@
-import { ref } from "vue";
-
 // Generic composable for cache/fetch logic
 export function useCacheFetch<T>(
   cacheMap: Record<string, T>,

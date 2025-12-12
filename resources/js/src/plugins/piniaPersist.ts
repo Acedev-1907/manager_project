@@ -29,7 +29,7 @@ export function createPersistedState() {
   return (context: PiniaPluginContext) => {
     const { store, options } = context;
     
-    // @ts-ignore - persist is custom option
+    // @ts-expect-error - persist is custom option
     const persistOptions: PersistOptions = options.persist || null;
     
     if (!persistOptions) return;

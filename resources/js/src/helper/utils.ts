@@ -1,4 +1,4 @@
-import { showError, showSuccess } from "./alert";
+import { showError } from "./alert";
 import { isAuthError, handleAuthError } from "./authInterceptor";
 
 // Error handling utilities
@@ -75,7 +75,7 @@ export function isValidEmail(email: string): boolean {
 }
 
 export function isValidPhone(phone: string): boolean {
-  const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+  const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
   return phoneRegex.test(phone);
 }
 

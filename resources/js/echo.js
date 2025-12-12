@@ -18,6 +18,10 @@ export function initEcho() {
 
     const token = getCurrentToken();
 
+    // Avoid Permissions-Policy warning: skip Pusher unload listener
+    if (Pusher?.Runtime && typeof Pusher.Runtime.addUnloadListener === 'function') {
+        Pusher.Runtime.addUnloadListener = () => {};
+    }
 
     window.Echo = new Echo({
         // broadcaster: 'reverb',

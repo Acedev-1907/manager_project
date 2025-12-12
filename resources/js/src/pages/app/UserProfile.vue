@@ -31,9 +31,9 @@ const zoomValue = ref(1);
 const minZoom = ref(1);
 const maxZoom = ref(2);
 
-const { getOrFetch, refetch } = useCacheFetch(
+const { getOrFetch } = useCacheFetch(
     { user: userStore.userInfoCache },
-    (key, data) => userStore.setUserInfoCache(data),
+    (_key, data) => userStore.setUserInfoCache(data),
     () => userStore.clearUserInfoCache()
 );
 

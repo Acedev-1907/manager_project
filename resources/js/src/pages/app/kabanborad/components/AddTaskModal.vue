@@ -4,7 +4,6 @@ import { required } from "@vuelidate/validators";
 import { ref, watch, onMounted, computed } from "vue";
 import { taskStore } from "../store/kabanStore";
 import { useCreateTask } from "../actions/CreateTask";
-import { showError } from "../../../../helper/alert";
 import BaseInput from "../../../../components/BaseInput.vue";
 import { getAvatarSrc } from '../../../../helper/avatar';
 
@@ -162,7 +161,7 @@ watch(() => props.visible, (newVal) => {
                                 <label class="form-label" for="task-member-search">Select Members</label>
                                 <div class="selected-members-minimal">
                                     <i class="bi bi-people-fill"></i>
-                                    <span v-for="(id, idx) in selectedMembers.slice(0, 2)" :key="id"
+                                    <span v-for="id in selectedMembers.slice(0, 2)" :key="id"
                                         class="tag-minimal member-tag" :title="getMemberById(id)?.email">
                                         <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name)"
                                             class="avatar-tag" :alt="getMemberById(id)?.name" />
