@@ -333,62 +333,20 @@ class ProjectController extends ApiController
     public function getProjectChartData(Request $request)
     {
         $projectId = $request->projectId;
-        $tasks = Task::where('projectId', $projectId)->get();
-        $taskProgress = TaskProgress::where('projectId', $projectId)->select('progress')->first();
-
-        // Get project to retrieve column information
         $project = Project::find($projectId);
-        $boardColumns = $project->getBoardColumns();
 
-        // Count tasks by column
-        $columnStats = [];
-        $columnNames = [];
-        $columnColors = [];
-
-        // Initialize stats for each column
-        foreach ($boardColumns as $column) {
-            $position = $column['position'];
-            $columnStats[$position] = 0;
-            $columnNames[$position] = $column['name'];
-            $columnColors[$position] = $column['color'];
+        if (!$project) {
+            return $this->respondNotFound('Project not found');
         }
 
-        // Count tasks by status
-        foreach ($tasks as $task) {
-            $status = $task->status;
+        // Calculate chart data using service method
+        $chartData = $this->service->calculateChartData($project);
 
-            // Special handling for completed status
-            if ($status === Task::COMPLETED) {
-                // Find "Completed" column in board_columns
-                foreach ($boardColumns as $column) {
-                    if ($column['name'] === 'Completed') {
-                        $position = $column['position'];
-                        if (isset($columnStats[$position])) {
-                            $columnStats[$position]++;
-                        }
-                        break;
-                    }
-                }
-            } else {
-                // Handle other statuses (position-based)
-                $statusInt = intval($status);
-                if (isset($columnStats[$statusInt])) {
-                    $columnStats[$statusInt]++;
-                }
-            }
-        }
+        // Get progress
+        $taskProgress = TaskProgress::where('projectId', $projectId)->select('progress')->first();
+        $chartData['progress'] = intval($taskProgress->progress ?? 0);
 
-        // Sort by column position
-        ksort($columnStats);
-        ksort($columnNames);
-        ksort($columnColors);
-
-        return response([
-            'tasks' => array_values($columnStats),
-            'columnNames' => array_values($columnNames),
-            'columnColors' => array_values($columnColors),
-            'progress' => intval($taskProgress->progress)
-        ]);
+        return $this->respondWithData($chartData, 'Chart data retrieved successfully');
     }
 
     /**
@@ -399,8 +357,13 @@ class ProjectController extends ApiController
      */
     public function getProjectMembers(int $id)
     {
-        $project = Project::with('users')->findOrFail($id);
-        return response(['data' => $project->users], 200);
+        $project = Project::with('users')->find($id);
+        
+        if (!$project) {
+            return $this->respondNotFound('Project not found');
+        }
+        
+        return $this->respondWithData($project->users, 'Project members retrieved successfully');
     }
 
     /**
@@ -416,10 +379,10 @@ class ProjectController extends ApiController
         $result = $this->service->deleteProject($id, $user);
 
         if (isset($result['errors'])) {
-            return response($result['errors'], $result['status']);
+            return $this->respondNotFound($result['errors'][0] ?? 'Project not found');
         }
 
-        return response(['message' => $result['message']], $result['status']);
+        return $this->respondDeleted($result['message']);
     }
 
     /**

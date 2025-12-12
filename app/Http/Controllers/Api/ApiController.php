@@ -224,4 +224,47 @@ class ApiController extends Controller
                 'message' => $message,
             ]);
     }
+
+    /**
+     * Respond with validation error
+     * 
+     * @param string|array $message
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function respondValidationError($message)
+    {
+        if (is_array($message)) {
+            $message = implode(', ', $message);
+        }
+        
+        return $this->setStatusCode(IlluminateResponse::HTTP_UNPROCESSABLE_ENTITY)
+            ->setReturnCode(self::ERROR_VALIDATION)
+            ->respondWithError($message);
+    }
+
+    /**
+     * Respond with forbidden error
+     * 
+     * @param string $message
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function respondForbidden(string $message = 'Forbidden')
+    {
+        return $this->setStatusCode(IlluminateResponse::HTTP_FORBIDDEN)
+            ->setReturnCode(self::ERROR_FORBIDDEN)
+            ->respondWithError($message);
+    }
+
+    /**
+     * Respond with server error
+     * 
+     * @param string $message
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function respondServerError(string $message = 'Internal server error')
+    {
+        return $this->setStatusCode(IlluminateResponse::HTTP_INTERNAL_SERVER_ERROR)
+            ->setReturnCode(self::ERROR_INTERNAL)
+            ->respondWithError($message);
+    }
 }

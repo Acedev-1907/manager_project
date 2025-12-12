@@ -8,32 +8,43 @@ use App\Services\TaskService;
 use App\Services\TaskCommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Api\ApiController;
 
-class TaskController extends Controller
+/**
+ * Task Controller
+ * 
+ * Handles all task-related operations including CRUD operations,
+ * status transitions, and task comments.
+ */
+class TaskController extends ApiController
 {
-
-    public function __construct(private TaskService $taskService, private TaskCommentService $taskCommentService)
-    {
-        $this->taskCommentService = $taskCommentService;
-    }
+    public function __construct(
+        private TaskService $taskService,
+        private TaskCommentService $taskCommentService
+    ) {}
 
     /**
      * Create task (Legacy - array based)
+     * 
+     * @param Request $req
+     * @return \Illuminate\Http\JsonResponse
      */
     public function createTask(Request $req)
     {
         $result = $this->taskService->createTask($req->all());
+        
         if (isset($result['errors'])) {
-            return response($result['errors'], $result['status']);
+            return $this->respondValidationError($result['errors']);
         }
-        return response([
-            'message' => $result['message'],
-            'task' => $result['task']
-        ], $result['status']);
+        
+        return $this->respondCreated($result['message'], $result['task']->id);
     }
 
     /**
      * Create task with DTO (New - recommended)
+     * 
+     * @param Request $req
+     * @return \Illuminate\Http\JsonResponse
      */
     public function createTaskWithDTO(Request $req)
     {
@@ -42,26 +53,30 @@ class TaskController extends Controller
             
             // Validate DTO
             if (empty($taskDTO->title) || empty($taskDTO->projectId)) {
-                return response(['error' => 'Title and projectId are required'], 422);
+                return $this->respondValidationError('Title and projectId are required');
             }
             
             // Use DTO in service
             $result = $this->taskService->createTaskWithDTO($taskDTO);
             
             if (isset($result['errors'])) {
-                return response($result['errors'], $result['status']);
+                return $this->respondValidationError($result['errors']);
             }
             
-            return response([
-                'message' => $result['message'],
-                'task' => $result['task']
-            ], $result['status']);
+            return $this->respondCreated($result['message'], $result['task']->id);
             
         } catch (\Exception $e) {
-            return response(['error' => $e->getMessage()], 422);
+            return $this->respondValidationError($e->getMessage());
         }
     }
 
+    /**
+     * Transition task status
+     * 
+     * @param Request $req
+     * @param string $transition
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function transition(Request $req, string $transition)
     {
         $transitions = [
@@ -74,7 +89,7 @@ class TaskController extends Controller
         ];
 
         if (!isset($transitions[$transition])) {
-            return response(['error' => 'Unknown transition: ' . $transition], 404);
+            return $this->respondNotFound('Unknown transition: ' . $transition);
         }
 
         [$newStatus, $nameStatus] = $transitions[$transition];
@@ -86,12 +101,19 @@ class TaskController extends Controller
         $checkUpdate = $this->taskService->updateTaskStatus($data, $newStatus);
 
         if ($checkUpdate) {
-            return response(['message' => "Task status updated to {$nameStatus}"], 200);
+            return $this->respondUpdated("Task status updated to {$nameStatus}");
         }
 
-        return response(['error' => 'Failed to update task status'], 500);
+        return $this->respondServerError('Failed to update task status');
     }
 
+    /**
+     * Transition task to specific status
+     * 
+     * @param Request $req
+     * @param string $status
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function transitionToStatus(Request $req, string $status)
     {
         // Handle both numeric and string status
@@ -102,12 +124,12 @@ class TaskController extends Controller
             $newStatus = (int)$status;
             // Validate status range (allow any non-negative integer)
             if ($newStatus < 0) {
-                return response(['error' => 'Invalid status: ' . $status], 400);
+                return $this->respondValidationError('Invalid status: ' . $status);
             }
         } else {
             // For string status, only allow 'OK' for completed
             if ($status !== 'OK') {
-                return response(['error' => 'Invalid status: ' . $status], 400);
+                return $this->respondValidationError('Invalid status: ' . $status);
             }
         }
 
@@ -128,43 +150,62 @@ class TaskController extends Controller
                 'OK' => 'Completed'
             ];
             $statusName = $statusNames[$newStatus] ?? "Column {$newStatus}";
-            return response(['message' => "Task moved to {$statusName}"], 200);
+            return $this->respondUpdated("Task moved to {$statusName}");
         }
 
-        return response(['error' => 'Failed to update task status'], 500);
+        return $this->respondServerError('Failed to update task status');
     }
 
-    public function destroy($id)
+    /**
+     * Delete a task
+     * 
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(int $id)
     {
         $result = $this->taskService->deleteTask($id);
+        
         if (isset($result['errors'])) {
-            return response($result['errors'], $result['status']);
+            return $this->respondNotFound($result['errors'][0] ?? 'Task not found');
         }
-        return response(['message' => $result['message']], $result['status']);
+        
+        return $this->respondDeleted($result['message']);
     }
 
     /**
      * Get the list of comments for a task
+     * 
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function getTaskComments($id)
+    public function getTaskComments(int $id)
     {
         $comments = $this->taskCommentService->getCommentsByTask($id);
-        return response(['comments' => $comments], 200);
+        return $this->respondWithData(['comments' => $comments], 'Comments retrieved successfully');
     }
 
     /**
      * Add a new comment to a task
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function addTaskComment(Request $request, $id)
+    public function addTaskComment(Request $request, int $id)
     {
         $userId = Auth::id();
         $content = $request->input('content');
+        
         if (!$content) {
-            return response(['error' => 'Content is required'], 422);
+            return $this->respondValidationError('Content is required');
         }
+        
         $comment = $this->taskCommentService->createComment($id, $userId, $content);
+        
         // Broadcast realtime event
         event(new TaskCommentCreated($comment, $id));
-        return response(['message' => 'Comment added successfully', 'comment' => $comment], 201);
+        
+        return $this->respondCreated('Comment added successfully', $comment->id);
     }
 }

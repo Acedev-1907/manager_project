@@ -47,16 +47,23 @@ class ProjectRepository extends BaseRepository
         return $projects->orderBy('created_at', 'desc')->paginate(9);
     }
 
-    public function countProjectsForUser($userId)
+    /**
+     * Count projects for a user (as creator or member)
+     * Optimized query using union to avoid duplicate counting
+     * 
+     * @param int $userId
+     * @return int
+     */
+    public function countProjectsForUser(int $userId): int
     {
-        // Get project IDs where user is creator
-        $createdProjectIds = $this->model->where('creator_id', $userId)->pluck('id')->toArray();
-        // Get project IDs where user is a member
+        // Use union to get unique project IDs in a single query
+        $createdProjectIds = $this->model->where('creator_id', $userId)->select('id');
+        
         $memberProjectIds = $this->model->whereHas('users', function ($q) use ($userId) {
             $q->where('users.id', $userId);
-        })->pluck('id')->toArray();
-        // Merge and get unique project IDs
-        $allProjectIds = array_unique(array_merge($createdProjectIds, $memberProjectIds));
-        return count($allProjectIds);
+        })->select('id');
+        
+        // Union both queries and count distinct IDs
+        return $createdProjectIds->union($memberProjectIds)->distinct()->count('id');
     }
 }

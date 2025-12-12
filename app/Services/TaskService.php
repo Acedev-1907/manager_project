@@ -6,7 +6,6 @@ use App\Models\Task;
 use App\Repositories\Task\TaskRepository;
 use App\Repositories\Task\TaskMemberRepository;
 use Illuminate\Support\Facades\Validator;
-use App\Repositories\Task\TaskCommentRepository;
 
 class TaskService
 {
@@ -122,42 +121,5 @@ class TaskService
         $this->taskMemberRepository->deleteByTaskId($taskId);
         $this->taskRepository->delete($taskId);
         return ['message' => 'Task deleted successfully', 'status' => 200];
-    }
-}
-
-class TaskCommentService
-{
-    protected $taskCommentRepo;
-
-    /**
-     * Initialize the service for task comments
-     */
-    public function __construct(TaskCommentRepository $taskCommentRepo)
-    {
-        $this->taskCommentRepo = $taskCommentRepo;
-    }
-
-    /**
-     * Get all comments for a task, including user info
-     */
-    public function getCommentsByTask($taskId)
-    {
-        return $this->taskCommentRepo->getModelInstance()
-            ->where('task_id', $taskId)
-            ->with('user')
-            ->orderBy('created_at')
-            ->get();
-    }
-
-    /**
-     * Create a new comment for a task
-     */
-    public function createComment($taskId, $userId, $content)
-    {
-        return $this->taskCommentRepo->create([
-            'task_id' => $taskId,
-            'user_id' => $userId,
-            'content' => $content,
-        ]);
     }
 }

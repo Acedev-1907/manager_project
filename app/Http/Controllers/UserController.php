@@ -19,6 +19,9 @@ class UserController extends ApiController
 
     /**
      * Get current authenticated user information
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show(Request $request)
     {
@@ -34,34 +37,34 @@ class UserController extends ApiController
             'updated_at'
         ]);
         $data['friend_code'] = ($user->isValidEmail == \App\Models\User::IS_VALID_EMAIL) ? $user->friend_code : null;
-        return response()->json([
-            'success' => true,
-            'data' => $data
-        ]);
+        
+        return $this->respondWithData($data, 'User information retrieved successfully');
     }
 
     /**
      * Update current authenticated user information
+     * 
+     * @param UpdateUserRequest $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function update(UpdateUserRequest $request)
     {
         $user = $request->user();
         $data = $request->validated();
         $updatedUser = $this->userService->updateCurrentUser($user, $data);
-        return response()->json([
-            'success' => true,
-            'message' => 'User information updated successfully.',
-            'data' => $updatedUser->only([
-                'id',
-                'name',
-                'email',
-                'phone',
-                'avatar',
-                'friend_code',
-                'email_verified_at',
-                'updated_at'
-            ])
+        
+        $userData = $updatedUser->only([
+            'id',
+            'name',
+            'email',
+            'phone',
+            'avatar',
+            'friend_code',
+            'email_verified_at',
+            'updated_at'
         ]);
+        
+        return $this->respondUpdatedWithData('User information updated successfully', $userData);
     }
 
     /**

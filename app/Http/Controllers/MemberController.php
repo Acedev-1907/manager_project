@@ -6,16 +6,29 @@ use App\Services\MemberService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Api\ApiController;
 
-class MemberController extends Controller
+/**
+ * Member Controller
+ * 
+ * Handles all member-related operations including adding,
+ * removing, and retrieving members/contacts.
+ */
+class MemberController extends ApiController
 {
-    protected $memberService;
+    protected MemberService $memberService;
 
     public function __construct(MemberService $memberService)
     {
         $this->memberService = $memberService;
     }
 
+    /**
+     * Get all contacts/members for the authenticated user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -25,65 +38,113 @@ class MemberController extends Controller
 
         try {
             $contacts = $this->memberService->getContacts($user, $query, $perPage, $page);
-            return response(['data' => $contacts], 200);
+            return $this->respondWithData($contacts, 'Contacts retrieved successfully');
         } catch (\Exception $e) {
             Log::error('Error fetching members: ' . $e->getMessage());
-            return response(['error' => 'Failed to fetch members'], 500);
+            return $this->respondServerError('Failed to fetch members');
         }
     }
 
+    /**
+     * Add a member by ID
+     * 
+     * @param Request $req
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function store(Request $req)
     {
         $user = $req->user();
         $fields = $req->all();
+        
         $errs = Validator::make($fields, [
             'member_id' => 'required|exists:users,id',
         ]);
-        if ($errs->fails()) return response(['error' => $errs->errors()->first()], 422);
-        $result = $this->memberService->addMember($user, $fields['member_id']);
-        if (isset($result['error'])) {
-            return response(['error' => $result['error']], 422);
+        
+        if ($errs->fails()) {
+            return $this->respondValidationError($errs->errors()->first());
         }
-        return response(['message' => $result['message']], 200);
+        
+        $result = $this->memberService->addMember($user, $fields['member_id']);
+        
+        if (isset($result['error'])) {
+            return $this->respondValidationError($result['error']);
+        }
+        
+        return $this->respondWithMessage($result['message']);
     }
 
-    public function destroy($id, Request $request)
+    /**
+     * Remove a member
+     * 
+     * @param int $id
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(int $id, Request $request)
     {
         $user = $request->user();
         $result = $this->memberService->removeMember($user, $id);
+        
         if (isset($result['error'])) {
-            return response(['error' => $result['error']], 404);
+            return $this->respondNotFound($result['error']);
         }
-        return response(['message' => $result['message']]);
+        
+        return $this->respondDeleted($result['message']);
     }
 
+    /**
+     * Add a member by email
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function addByEmail(Request $request)
     {
         $user = $request->user();
         $fields = $request->all();
+        
         $errs = Validator::make($fields, [
             'email' => 'required|email',
         ]);
-        if ($errs->fails()) return response(['error' => $errs->errors()->first()], 422);
-        $result = $this->memberService->addByEmail($user, $fields['email']);
-        if (isset($result['error'])) {
-            return response(['error' => $result['error']], 404);
+        
+        if ($errs->fails()) {
+            return $this->respondValidationError($errs->errors()->first());
         }
-        return response(['message' => $result['message']], 200);
+        
+        $result = $this->memberService->addByEmail($user, $fields['email']);
+        
+        if (isset($result['error'])) {
+            return $this->respondNotFound($result['error']);
+        }
+        
+        return $this->respondWithMessage($result['message']);
     }
 
+    /**
+     * Add a member by ID or email
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function addByIdOrEmail(Request $request)
     {
         $user = $request->user();
         $fields = $request->all();
+        
         $errs = Validator::make($fields, [
             'input' => 'required',
         ]);
-        if ($errs->fails()) return response(['error' => $errs->errors()->first()], 422);
-        $result = $this->memberService->addByIdOrEmail($user, $fields['input']);
-        if (isset($result['error'])) {
-            return response(['error' => $result['error']], 404);
+        
+        if ($errs->fails()) {
+            return $this->respondValidationError($errs->errors()->first());
         }
-        return response(['message' => $result['message']], 200);
+        
+        $result = $this->memberService->addByIdOrEmail($user, $fields['input']);
+        
+        if (isset($result['error'])) {
+            return $this->respondNotFound($result['error']);
+        }
+        
+        return $this->respondWithMessage($result['message']);
     }
 }

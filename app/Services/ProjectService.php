@@ -25,6 +25,86 @@ class ProjectService
     }
 
     /**
+     * Create project data array from fields or DTO
+     * 
+     * @param array|\App\DTOs\ProjectDTO $data
+     * @param \App\Models\User $user
+     * @return array
+     */
+    private function prepareProjectData($data, $user): array
+    {
+        if ($data instanceof \App\DTOs\ProjectDTO) {
+            return [
+                'name' => $data->name,
+                'startDate' => $data->startDate,
+                'endDate' => $data->endDate,
+                'content' => $data->content,
+                'status' => $data->status ?? \App\Models\Project::NOT_STARTED,
+                'slug' => $data->slug ?? \App\Models\Project::createSlug($data->name),
+                'creator_id' => $user->id,
+            ];
+        }
+
+        return [
+            'name' => $data['name'],
+            'startDate' => $data['startDate'],
+            'endDate' => $data['endDate'],
+            'content' => $data['content'] ?? null,
+            'status' => \App\Models\Project::NOT_STARTED,
+            'slug' => \App\Models\Project::createSlug($data['name']),
+            'creator_id' => $user->id,
+        ];
+    }
+
+    /**
+     * Get members list from fields or DTO
+     * 
+     * @param array|\App\DTOs\ProjectDTO $data
+     * @return array
+     */
+    private function getMembersList($data): array
+    {
+        if ($data instanceof \App\DTOs\ProjectDTO) {
+            return $data->members ?? [];
+        }
+        return $data['members'] ?? [];
+    }
+
+    /**
+     * Create project with members and setup
+     * 
+     * @param array $projectData
+     * @param array $members
+     * @param \App\Models\User $user
+     * @return \App\Models\Project
+     */
+    private function createProjectWithMembers(array $projectData, array $members, $user): \App\Models\Project
+    {
+        $project = $this->repo->create($projectData);
+
+        // Attach creator to project
+        $this->repo->attachUsers($project, [$user->id]);
+
+        // Handle additional members
+        if (!empty($members) && is_array($members)) {
+            $members = array_diff($members, [$user->id]);
+            if (!empty($members)) {
+                $this->repo->attachUsers($project, $members);
+            }
+        }
+
+        // Create task progress record for creator
+        TaskProgress::create([
+            'projectId' => $project->id,
+            'user_id' => $user->id,
+            'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
+            'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
+        ]);
+
+        return $project;
+    }
+
+    /**
      * Create a new project with members (Legacy - array based)
      * 
      * @param array $fields Project data
@@ -45,37 +125,11 @@ class ProjectService
         }
 
         return DB::transaction(function () use ($fields, $user) {
-            $project = $this->repo->create([
-                'name' => $fields['name'],
-                'startDate' => $fields['startDate'],
-                'endDate' => $fields['endDate'],
-                'content' => $fields['content'] ?? null,
-                'status' => \App\Models\Project::NOT_STARTED,
-                'slug' => \App\Models\Project::createSlug($fields['name']),
-                'creator_id' => $user->id,
-            ]);
-
-            // Attach creator to project
-            $this->repo->attachUsers($project, [$user->id]);
-
-            // Handle additional members
-            $members = $fields['members'] ?? [];
-            if (!empty($members) && is_array($members)) {
-                $members = array_diff($members, [$user->id]);
-                if (!empty($members)) {
-                    $this->repo->attachUsers($project, $members);
-                }
-            }
-
+            $projectData = $this->prepareProjectData($fields, $user);
+            $members = $this->getMembersList($fields);
+            
+            $project = $this->createProjectWithMembers($projectData, $members, $user);
             $allMembers = array_unique(array_merge($members, [$user->id]));
-
-            // Create task progress record for creator
-            TaskProgress::create([
-                'projectId' => $project->id,
-                'user_id' => $user->id,
-                'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
-                'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
-            ]);
 
             // Broadcast events after transaction commit
             DB::afterCommit(function () use ($project, $allMembers) {
@@ -96,37 +150,11 @@ class ProjectService
     public function createProjectWithDTO(\App\DTOs\ProjectDTO $dto, $user): array
     {
         return DB::transaction(function () use ($dto, $user) {
-            $project = $this->repo->create([
-                'name' => $dto->name,
-                'startDate' => $dto->startDate,
-                'endDate' => $dto->endDate,
-                'content' => $dto->content,
-                'status' => $dto->status ?? \App\Models\Project::NOT_STARTED,
-                'slug' => $dto->slug ?? \App\Models\Project::createSlug($dto->name),
-                'creator_id' => $user->id,
-            ]);
-
-            // Attach creator to project
-            $this->repo->attachUsers($project, [$user->id]);
-
-            // Handle additional members from DTO
-            $members = $dto->members;
-            if (!empty($members) && is_array($members)) {
-                $members = array_diff($members, [$user->id]);
-                if (!empty($members)) {
-                    $this->repo->attachUsers($project, $members);
-                }
-            }
-
+            $projectData = $this->prepareProjectData($dto, $user);
+            $members = $this->getMembersList($dto);
+            
+            $project = $this->createProjectWithMembers($projectData, $members, $user);
             $allMembers = array_unique(array_merge($members, [$user->id]));
-
-            // Create task progress record for creator
-            TaskProgress::create([
-                'projectId' => $project->id,
-                'user_id' => $user->id,
-                'pinned_on_dashboard' => TaskProgress::NOT_PINNED_ON_DASHBOARD,
-                'progress' => TaskProgress::INITIAL_PROJECT_PERCENCT,
-            ]);
 
             // Broadcast events after transaction commit
             DB::afterCommit(function () use ($project, $allMembers) {
@@ -347,37 +375,20 @@ class ProjectService
     }
 
     /**
-     * Get the pinned project for the current user
+     * Calculate chart data for a project (tasks by column)
      * 
-     * @param \App\Models\User $user
+     * @param \App\Models\Project $project
      * @return array
      */
-    public function getPinnedProjectForUser($user): array
+    public function calculateChartData(\App\Models\Project $project): array
     {
-        $project = DB::table('task_progress')
-            ->join('projects', 'task_progress.projectId', '=', 'projects.id')
-            ->select('projects.id', 'projects.name')
-            ->where('task_progress.pinned_on_dashboard', TaskProgress::PINNED_ON_DASHBOARD)
-            ->where('task_progress.user_id', $user->id)
-            ->first();
+        $boardColumns = $project->getBoardColumns();
 
-        if (!$project) {
-            return [
-                'data' => null,
-                'message' => 'No pinned project found'
-            ];
-        }
-
-        // Get project model for column information
-        $projectModel = \App\Models\Project::find($project->id);
-        $boardColumns = $projectModel->getBoardColumns();
-
-        // Count tasks by column
+        // Initialize stats for each column
         $columnStats = [];
         $columnNames = [];
         $columnColors = [];
 
-        // Initialize stats for each column
         foreach ($boardColumns as $column) {
             $position = $column['position'];
             $columnStats[$position] = 0;
@@ -416,6 +427,41 @@ class ProjectService
         ksort($columnNames);
         ksort($columnColors);
 
+        return [
+            'tasks' => array_values($columnStats),
+            'columnNames' => array_values($columnNames),
+            'columnColors' => array_values($columnColors),
+        ];
+    }
+
+    /**
+     * Get the pinned project for the current user
+     * 
+     * @param \App\Models\User $user
+     * @return array
+     */
+    public function getPinnedProjectForUser($user): array
+    {
+        $project = DB::table('task_progress')
+            ->join('projects', 'task_progress.projectId', '=', 'projects.id')
+            ->select('projects.id', 'projects.name')
+            ->where('task_progress.pinned_on_dashboard', TaskProgress::PINNED_ON_DASHBOARD)
+            ->where('task_progress.user_id', $user->id)
+            ->first();
+
+        if (!$project) {
+            return [
+                'data' => null,
+                'message' => 'No pinned project found'
+            ];
+        }
+
+        // Get project model for column information
+        $projectModel = \App\Models\Project::find($project->id);
+        
+        // Calculate chart data
+        $chartData = $this->calculateChartData($projectModel);
+
         // Get progress
         $progress = TaskProgress::where('projectId', $project->id)
             ->where('user_id', $user->id)
@@ -425,9 +471,9 @@ class ProjectService
             'data' => [
                 'id' => $project->id,
                 'name' => $project->name,
-                'tasks' => array_values($columnStats),
-                'columnNames' => array_values($columnNames),
-                'columnColors' => array_values($columnColors),
+                'tasks' => $chartData['tasks'],
+                'columnNames' => $chartData['columnNames'],
+                'columnColors' => $chartData['columnColors'],
                 'progress' => intval($progress),
             ],
             'message' => 'Get pinned project successfully'
