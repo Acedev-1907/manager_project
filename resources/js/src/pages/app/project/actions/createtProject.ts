@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
-import { showError, showSuccess } from "../../../../helper/alert";
+import { showSuccess } from "../../../../helper/alert";
 import { showErrorResponse } from "../../../../helper/utils";
 import { projectStore } from "../store/projectStore";
 

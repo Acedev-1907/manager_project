@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import useVuelidate from '@vuelidate/core';
 import { required } from '@vuelidate/validators';
 import { useCreateOrUpdateProject } from '../actions/createtProject';
@@ -22,9 +22,7 @@ const rules = {
 
 const v$ = useVuelidate(rules, projectStore.projectInput);
 const { loading, createOrUpdate } = useCreateOrUpdateProject();
-const { getMembers, memberData, loading: membersLoading } = useGetMembers();
-
-const users = ref<any[]>([]);
+const { getMembers, memberData } = useGetMembers();
 const selectedMembers = ref<number[]>([]);
 
 onMounted(async () => {
@@ -53,6 +51,7 @@ async function submitProject() {
             emit('close');
         }
     } catch (error) {
+        // ignore error here; alert handled in action
     }
 }
 </script>

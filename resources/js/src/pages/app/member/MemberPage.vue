@@ -55,7 +55,6 @@ const totalPages = ref(1);
 const totalItems = ref(0);
 const isLoadingMore = ref(false);
 const hasMoreData = ref(true);
-const allMembers = ref<Member[]>([]);
 
 
 const { state } = useResponsive();

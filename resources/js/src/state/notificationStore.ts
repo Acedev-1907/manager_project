@@ -52,7 +52,9 @@ function setupNotificationListener(userId: string | number | null) {
     if (userInteracted) {
       try {
         new Audio("/sounds/new-notification.mp3").play();
-      } catch (e) {}
+      } catch (e) {
+        // ignore audio play errors
+      }
     }
   });
 }

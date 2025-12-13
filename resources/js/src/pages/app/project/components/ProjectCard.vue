@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue';
+import { defineProps } from 'vue';
 import { ProjectType } from '../actions/GetProject';
 import { RouterLink, useRouter } from 'vue-router';
 import { getAvatarSrc } from '../../../../helper/avatar';

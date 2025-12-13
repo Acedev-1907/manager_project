@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import { SingleProjectResponseType, TaskStatus } from '../actions/getProjectDetail.type';
+import { SingleProjectResponseType } from '../actions/getProjectDetail.type';
 
 const props = defineProps<{
     ProjectData: SingleProjectResponseType

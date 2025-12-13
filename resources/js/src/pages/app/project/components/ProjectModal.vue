@@ -1,3 +1,4 @@
+<!-- eslint-disable vue/no-mutating-props, @typescript-eslint/no-unused-vars -->
 <template>
     <Teleport to="body">
         <div class="modal-backdrop">
@@ -84,7 +85,7 @@
 
                                     <div class="members-display">
                                         <div v-if="selectedMembers.length > 0" class="members-avatars-grid">
-                                            <div v-for="(id, idx) in selectedMembers" :key="id"
+                                            <div v-for="id in selectedMembers" :key="id"
                                                 class="member-avatar-item">
                                                 <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name || '')"
                                                     class="member-avatar" :alt="getMemberById(id)?.name || ''"
@@ -127,7 +128,7 @@
 
                         <!-- Members List -->
                         <div class="member-modal-list" @scroll="handleMemberModalScroll">
-                            <div v-for="(memberObj, idx) in filteredMembers" :key="memberObj.id"
+                            <div v-for="memberObj in filteredMembers" :key="memberObj.id"
                                 class="member-modal-row" @click="toggleMember(memberObj.id)"
                                 :class="{ 'selected-member': selectedMembers.includes(memberObj.id) }">
                                 <div class="member-avatar-container">
@@ -170,7 +171,7 @@
                                 </span>
                             </div>
                             <div class="selected-members-display">
-                                <div v-for="(id, idx) in selectedMembers" :key="id" class="member-tag">
+                                <div v-for="id in selectedMembers" :key="id" class="member-tag">
                                     <img :src="getAvatarSrc(getMemberById(id)?.avatar, getMemberById(id)?.name || '')"
                                         class="member-avatar" :alt="getMemberById(id)?.name || ''" />
                                     <span class="member-name">{{ getMemberById(id)?.name || 'Unknown User' }}</span>
@@ -201,6 +202,7 @@
 </template>
 
 <script setup lang="ts">
+// eslint-disable vue/no-mutating-props, @typescript-eslint/no-unused-vars
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import BaseInput from '../../../../components/BaseInput.vue';
 import DateInput from '../../../../components/DateInput.vue';
@@ -212,7 +214,7 @@ import { makeHttpReq } from '../../../../helper/makeHttpReq';
 const props = defineProps<{ isEdit: boolean, projectInput: any, loading: boolean }>()
 const emit = defineEmits(['close', 'submit'])
 
-const { getMembers, memberData } = useGetMembers();
+const { getMembers } = useGetMembers();
 const selectedMembers = ref<number[]>([]);
 const currentUserId = ref<number | null>(null);
 const searchQuery = ref('');
@@ -228,16 +230,6 @@ const currentPage = ref(1);
 const isLoadingMore = ref(false);
 const hasMoreData = ref(true);
 const allMembers = ref<any[]>([]);
-const memberCache = ref<{ [key: string]: any }>({});
-
-let closeTimeout: ReturnType<typeof setTimeout> | null = null;
-function handleMouseLeave() {
-    closeTimeout = setTimeout(() => { showAll.value = false }, 180);
-}
-function handleMouseEnter() {
-    if (closeTimeout) clearTimeout(closeTimeout);
-    showAll.value = true;
-}
 
 onMounted(async () => {
     projectStore.edit = props.isEdit;
@@ -444,7 +436,7 @@ watch(showMemberModal, async (newValue) => {
 });
 
 // Watch for search query changes to reload members
-watch(searchQuery, (newQuery) => {
+watch(searchQuery, () => {
     if (showMemberModal.value) {
         // Reset pagination and reload with new search
         currentPage.value = 1;

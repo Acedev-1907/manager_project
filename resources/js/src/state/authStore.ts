@@ -17,7 +17,7 @@ export const useAuthStore = defineStore('auth', {
     /**
      * Check if user is authenticated
      */
-    isLoggedIn: (_state) => {
+    isLoggedIn: () => {
       // Always check from localStorage for accuracy
       const userData = getUserData();
       return !!(userData?.token && userData?.user);
@@ -26,7 +26,7 @@ export const useAuthStore = defineStore('auth', {
     /**
      * Get current token
      */
-    currentToken: (_state) => {
+    currentToken: () => {
       const userData = getUserData();
       return userData?.token || null;
     },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, watch, computed, nextTick, onUnmounted } from 'vue';
 import { getAvatarSrc } from '../../../../helper/avatar';
 import { getTaskComments, addTaskComment } from '../actions/taskComment';
 import { showError } from '../../../../helper/alert';

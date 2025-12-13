@@ -75,7 +75,7 @@ function handleClickOutside(e: MouseEvent) {
   }
 }
 
-function handleCardMouseEnter(taskId: number) {
+function handleCardMouseEnter() {
   // This function is called but showMenuTaskId is not used anymore
 }
 
@@ -171,7 +171,7 @@ onBeforeUnmount(() => {
         </div>
         <div v-else class="task-list">
           <div v-for="taskObj in filteredTasks" :key="taskObj.id" class="task-card" draggable="true"
-            :data-task-id="taskObj.id" :data-project-id="projectId" @mouseenter="handleCardMouseEnter(taskObj.id)"
+            :data-task-id="taskObj.id" :data-project-id="projectId" @mouseenter="handleCardMouseEnter"
             @mouseleave="handleCardMouseLeave(taskObj.id)" @dragstart="closeMenu"
             :style="{ zIndex: props.menuState && props.menuState.column === config.key && props.menuState.taskId === taskObj.id ? 3000 : 0 }">
             <div class="task-header">
