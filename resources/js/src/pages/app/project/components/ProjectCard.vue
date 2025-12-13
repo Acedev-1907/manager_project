@@ -52,51 +52,54 @@ function stopPropagation(e: Event) {
         </div>
         
         <div class="project-meta-section">
-            <div class="meta-item">
+            <div class="meta-row">
+                <div class="meta-item">
+                    <i class="bi bi-calendar-event meta-icon"></i>
+                    <span class="meta-label">Start:</span>
+                    <span class="meta-value">{{ formatDate(project.startDate) }}</span>
+                </div>
+                <div class="meta-item">
+                    <i class="bi bi-calendar-check meta-icon"></i>
+                    <span class="meta-label">End:</span>
+                    <span class="meta-value">{{ formatDate(project.endDate) }}</span>
+                </div>
+            </div>
+            <div class="meta-item meta-item-full">
                 <i class="bi bi-person-circle meta-icon"></i>
                 <span class="meta-label">Creator:</span>
                 <span class="meta-value">{{ project.creator?.name || 'N/A' }}</span>
             </div>
-            <div class="meta-item">
-                <i class="bi bi-calendar-event meta-icon"></i>
-                <span class="meta-label">Start:</span>
-                <span class="meta-value">{{ formatDate(project.startDate) }}</span>
-            </div>
-            <div class="meta-item">
-                <i class="bi bi-calendar-check meta-icon"></i>
-                <span class="meta-label">End:</span>
-                <span class="meta-value">{{ formatDate(project.endDate) }}</span>
-            </div>
         </div>
         
-        <div class="project-members-section" v-if="project.users && project.users.length > 0">
-            <div class="members-label">
-                <i class="bi bi-people"></i>
-                <span>Team Members</span>
+        <div class="project-bottom-section">
+            <div class="project-members-section" v-if="project.users && project.users.length > 0">
+                <div class="members-label">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div class="project-members">
+                    <template v-for="user in project.users" :key="user.id">
+                        <div class="member-avatar-wrapper" :title="user.name">
+                            <img v-if="'avatar' in user && typeof user.avatar === 'string' && user.avatar"
+                                :src="getAvatarSrc(user.avatar, user.name)" class="member-avatar" :alt="user.name" />
+                            <span v-else class="member-avatar member-avatar-fallback">
+                                {{ user.name.charAt(0).toUpperCase() }}
+                            </span>
+                        </div>
+                    </template>
+                </div>
             </div>
-            <div class="project-members">
-                <template v-for="user in project.users" :key="user.id">
-                    <div class="member-avatar-wrapper" :title="user.name">
-                        <img v-if="'avatar' in user && typeof user.avatar === 'string' && user.avatar"
-                            :src="getAvatarSrc(user.avatar, user.name)" class="member-avatar" :alt="user.name" />
-                        <span v-else class="member-avatar member-avatar-fallback">
-                            {{ user.name.charAt(0).toUpperCase() }}
-                        </span>
-                    </div>
-                </template>
-            </div>
-        </div>
-        
-        <div class="project-progress-section">
-            <div class="progress-header">
-                <span class="progress-label">Progress</span>
-                <span class="progress-percentage">{{ project?.task_progress?.progress || 0 }}%</span>
-            </div>
-            <div class="project-progress">
-                <div class="progress custom-progress" role="progressbar" :aria-valuenow="project?.task_progress?.progress"
-                    aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar bg-gradient-success"
-                        :style="{ width: (project?.task_progress?.progress || 0) + '%' }">
+            
+            <div class="project-progress-section">
+                <div class="progress-header">
+                    <span class="progress-label">Progress</span>
+                    <span class="progress-percentage">{{ project?.task_progress?.progress || 0 }}%</span>
+                </div>
+                <div class="project-progress">
+                    <div class="progress custom-progress" role="progressbar" :aria-valuenow="project?.task_progress?.progress"
+                        aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar bg-gradient-success"
+                            :style="{ width: (project?.task_progress?.progress || 0) + '%' }">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -129,16 +132,16 @@ function stopPropagation(e: Event) {
 <style scoped>
 .project-card {
     background: #fff;
-    border-radius: 1.25rem;
-    border: 1.5px solid #eef2f7;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
-    padding: 1.4rem 1.35rem;
-    margin-bottom: 1.1rem;
-    font-size: 1rem;
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 0.75rem;
+    transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
 }
@@ -149,10 +152,10 @@ function stopPropagation(e: Event) {
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 3px;
     background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.2s ease;
 }
 
 .project-card:hover::before {
@@ -160,9 +163,9 @@ function stopPropagation(e: Event) {
 }
 
 .project-card:hover {
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
-    border-color: #e2e8f0;
-    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #d1d5db;
+    transform: translateY(-1px);
 }
 
 /* Pin ribbon */
@@ -173,17 +176,17 @@ function stopPropagation(e: Event) {
     width: 0;
     height: 0;
     border-style: solid;
-    border-width: 0 50px 50px 0;
+    border-width: 0 40px 40px 0;
     border-color: transparent #fbbf24 transparent transparent;
     z-index: 1;
 }
 
 .pin-ribbon i {
     position: absolute;
-    top: 8px;
-    right: -40px;
+    top: 6px;
+    right: -32px;
     color: white;
-    font-size: 1rem;
+    font-size: 0.875rem;
     transform: rotate(45deg);
 }
 
@@ -191,7 +194,7 @@ function stopPropagation(e: Event) {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0;
     position: relative;
     z-index: 2;
 }
@@ -199,104 +202,133 @@ function stopPropagation(e: Event) {
 .project-title-wrapper {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
     flex: 1;
 }
 
 .project-title {
     font-weight: 700;
-    color: #1e293b;
-    font-size: 1.35rem;
+    color: #111827;
+    font-size: 1.125rem;
     word-break: break-word;
     letter-spacing: -0.01em;
     margin: 0;
-    line-height: 1.3;
+    line-height: 1.4;
 }
 
 .project-meta-section {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
-    padding: 0.85rem 0.9rem;
-    background: #f8fafc;
-    border-radius: 0.75rem;
-    margin-bottom: 0.35rem;
+    gap: 0.5rem;
+    padding: 0.625rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    margin-bottom: 0;
+}
+
+.meta-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
 }
 
 .meta-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-    color: #64748b;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    color: #6b7280;
+}
+
+.meta-item-full {
+    width: 100%;
 }
 
 .meta-icon {
     color: #6366f1;
-    font-size: 1rem;
-    width: 18px;
+    font-size: 0.875rem;
+    width: 16px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .meta-label {
     font-weight: 500;
-    color: #94a3b8;
+    color: #9ca3af;
+    font-size: 0.75rem;
 }
 
 .meta-value {
     font-weight: 600;
-    color: #334155;
+    color: #374151;
+    font-size: 0.8125rem;
+}
+
+.project-bottom-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
 }
 
 .project-members-section {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .members-label {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
+    gap: 0.375rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: #64748b;
-    margin-bottom: 0.75rem;
+    color: #6b7280;
+    flex-shrink: 0;
 }
 
 .members-label i {
     color: #6366f1;
+    font-size: 0.875rem;
 }
 
 .project-members {
     display: flex;
-    gap: 0.5rem;
+    gap: -0.25rem;
     flex-wrap: wrap;
+    flex: 1;
 }
 
 .member-avatar-wrapper {
     position: relative;
     transition: transform 0.2s ease;
+    margin-left: -0.25rem;
+}
+
+.member-avatar-wrapper:first-child {
+    margin-left: 0;
 }
 
 .member-avatar-wrapper:hover {
-    transform: scale(1.1);
+    transform: scale(1.15);
     z-index: 10;
 }
 
 .member-avatar {
-    width: 36px;
-    height: 36px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     object-fit: cover;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.95rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: white;
     border: 2px solid white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
 }
 
@@ -306,24 +338,24 @@ function stopPropagation(e: Event) {
 }
 
 .project-progress-section {
-    margin-bottom: 0.35rem;
+    margin-bottom: 0;
 }
 
 .progress-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.375rem;
 }
 
 .progress-label {
-    font-size: 0.9rem;
+    font-size: 0.8125rem;
     font-weight: 600;
-    color: #64748b;
+    color: #6b7280;
 }
 
 .progress-percentage {
-    font-size: 0.95rem;
+    font-size: 0.875rem;
     font-weight: 700;
     color: #6366f1;
 }
@@ -333,18 +365,18 @@ function stopPropagation(e: Event) {
 }
 
 .custom-progress {
-    border-radius: 1rem;
-    background: #e2e8f0;
-    height: 10px;
+    border-radius: 0.5rem;
+    background: #e5e7eb;
+    height: 8px;
     overflow: hidden;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .bg-gradient-success {
     background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
     height: 100%;
-    border-radius: 1rem;
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 0.5rem;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
 }
@@ -356,7 +388,7 @@ function stopPropagation(e: Event) {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
     animation: shimmer 2s infinite;
 }
 
@@ -373,28 +405,29 @@ function stopPropagation(e: Event) {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-    padding-top: 1rem;
-    border-top: 1px solid #e2e8f0;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
 }
 
 .action-btn {
-    border-radius: 0.75rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    border-radius: 0.5rem;
+    width: 2rem;
+    height: 2rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
-    border: 2px solid transparent;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    background: #f8fafc;
+    font-size: 0.9375rem;
+    border: 1.5px solid transparent;
+    transition: all 0.2s ease;
+    background: #f9fafb;
+    padding: 0;
 }
 
 .action-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 /* Edit (blue) */
@@ -404,7 +437,7 @@ function stopPropagation(e: Event) {
 }
 
 .action-btn-edit:hover {
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    background: #dbeafe;
     color: #1d4ed8;
     border-color: #93c5fd;
 }
@@ -416,23 +449,23 @@ function stopPropagation(e: Event) {
 }
 
 .action-btn-pin:hover {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    background: #fef3c7;
     color: #ca8a04;
     border-color: #fcd34d;
-    transform: translateY(-2px) rotate(15deg);
+    transform: translateY(-1px) rotate(15deg);
 }
 
 .action-btn-pin.pinned-active {
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
     color: white;
     border-color: #f59e0b;
-    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
 }
 
 .action-btn-pin.pinned-active:hover {
     background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    transform: translateY(-2px) rotate(45deg);
-    box-shadow: 0 6px 16px rgba(251, 191, 36, 0.5);
+    transform: translateY(-1px) rotate(45deg);
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
 }
 
 /* View (green) */
@@ -443,7 +476,7 @@ function stopPropagation(e: Event) {
 }
 
 .action-btn-view:hover {
-    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    background: #dcfce7;
     color: #15803d;
     border-color: #86efac;
 }
@@ -455,7 +488,7 @@ function stopPropagation(e: Event) {
 }
 
 .action-btn-delete:hover {
-    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    background: #fee2e2;
     color: #b91c1c;
     border-color: #fca5a5;
 }
@@ -465,50 +498,38 @@ function stopPropagation(e: Event) {
 }
 
 .clickable-card:hover {
-    background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+    background: #fafafa;
 }
 
 /* Pinned badge */
 .pinned-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.25rem;
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
     color: white;
-    padding: 0.35rem 0.75rem;
-    border-radius: 1.25rem;
-    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.75rem;
+    font-size: 0.6875rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
-    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.35);
-    animation: pulse-badge 2s ease-in-out infinite;
+    letter-spacing: 0.01em;
+    box-shadow: 0 2px 6px rgba(251, 191, 36, 0.3);
     white-space: nowrap;
 }
 
 .pinned-badge i {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
 }
 
 .badge-text {
-    font-size: 0.7rem;
-}
-
-@keyframes pulse-badge {
-    0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 4px 12px rgba(251, 191, 36, 0.35);
-    }
-    50% {
-        transform: scale(1.05);
-        box-shadow: 0 6px 16px rgba(251, 191, 36, 0.5);
-    }
+    font-size: 0.625rem;
 }
 
 /* Pinned project highlight */
 .pinned-project {
-    border: 2px solid #fbbf24;
+    border: 1.5px solid #fbbf24;
     background: linear-gradient(to bottom, #fffbeb 0%, #ffffff 50%);
-    box-shadow: 0 8px 24px rgba(251, 191, 36, 0.2);
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.15);
     position: relative;
 }
 
@@ -518,41 +539,52 @@ function stopPropagation(e: Event) {
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 3px;
     background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
     opacity: 1;
 }
 
 .pinned-project:hover {
-    box-shadow: 0 12px 32px rgba(251, 191, 36, 0.3);
+    box-shadow: 0 6px 16px rgba(251, 191, 36, 0.25);
     border-color: #f59e0b;
-    transform: translateY(-3px);
+    transform: translateY(-2px);
 }
 
 /* Responsive */
 @media (max-width: 768px) {
     .project-card {
-        padding: 1.25rem;
-        border-radius: 1.25rem;
+        padding: 0.875rem;
+        border-radius: 0.875rem;
     }
     
     .project-title {
-        font-size: 1.2rem;
+        font-size: 1rem;
     }
     
     .project-meta-section {
-        padding: 0.75rem;
-        gap: 0.5rem;
+        padding: 0.5rem;
+        gap: 0.375rem;
+    }
+    
+    .meta-row {
+        grid-template-columns: 1fr;
+        gap: 0.375rem;
     }
     
     .action-btn {
-        width: 2.25rem;
-        height: 2.25rem;
-        font-size: 1rem;
+        width: 1.875rem;
+        height: 1.875rem;
+        font-size: 0.875rem;
     }
     
     .pinned-badge .badge-text {
         display: none;
+    }
+    
+    .member-avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 0.6875rem;
     }
 }
 </style>
