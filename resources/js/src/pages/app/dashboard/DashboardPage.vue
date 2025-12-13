@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, onActivated, ref, onUnmounted, watch } from 'vue';
+import { onMounted, onActivated, ref, onUnmounted } from 'vue';
 import { useGetPinnedProject } from './actions/GetPinnedProject';
 import { useGetTotalProject } from './actions/countProject';
 import LoadingPage from '../../../components/LoadingPage.vue';
@@ -8,6 +8,8 @@ import eventBus, { replayRecentEvents, getRecentEvents } from '../../../helper/e
 import { getCurrentUserId, isCurrentUser } from '../../../helper/getUserData';
 import { createDebouncedFunction } from '../../../helper/utils';
 import { useGlobalRealtimeSetup } from '../../../helper/useGlobalRealtimeSetup';
+import { useStorage } from '../../../composables/useStorage';
+import { CachePresets } from '../../../composables/useCacheManager';
 
 // Define component name for keep-alive
 defineOptions({
@@ -28,35 +30,27 @@ let isRefreshing = false;
 let lastRefreshTime = 0;
 const REFRESH_DEBOUNCE = 1000; // 1 second
 
-// Cache management
-const dashboardCache = ref<Record<string, any>>({});
-const CACHE_TIMEOUT = 1800000; // 30 minutes
+// Cache management - Sử dụng memory storage (tự động clear khi reload)
+const dashboardCache = useStorage<Record<string, any>>('dashboardCache', {}, {
+  ...CachePresets.dashboard, // memory, 2 minutes
+});
 
-// Initialize cache from localStorage
-const initializeCache = () => {
-    try {
-        const cachedData = localStorage.getItem('dashboardCache');
-        if (cachedData && cachedData !== '0' && cachedData !== 'null') {
-            const parsed = JSON.parse(cachedData);
-            if (parsed && typeof parsed === 'object') {
-                dashboardCache.value = parsed;
-            }
-        }
-    } catch (error) {
-        dashboardCache.value = {};
-    }
-};
+// Timestamp cache - Sử dụng memory storage
+const pinnedProjectTimestamp = useStorage<number | null>('pinned_project_timestamp', null, {
+  storageType: 'memory',
+  ttl: 2 * 60 * 1000, // 2 minutes
+});
 
-// Auto-save cache to localStorage
-watch(dashboardCache, (val) => {
-    localStorage.setItem('dashboardCache', JSON.stringify(val));
-}, { deep: true });
+const countProjectTimestamp = useStorage<number | null>('count_project_timestamp', null, {
+  storageType: 'memory',
+  ttl: 2 * 60 * 1000, // 2 minutes
+});
 
 // Helper function to check cache validity
-const isCacheValid = (timestamp: string | null): boolean => {
+const isCacheValid = (timestamp: number | null): boolean => {
     if (!timestamp) return false;
-    const age = Date.now() - parseInt(timestamp);
-    return age < CACHE_TIMEOUT;
+    const age = Date.now() - timestamp;
+    return age < (2 * 60 * 1000); // 2 minutes
 };
 
 // Helper function to setup project listeners
@@ -76,21 +70,22 @@ const setupProjectListeners = (projectData: any) => {
 
 // Helper function to save to cache
 const saveToCache = (key: string, data: any) => {
-    dashboardCache.value[key] = data;
-    localStorage.setItem(`${key}_timestamp`, Date.now().toString());
+    dashboardCache.value.value[key] = data;
     
-    // Increment chart key to force re-render when pinned project changes
+    // Update timestamp in memory storage
     if (key === 'pinned_project') {
+        pinnedProjectTimestamp.value.value = Date.now();
         chartRenderKey.value += 1;
+    } else if (key === 'count_project') {
+        countProjectTimestamp.value.value = Date.now();
     }
 };
 
 // Helper function to clear only pinned project cache (preserve count project)
 const clearPinnedProjectCache = () => {
-    if (dashboardCache.value['pinned_project']) {
-        delete dashboardCache.value['pinned_project'];
-        localStorage.setItem('dashboardCache', JSON.stringify(dashboardCache.value));
-        localStorage.removeItem('pinned_project_timestamp');
+    if (dashboardCache.value.value['pinned_project']) {
+        delete dashboardCache.value.value['pinned_project'];
+        pinnedProjectTimestamp.value.value = null;
     }
 };
 
@@ -98,6 +93,7 @@ const clearPinnedProjectCache = () => {
 const debouncedRefreshPinnedProject = createDebouncedFunction(async () => {
     try {
         await getPinnedProject();
+        // @ts-expect-error - Pinia store type inference issue
         dashboardStore.setPinnedProject(project.value);
         saveToCache('pinned_project', project.value);
         setupProjectListeners(project.value);
@@ -123,6 +119,7 @@ const refreshPinnedProjectOnce = async () => {
         // Only clear pinned project cache, preserve count project cache
         clearPinnedProjectCache();
         await getPinnedProject();
+        // @ts-expect-error - Pinia store type inference issue
         dashboardStore.setPinnedProject(project.value);
         saveToCache('pinned_project', project.value);
         setupProjectListeners(project.value);
@@ -143,6 +140,7 @@ const setupCountProjectListener = () => {
                 "UserProjectCountUpdated",
                 (e: { countProject: number; userId: number }) => {
                     const newCount = { count: e.countProject };
+                    // @ts-expect-error - Pinia store type inference issue
                     dashboardStore.setCountProject(newCount);
                     saveToCache('count_project', newCount);
                 }
@@ -156,7 +154,8 @@ const setupCountProjectListener = () => {
 // Handle pinned project data
 const handlePinnedProjectData = async (hasValidCache: boolean) => {
     if (hasValidCache) {
-        const cachedData = dashboardCache.value['pinned_project'];
+        const cachedData = dashboardCache.value.value['pinned_project'];
+        // @ts-expect-error - Pinia store type inference issue
         dashboardStore.setPinnedProject(cachedData);
         project.value = cachedData;
         setupProjectListeners(project.value);
@@ -181,6 +180,7 @@ const handlePinnedProjectData = async (hasValidCache: boolean) => {
         }
     } else {
         await getPinnedProject();
+        // @ts-expect-error - Pinia store type inference issue
         dashboardStore.setPinnedProject(project.value);
         saveToCache('pinned_project', project.value);
         setupProjectListeners(project.value);
@@ -207,7 +207,8 @@ const handlePinnedProjectData = async (hasValidCache: boolean) => {
 // Handle count project data
 const handleCountProjectData = async (hasValidCache: boolean) => {
     if (hasValidCache) {
-        const cachedData = dashboardCache.value['count_project'];
+        const cachedData = dashboardCache.value.value['count_project'];
+        // @ts-expect-error - Pinia store type inference issue
         dashboardStore.setCountProject(cachedData);
     } else {
         try {
@@ -216,11 +217,13 @@ const handleCountProjectData = async (hasValidCache: boolean) => {
             });
 
             await Promise.race([getTotalProject(), timeoutPromise]);
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setCountProject(countProject.value);
             saveToCache('count_project', countProject.value);
         } catch (error) {
             const defaultCount = { count: 0 };
             countProject.value = defaultCount;
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setCountProject(defaultCount);
             saveToCache('count_project', defaultCount);
         }
@@ -231,7 +234,8 @@ const handleCountProjectData = async (hasValidCache: boolean) => {
 const setupEventListeners = () => {
     // Count project updated events
     eventBus.on('count-project-updated', (newCount: any) => {
-        dashboardCache.value['count_project'] = newCount;
+        dashboardCache.value.value['count_project'] = newCount;
+        // @ts-expect-error - Pinia store type inference issue
         dashboardStore.setCountProject(newCount);
     });
 
@@ -272,6 +276,7 @@ const setupEventListeners = () => {
                     tasks: data.tasks,
                     progress: typeof data.progress === 'number' ? data.progress : project.value?.progress
                 };
+                // @ts-expect-error - Pinia store type inference issue
                 dashboardStore.setPinnedProject(project.value);
                 // Save to cache to keep UI consistent on navigation
                 saveToCache('pinned_project', project.value);
@@ -306,6 +311,7 @@ const setupEventListeners = () => {
             // Clear only pinned project cache, preserve count project cache
             clearPinnedProjectCache();
             await getPinnedProject();
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setPinnedProject(project.value);
             saveToCache('pinned_project', project.value);
             setupProjectListeners(project.value);
@@ -329,15 +335,11 @@ const handleVisibilityChange = () => {
 };
 
 onMounted(async () => {
-    // Initialize cache
-    initializeCache();
+    // Cache đã được khởi tạo tự động bởi useStorage
 
     // Check cache validity
-    const pinnedProjectTimestamp = localStorage.getItem('pinned_project_timestamp');
-    const countProjectTimestamp = localStorage.getItem('count_project_timestamp');
-
-    const hasValidPinnedProjectCache = dashboardCache.value['pinned_project'] && isCacheValid(pinnedProjectTimestamp);
-    const hasValidCountProjectCache = dashboardCache.value['count_project'] && isCacheValid(countProjectTimestamp);
+    const hasValidPinnedProjectCache = dashboardCache.value.value['pinned_project'] && isCacheValid(pinnedProjectTimestamp.value.value);
+    const hasValidCountProjectCache = dashboardCache.value.value['count_project'] && isCacheValid(countProjectTimestamp.value.value);
 
     // Set loading based on cache validity
     isLoading.value = !(hasValidPinnedProjectCache && hasValidCountProjectCache);
@@ -365,9 +367,9 @@ onMounted(async () => {
 onActivated(async () => {
     console.log('Dashboard activated');
     
-    // Check if we need to refresh due to project pinning
-    const needsRefresh = localStorage.getItem('dashboard_needs_refresh');
-    const refreshReason = localStorage.getItem('dashboard_refresh_reason');
+    // Check if we need to refresh due to project pinning (sessionStorage - chỉ trong session)
+    const needsRefresh = sessionStorage.getItem('dashboard_needs_refresh');
+    const refreshReason = sessionStorage.getItem('dashboard_refresh_reason');
     
     if (needsRefresh === 'true') {
         console.log('Dashboard activated: Needs refresh due to:', refreshReason);
@@ -376,14 +378,15 @@ onActivated(async () => {
         isLoading.value = true;
         
         // Clear flags
-        localStorage.removeItem('dashboard_needs_refresh');
-        localStorage.removeItem('dashboard_refresh_reason');
-        localStorage.removeItem('dashboard_pinned_project_id');
+        sessionStorage.removeItem('dashboard_needs_refresh');
+        sessionStorage.removeItem('dashboard_refresh_reason');
+        sessionStorage.removeItem('dashboard_pinned_project_id');
         
         try {
             // Force refresh - only clear pinned project cache
             clearPinnedProjectCache();
             await getPinnedProject();
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setPinnedProject(project.value);
             saveToCache('pinned_project', project.value);
             setupProjectListeners(project.value);
@@ -424,6 +427,7 @@ onActivated(async () => {
 
     // Check if dashboard has valid data, if not, refresh
     const hasValidPinnedProject = project.value && project.value.id && project.value.name;
+    // @ts-expect-error - Pinia store type inference issue
     const hasValidCountProject = dashboardStore.countProject && dashboardStore.countProject.count !== undefined;
     
     if (!hasValidPinnedProject || !hasValidCountProject) {
@@ -431,6 +435,7 @@ onActivated(async () => {
             hasValidPinnedProject,
             hasValidCountProject,
             pinnedProject: project.value,
+            // @ts-expect-error - Pinia store type inference issue
             countProject: dashboardStore.countProject
         });
         
@@ -458,15 +463,8 @@ onActivated(async () => {
     if (!pinnedProjectId) {
         try {
             // Try in-memory dashboardCache first
-        const cachedPinned = dashboardCache?.value?.['pinned_project'];
+        const cachedPinned = dashboardCache?.value?.value?.['pinned_project'];
             if (cachedPinned?.id) pinnedProjectId = cachedPinned.id;
-            if (!pinnedProjectId) {
-                const dashCacheRaw = localStorage.getItem('dashboardCache');
-                if (dashCacheRaw) {
-                    const parsed = JSON.parse(dashCacheRaw || '{}');
-                    if (parsed?.pinned_project?.id) pinnedProjectId = parsed.pinned_project.id;
-                }
-            }
         } catch (_) {
             // Silent error handling
         }

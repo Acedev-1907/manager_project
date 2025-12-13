@@ -20,13 +20,13 @@ export const useMemberStore = defineStore("member", {
   }),
   
   getters: {
-    hasFriendsList: (state) => state.friendsList !== null && state.friendsList.data.length > 0,
-    isCacheFresh: (state) => {
+    hasFriendsList: (state: { friendsList: MemberListResponse | null }) => state.friendsList !== null && state.friendsList.data.length > 0,
+    isCacheFresh: (state: { lastFetched: number | null }) => {
       if (!state.lastFetched) return false;
       const age = Date.now() - state.lastFetched;
       return age < 5 * 60 * 1000; // 5 minutes
     },
-    hasInvitations: (state) => {
+    hasInvitations: (state: { sentInvitations: MemberListResponse | null; receivedInvitations: MemberListResponse | null }) => {
       return (state.sentInvitations !== null || state.receivedInvitations !== null);
     },
   },

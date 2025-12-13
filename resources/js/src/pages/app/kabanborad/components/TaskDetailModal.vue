@@ -15,16 +15,31 @@ const showNewMsgBtn = ref(false);
 const sendingComment = ref(false); // Thêm biến chống spam gửi comment
 const activeTab = ref<'content' | 'discussion'>('content'); // Tab active cho mobile
 
-// Lấy userId hiện tại
+// Lấy userId hiện tại từ user-store
+import { useUserStore } from '../../../../state/userStore';
+const userStore = useUserStore();
 const currentUserId = computed(() => {
+    // Ưu tiên lấy từ user-store
+    // @ts-expect-error - Pinia store type inference issue
+    if (userStore.user?.id) {
+        // @ts-expect-error - Pinia store type inference issue
+        return userStore.user.id;
+    }
+    // Fallback: lấy từ userData (backward compatibility)
     const data = localStorage.getItem("userData");
     if (data) {
         const parsed = JSON.parse(data);
-        return parsed.user?.id;
+        return parsed.userId || parsed.user?.id;
     }
     return null;
 });
 const currentUserIdStr = computed(() => String(currentUserId.value));
+
+// Computed property for template
+const currentUser = computed(() => {
+    // @ts-expect-error - Pinia store type inference issue
+    return userStore.user;
+});
 
 let channel: any = null;
 
@@ -144,8 +159,8 @@ async function sendComment() {
         content: newComment.value,
         user: {
             id: currentUserId.value,
-            name: userData.user?.name || 'You',
-            avatar: userData.user?.avatar || ''
+            name: currentUser.value?.name || userData.user?.name || 'You',
+            avatar: currentUser.value?.avatar || userData.user?.avatar || ''
         },
         created_at: new Date().toISOString(),
         pending: true

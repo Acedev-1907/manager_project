@@ -20,13 +20,13 @@ export const useProjectStore = defineStore("project", {
       members: [] as number[],
     } as ProjectInput,
     edit: false,
-    projectList: null as any, // cache project list
-    lastFetched: null as number | null, // thời gian fetch gần nhất
+    projectList: null as any, // cache project list (runtime only, use memory cache instead)
+    lastFetched: null as number | null, // thời gian fetch gần nhất (runtime only)
   }),
   
   getters: {
-    hasProjects: (state) => state.projectList !== null,
-    isCacheFresh: (state) => {
+    hasProjects: (state: { projectList: any }) => state.projectList !== null,
+    isCacheFresh: (state: { lastFetched: number | null }) => {
       if (!state.lastFetched) return false;
       const age = Date.now() - state.lastFetched;
       return age < 5 * 60 * 1000; // 5 minutes
@@ -64,6 +64,14 @@ export const useProjectStore = defineStore("project", {
     },
   },
   
+  // Chỉ persist projectInput (form data) vào sessionStorage (tạm thời)
+  // Không persist projectList - nên dùng memory cache thay thế
+  persist: {
+    key: 'project-store',
+    paths: ['projectInput', 'edit'], // Chỉ lưu form input vào sessionStorage
+    storageType: 'sessionStorage', // Session only - cleared on tab close
+    ttl: 60 * 60 * 1000, // 1 hour
+  },
 });
 
 // Export as singleton for backward compatibility

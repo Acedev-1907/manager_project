@@ -35,6 +35,9 @@ export function createDebouncedFunction<T extends (...args: any[]) => any>(
 }
 
 // Cache utilities
+// DEPRECATED: Sử dụng useStorage hoặc useCacheManager thay thế
+// Giữ lại để backward compatibility
+
 export const CACHE_TIMEOUT = 1800000; // 30 minutes
 
 export function isCacheValid(timestamp: string | null): boolean {
@@ -43,11 +46,19 @@ export function isCacheValid(timestamp: string | null): boolean {
   return age < CACHE_TIMEOUT;
 }
 
+/**
+ * @deprecated Sử dụng useStorage với storageType: 'memory' thay thế
+ * saveToCache sẽ được migrate sang useStorage trong tương lai
+ */
 export function saveToCache(key: string, data: any) {
   localStorage.setItem(key, JSON.stringify(data));
   localStorage.setItem(`${key}_timestamp`, Date.now().toString());
 }
 
+/**
+ * @deprecated Sử dụng useStorage với storageType: 'memory' thay thế
+ * getFromCache sẽ được migrate sang useStorage trong tương lai
+ */
 export function getFromCache<T>(key: string): T | null {
   try {
     const data = localStorage.getItem(key);
@@ -63,6 +74,9 @@ export function getFromCache<T>(key: string): T | null {
   }
 }
 
+/**
+ * @deprecated Sử dụng useStorage.remove() thay thế
+ */
 export function clearCache(key: string) {
   localStorage.removeItem(key);
   localStorage.removeItem(`${key}_timestamp`);

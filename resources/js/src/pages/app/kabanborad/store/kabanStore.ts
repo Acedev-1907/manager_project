@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { CreateTaskInput } from "../actions/CreateTask";
 
-const useTaskStore = defineStore("task", {
+export const useTaskStore = defineStore("task", {
   state: () => ({
     taskInput: {
       name: "",

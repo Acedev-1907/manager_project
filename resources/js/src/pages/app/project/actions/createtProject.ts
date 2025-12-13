@@ -2,7 +2,7 @@ import { ref } from "vue";
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { showSuccess } from "../../../../helper/alert";
 import { showErrorResponse } from "../../../../helper/utils";
-import { projectStore } from "../store/projectStore";
+import { useProjectStore } from "../store/projectStore";
 
 export type ProjectInputType = {
   id: number;
@@ -18,14 +18,17 @@ export type ProjectResponseType = {
 
 export function useCreateOrUpdateProject() {
   const loading = ref(false);
+  const projectStore = useProjectStore();
 
   async function createOrUpdate() {
     try {
       loading.value = true;
+      // @ts-expect-error - Pinia store type inference issue
       const data = projectStore.edit
         ? await updateProject()
         : await createProject();
       loading.value = false;
+      // @ts-expect-error - Pinia store type inference issue
       projectStore.projectInput = {
         id: 0,
         name: "",
@@ -42,27 +45,32 @@ export function useCreateOrUpdateProject() {
       showErrorResponse(error);
       return { success: false, error };
     }
-  }
-  return { createOrUpdate, loading };
 }
 
 async function createProject() {
   const data = await makeHttpReq<ProjectInputType, ProjectResponseType>(
     "projects",
     "POST",
+      // @ts-expect-error - Pinia store type inference issue
     projectStore.projectInput,
     { showGlobalLoading: false }
   );
   return data;
 }
+
 async function updateProject() {
   const data = await makeHttpReq<ProjectInputType, ProjectResponseType>(
     "projects",
     "PUT",
+      // @ts-expect-error - Pinia store type inference issue
     projectStore.projectInput,
     { showGlobalLoading: false }
   );
+    // @ts-expect-error - Pinia store type inference issue
   projectStore.edit = false;
 
   return data;
+  }
+
+  return { createOrUpdate, loading };
 }

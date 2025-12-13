@@ -35,7 +35,7 @@ export function handleMemberEvent(
   friendsList: Ref<any>,
   receivedInvitations: Ref<any>,
   sentInvitations: Ref<any>,
-  memberCacheRef?: Ref<{ [key: string]: any }>
+  memberCacheRef?: { value: Ref<{ [key: string]: any }> }
 ) {
   // Remove member from friends list if removed
   if (e.action === "removed") {
@@ -226,10 +226,10 @@ export function handleMemberEvent(
       // Optionally update memberCache if needed
       if (memberCacheRef && memberCacheRef.value) {
         const cacheKey = `member_page_`;
-        if (!memberCacheRef.value[cacheKey]) {
-          memberCacheRef.value[cacheKey] = { data: { data: [] } };
+        if (!memberCacheRef.value.value[cacheKey]) {
+          memberCacheRef.value.value[cacheKey] = { data: { data: [] } };
         }
-        const cacheArr = memberCacheRef.value[cacheKey].data.data;
+        const cacheArr = memberCacheRef.value.value[cacheKey].data.data;
         const exists = cacheArr.some((m: any) => m.id === e.payload.member.id);
         if (!exists) {
           cacheArr.unshift(e.payload.member);

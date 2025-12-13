@@ -7,7 +7,8 @@ import { getUserData } from "../helper/getUserData";
 function checkAuth(): boolean {
   try {
     const userData = getUserData();
-    return !!(userData?.token && userData?.user);
+    // Chỉ cần token là đủ (user info đã được lưu trong user-store)
+    return !!(userData?.token);
   } catch (error) {
     return false;
   }

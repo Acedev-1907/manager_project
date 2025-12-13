@@ -62,14 +62,22 @@ function setupNotificationListener(userId: string | number | null) {
 // Khởi tạo lắng nghe realtime khi user đăng nhập
 export function listenRealtime() {
   const userStore = useUserStore();
+  // @ts-expect-error - Pinia store type inference issue
   let userId: string | number | null = userStore.user?.id ?? null;
   if (!userId) {
     const userDataRaw = localStorage.getItem("userData");
     const userData = userDataRaw ? JSON.parse(userDataRaw) : {};
-    userId = userData.id || (userData.user && userData.user.id) || null;
+    // Ưu tiên lấy từ user-store (đã được persist)
+    // @ts-expect-error - Pinia store type inference issue
+    userId = userStore.user?.id || null;
+    // Fallback: lấy từ userData (backward compatibility)
+    if (!userId) {
+      userId = userData.userId || (userData.user && userData.user.id) || null;
+    }
     if (userId) setupNotificationListener(userId);
   }
   watch(
+    // @ts-expect-error - Pinia store type inference issue
     () => userStore.user?.id,
     (newId) => {
       if (newId) setupNotificationListener(newId);

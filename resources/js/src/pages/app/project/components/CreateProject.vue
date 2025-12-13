@@ -3,11 +3,12 @@ import { useRouter } from 'vue-router';
 import useVuelidate from '@vuelidate/core';
 import { required } from '@vuelidate/validators';
 import { useCreateOrUpdateProject } from '../actions/createtProject';
-import { projectStore } from '../store/projectStore';
-import { watch } from 'vue';
+import { useProjectStore } from '../store/projectStore';
+import { watch, computed } from 'vue';
 import DateInput from '../../../../components/DateInput.vue';
 
 const router = useRouter();
+const projectStore = useProjectStore();
 
 const rules = {
     name: { required },
@@ -15,12 +16,29 @@ const rules = {
     endDate: { required }
 }
 
+// @ts-expect-error - Pinia store type inference issue
 const v$ = useVuelidate(rules, projectStore.projectInput);
 const { loading, createOrUpdate } = useCreateOrUpdateProject();
 
+// Computed properties for template
+const isEdit = computed(() => {
+    // @ts-expect-error - Pinia store type inference issue
+    return projectStore.edit;
+});
+
+const projectInput = computed({
+    // @ts-expect-error - Pinia store type inference issue
+    get: () => projectStore.projectInput,
+    // @ts-expect-error - Pinia store type inference issue
+    set: (value) => { projectStore.projectInput = value; }
+});
+
 // Watch for start date changes - only validate end date
+// @ts-expect-error - Pinia store type inference issue
 watch(() => projectStore.projectInput.startDate, (newStartDate) => {
+    // @ts-expect-error - Pinia store type inference issue
     if (newStartDate && projectStore.projectInput.endDate && projectStore.projectInput.endDate < newStartDate) {
+        // @ts-expect-error - Pinia store type inference issue
         projectStore.projectInput.endDate = '';
     }
 });
@@ -51,10 +69,10 @@ async function submitProject() {
                 <div class="card shadow-sm border-0 rounded-3">
                     <div class="card-header bg-white border-bottom-0 pb-0">
                         <h3 class="card-title mb-0 fw-bold text-dark">
-                            {{ projectStore.edit ? 'Edit Project' : 'Create New Project' }}
+                            {{ isEdit ? 'Edit Project' : 'Create New Project' }}
                         </h3>
                         <p class="text-muted mb-0 mt-1">
-                            {{ projectStore.edit ?
+                            {{ isEdit ?
                                 'Update your project details below.' :
                                 'Fill in the details to create a new project.' }}
                         </p>
@@ -64,12 +82,12 @@ async function submitProject() {
                             <div class="row g-3">
                                 <div class="col-12">
                                     <Error label="Project Name" :errors="v$.name.$errors" />
-                                    <BaseInput v-model="projectStore.projectInput.name"
+                                    <BaseInput v-model="projectInput.name"
                                         placeholder="Enter project name" />
                                 </div>
                                 <div class="col-md-6 col-12">
                                     <Error label="Start Date" :errors="v$.startDate.$errors" />
-                                    <DateInput v-model="projectStore.projectInput.startDate" placeholder="DD/MM/YYYY" />
+                                    <DateInput v-model="projectInput.startDate" placeholder="DD/MM/YYYY" />
                                     <small class="text-muted mt-1 d-block">
                                         <i class="bi bi-info-circle"></i>
                                         Project start date (can be any date)
@@ -77,8 +95,8 @@ async function submitProject() {
                                 </div>
                                 <div class="col-md-6 col-12">
                                     <Error label="End Date" :errors="v$.endDate.$errors" />
-                                    <DateInput v-model="projectStore.projectInput.endDate" placeholder="DD/MM/YYYY"
-                                        :min="projectStore.projectInput.startDate" />
+                                    <DateInput v-model="projectInput.endDate" placeholder="DD/MM/YYYY"
+                                        :min="projectInput.startDate" />
                                     <small class="text-muted mt-1 d-block">
                                         <i class="bi bi-info-circle"></i>
                                         Project end date (must be after start date)
@@ -90,8 +108,8 @@ async function submitProject() {
                                 <RouterLink to="/projects" class="btn btn-outline-secondary">
                                     <i class="bi bi-arrow-left"></i> Back to Projects
                                 </RouterLink>
-                                <BaseBtn type="submit" :variant="projectStore.edit ? 'warning' : 'primary'"
-                                    :label="projectStore.edit ? 'Update Project' : 'Create Project'"
+                                <BaseBtn type="submit" :variant="isEdit ? 'warning' : 'primary'"
+                                    :label="isEdit ? 'Update Project' : 'Create Project'"
                                     :loading="loading" />
                             </div>
                         </form>

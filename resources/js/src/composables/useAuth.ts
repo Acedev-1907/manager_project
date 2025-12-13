@@ -24,7 +24,8 @@ export function useAuth() {
    */
   const isAuthenticated = computed(() => {
     const userData = getUserData();
-    return !!(userData?.token && userData?.user);
+    // Chỉ cần token là đủ (user info đã được lưu trong user-store)
+    return !!(userData?.token);
   });
 
   /**
@@ -49,8 +50,11 @@ export function useAuth() {
     if (isInitialized.value) return;
 
     const userData = getUserData();
-    if (userData?.user) {
-      // Sync user data to store
+    // Nếu user-store chưa có user info, thử lấy từ userData (backward compatibility)
+    // @ts-expect-error - Pinia store type inference issue
+    if (!userStore.user && userData?.user) {
+      // Sync user data to store (chỉ khi chưa có trong store)
+      // @ts-expect-error - Pinia store type inference issue
       userStore.setUser({
         id: userData.user.id,
         name: userData.user.name,
@@ -80,7 +84,16 @@ export function useAuth() {
       throw new Error('Invalid login response');
     }
 
-    // Save to localStorage
+    // Lưu user info vào user-store trước
+    // @ts-expect-error - Pinia store type inference issue
+    userStore.setUser({
+      id: loginData.user.id,
+      name: loginData.user.name,
+      avatar: loginData.user.avatar || '',
+      friend_code: null, // Sẽ được cập nhật từ API
+    });
+
+    // Chỉ lưu token vào localStorage (không lưu user info để tránh trùng với user-store)
     setUserData(loginData);
 
     // Initialize Echo with new token
@@ -91,9 +104,10 @@ export function useAuth() {
       console.warn('Failed to initialize Echo:', error);
     }
 
-    // Fetch latest user data from API
+    // Fetch latest user data from API và cập nhật user-store
     try {
       const userRes = await makeHttpReq<undefined, { data: any }>('user', 'GET');
+      // @ts-expect-error - Pinia store type inference issue
       userStore.setUser({
         id: userRes.data.id,
         name: userRes.data.name,
@@ -101,13 +115,8 @@ export function useAuth() {
         friend_code: userRes.data.friend_code || null,
       });
     } catch (error) {
-      // Fallback to login data if API call fails
-      userStore.setUser({
-        id: loginData.user.id,
-        name: loginData.user.name,
-        avatar: loginData.user.avatar || '',
-        friend_code: null,
-      });
+      // Fallback to login data if API call fails (đã set ở trên)
+      console.warn('Failed to fetch user data from API:', error);
     }
 
     // Clear cache on login
@@ -140,6 +149,7 @@ export function useAuth() {
     }
 
     // Clear user store
+    // @ts-expect-error - Pinia store type inference issue
     userStore.clearUser();
 
     // Navigate to login

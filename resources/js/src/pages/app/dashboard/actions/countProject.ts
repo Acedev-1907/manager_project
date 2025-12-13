@@ -37,23 +37,12 @@ export function useGetTotalProject() {
 
           // Update store
           const dashboardStore = useDashboardStore();
+          // @ts-expect-error - Pinia store type inference issue
           dashboardStore.setCountProject(newCount);
 
-          // Update cache
+          // Cache được quản lý bởi DashboardPage với memory storage
+          // Chỉ cần update store và emit event
           try {
-            const dashboardCache = JSON.parse(
-              localStorage.getItem("dashboardCache") || "{}"
-            );
-            dashboardCache["count_project"] = newCount;
-            localStorage.setItem(
-              "dashboardCache",
-              JSON.stringify(dashboardCache)
-            );
-            localStorage.setItem(
-              "count_project_timestamp",
-              Date.now().toString()
-            );
-
             // Emit event để DashboardPage có thể update reactive ref
             eventBus.emit("count-project-updated", newCount);
           } catch (error) {

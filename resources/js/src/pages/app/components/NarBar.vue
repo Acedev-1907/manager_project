@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { APP } from "../../../App/APP";
 import { useUserStore } from '../../../state/userStore';
@@ -76,6 +76,12 @@ function handleNavClick() {
 
 const userStore = useUserStore();
 
+// Computed properties for template to avoid TypeScript errors
+const currentUser = computed(() => {
+    // @ts-expect-error - Pinia store type inference issue
+    return userStore.user;
+});
+
 </script>
 <template>
     <nav class="top-navbar">
@@ -88,13 +94,13 @@ const userStore = useUserStore();
                 style="display: flex; align-items: center; margin-left: auto; position: relative; gap: 0.4rem; padding-right: 0.5rem;">
                 <BellNotification />
                 <div class="navbar-avatar-btn" @click="toggleMenu($event)" style="position: relative;">
-                    <template v-if="userStore.user && userStore.user.name">
-                        <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
-                            <img :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" alt="avatar"
+                    <template v-if="currentUser && currentUser.name">
+                        <span v-if="currentUser.avatar && currentUser.avatar.length > 0" class="avatar-circle">
+                            <img :src="getAvatarSrc(currentUser.avatar, currentUser.name)" alt="avatar"
                                 style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
                         </span>
-                        <span v-else-if="userStore.user.name && userStore.user.name.length > 0" class="avatar-circle">
-                            {{ userStore.user.name.charAt(0).toUpperCase() }}
+                        <span v-else-if="currentUser.name && currentUser.name.length > 0" class="avatar-circle">
+                            {{ currentUser.name.charAt(0).toUpperCase() }}
                         </span>
                         <span v-else class="avatar-circle">?</span>
                     </template>
@@ -121,16 +127,16 @@ const userStore = useUserStore();
                 <!-- Tài khoản -->
                 <div class="custom-user-list">
                     <div class="custom-user-item">
-                        <img v-if="userStore.user?.avatar"
-                            :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" class="custom-avatar-img" />
-                        <span v-else-if="userStore.user?.name" class="avatar-circle">{{
-                            userStore.user.name.charAt(0).toUpperCase()
+                        <img v-if="currentUser?.avatar"
+                            :src="getAvatarSrc(currentUser.avatar, currentUser.name)" class="custom-avatar-img" />
+                        <span v-else-if="currentUser?.name" class="avatar-circle">{{
+                            currentUser.name.charAt(0).toUpperCase()
                             }}</span>
                         <span v-else class="avatar-circle">?</span>
                         <div class="user-info-block">
-                            <span v-if="userStore.user?.name" class="custom-user-name">{{ userStore.user.name }}</span>
-                            <span v-if="userStore.user?.friend_code" class="friend-code-text">
-                                Friend code: {{ userStore.user?.friend_code }}
+                            <span v-if="currentUser?.name" class="custom-user-name">{{ currentUser.name }}</span>
+                            <span v-if="currentUser?.friend_code" class="friend-code-text">
+                                Friend code: {{ currentUser?.friend_code }}
                             </span>
                         </div>
                     </div>
@@ -169,13 +175,13 @@ const userStore = useUserStore();
         <div class="navbar-user d-none d-md-flex" style="position: relative;">
             <BellNotification />
             <div class="navbar-avatar-btn" @click="toggleMenu($event)" style="position: relative;">
-                <template v-if="userStore.user && userStore.user.name">
-                    <span v-if="userStore.user.avatar && userStore.user.avatar.length > 0" class="avatar-circle">
-                        <img :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)" alt="avatar"
+                <template v-if="currentUser && currentUser.name">
+                    <span v-if="currentUser.avatar && currentUser.avatar.length > 0" class="avatar-circle">
+                        <img :src="getAvatarSrc(currentUser.avatar, currentUser.name)" alt="avatar"
                             style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
                     </span>
-                    <span v-else-if="userStore.user.name && userStore.user.name.length > 0" class="avatar-circle">
-                        {{ userStore.user.name.charAt(0).toUpperCase() }}
+                    <span v-else-if="currentUser.name && currentUser.name.length > 0" class="avatar-circle">
+                        {{ currentUser.name.charAt(0).toUpperCase() }}
                     </span>
                     <span v-else class="avatar-circle">?</span>
                 </template>
@@ -188,21 +194,21 @@ const userStore = useUserStore();
                     <!-- Tài khoản -->
                     <div class="custom-user-list">
                         <div class="custom-user-item">
-                            <img v-if="userStore.user?.avatar"
-                                :src="getAvatarSrc(userStore.user.avatar, userStore.user.name)"
+                            <img v-if="currentUser?.avatar"
+                                :src="getAvatarSrc(currentUser.avatar, currentUser.name)"
                                 class="custom-avatar-img" />
-                            <span v-else-if="userStore.user?.name" class="avatar-circle">{{
-                                userStore.user.name.charAt(0).toUpperCase()
+                            <span v-else-if="currentUser?.name" class="avatar-circle">{{
+                                currentUser.name.charAt(0).toUpperCase()
                                 }}</span>
                             <span v-else class="avatar-circle">?</span>
                             <div class="user-info-block"
                                 style="display: flex; flex-direction: column; align-items: flex-start;">
-                                <span v-if="userStore.user?.name" class="custom-user-name">{{
-                                    userStore.user.name
+                                <span v-if="currentUser?.name" class="custom-user-name">{{
+                                    currentUser.name
                                 }}</span>
-                                <span v-if="userStore.user?.friend_code"
+                                <span v-if="currentUser?.friend_code"
                                     style="color: #2563eb; font-size: 0.95em; display: block; line-height: 1.2; margin-left: 0; margin-top: 2px;">
-                                    Friend code: {{ userStore.user?.friend_code }}
+                                    Friend code: {{ currentUser?.friend_code }}
                                 </span>
                                 <span v-else class="custom-user-name">Unknown</span>
                             </div>

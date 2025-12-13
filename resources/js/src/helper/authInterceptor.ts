@@ -25,6 +25,7 @@ export function handleAuthError() {
   
   // Update auth store
   const authStore = useAuthStore();
+  // @ts-expect-error - Pinia store type inference issue
   authStore.clearAuth();
 
   // Get current path

@@ -12,15 +12,15 @@ export const useUserStore = defineStore("user", {
   state: () => ({
     user: null as User | null,
     avatar: "",
-    userInfoCache: null as any, // cache user info
-    lastFetched: null as number | null, // thời gian fetch gần nhất
+    userInfoCache: null as any, // cache user info (runtime only, not persisted)
+    lastFetched: null as number | null, // thời gian fetch gần nhất (runtime only)
   }),
   
   getters: {
-    isLoggedIn: (state) => state.user !== null,
-    userId: (state) => state.user?.id,
-    userName: (state) => state.user?.name || '',
-    userAvatar: (state) => state.user?.avatar || state.avatar || '',
+    isLoggedIn: (state: { user: User | null }) => state.user !== null,
+    userId: (state: { user: User | null }) => state.user?.id,
+    userName: (state: { user: User | null; avatar: string }) => state.user?.name || '',
+    userAvatar: (state: { user: User | null; avatar: string }) => state.user?.avatar || state.avatar || '',
   },
   
   actions: {
@@ -52,4 +52,11 @@ export const useUserStore = defineStore("user", {
     },
   },
   
+  // Chỉ persist user và avatar (dữ liệu quan trọng), không persist cache
+  persist: {
+    key: 'user-store',
+    paths: ['user', 'avatar'], // Chỉ lưu user và avatar vào localStorage
+    storageType: 'localStorage', // Persistent across sessions
+    ttl: 0, // Never expire
+  },
 });

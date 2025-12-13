@@ -31,8 +31,9 @@ export function useDashboardRealtime(
                 "UserProjectCountUpdated",
                 (e: { countProject: number; userId: number }) => {
                     const newCount = { count: e.countProject };
+                    // @ts-expect-error - Pinia store type inference issue
                     dashboardStore.setCountProject(newCount);
-                    localStorage.setItem('count_project_timestamp', Date.now().toString());
+                    // Timestamp được quản lý bởi DashboardPage với memory storage
                 }
             );
         } catch (error) {
@@ -67,6 +68,7 @@ export function useDashboardRealtime(
 
         // Count project updated
         eventBus.on('count-project-updated', (newCount: any) => {
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setCountProject(newCount);
         });
     };

@@ -8,6 +8,8 @@ import { useGetTotalProject } from '../pages/app/dashboard/actions/countProject'
  * 
  * Tập trung quản lý data và logic cho Dashboard
  * Giảm duplicated code và tối ưu API calls
+ * 
+ * Note: Cache được quản lý bởi DashboardPage với memory storage
  */
 export function useDashboardData() {
     const dashboardStore = useDashboardStore();
@@ -17,37 +19,24 @@ export function useDashboardData() {
     const isLoading = ref(false);
     const chartRenderKey = ref(0);
 
-    // Cache management
-    const CACHE_TIMEOUT = 1800000; // 30 minutes
-
-    /**
-     * Kiểm tra cache validity
-     */
-    const isCacheValid = (timestamp: string | null): boolean => {
-        if (!timestamp) return false;
-        const age = Date.now() - parseInt(timestamp);
-        return age < CACHE_TIMEOUT;
-    };
-
     /**
      * Load pinned project data
+     * Cache được quản lý bởi DashboardPage với memory storage
      */
     const loadPinnedProject = async (useCache: boolean = true): Promise<void> => {
         try {
-            if (useCache) {
-                const cachedData = dashboardStore.pinnedProject;
-                const timestamp = localStorage.getItem('pinned_project_timestamp');
-                
-                if (cachedData && isCacheValid(timestamp)) {
-                    project.value = cachedData;
-                    chartRenderKey.value++;
-                    return;
-                }
+            // @ts-expect-error - Pinia store type inference issue
+            if (useCache && dashboardStore.pinnedProject) {
+                // Sử dụng cache từ store (đã được quản lý bởi DashboardPage)
+                // @ts-expect-error - Pinia store type inference issue
+                project.value = dashboardStore.pinnedProject;
+                chartRenderKey.value++;
+                return;
             }
 
             await getPinnedProject();
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setPinnedProject(project.value);
-            localStorage.setItem('pinned_project_timestamp', Date.now().toString());
             chartRenderKey.value++;
         } catch (error) {
             console.error('Failed to load pinned project:', error);
@@ -56,25 +45,24 @@ export function useDashboardData() {
 
     /**
      * Load project count
+     * Cache được quản lý bởi DashboardPage với memory storage
      */
     const loadProjectCount = async (useCache: boolean = true): Promise<void> => {
         try {
-            if (useCache) {
-                const cachedData = dashboardStore.countProject;
-                const timestamp = localStorage.getItem('count_project_timestamp');
-                
-                if (cachedData && isCacheValid(timestamp)) {
-                    return;
-                }
+            // @ts-expect-error - Pinia store type inference issue
+            if (useCache && dashboardStore.countProject) {
+                // Sử dụng cache từ store (đã được quản lý bởi DashboardPage)
+                return;
             }
 
             await getTotalProject();
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setCountProject(countProject.value);
-            localStorage.setItem('count_project_timestamp', Date.now().toString());
         } catch (error) {
             console.error('Failed to load project count:', error);
             // Set default value on error
             const defaultCount = { count: 0 };
+            // @ts-expect-error - Pinia store type inference issue
             dashboardStore.setCountProject(defaultCount);
         }
     };
@@ -96,10 +84,10 @@ export function useDashboardData() {
 
     /**
      * Clear all cache
+     * Cache được quản lý bởi DashboardPage với memory storage
      */
     const clearCache = (): void => {
-        localStorage.removeItem('pinned_project_timestamp');
-        localStorage.removeItem('count_project_timestamp');
+        // @ts-expect-error - Pinia store type inference issue
         dashboardStore.clearAll();
     };
 
@@ -109,6 +97,7 @@ export function useDashboardData() {
     });
 
     const projectCount = computed(() => {
+        // @ts-expect-error - Pinia store type inference issue
         return dashboardStore.countProject?.count || 0;
     });
 
@@ -127,7 +116,6 @@ export function useDashboardData() {
         loadProjectCount,
         refreshDashboard,
         clearCache,
-        isCacheValid,
     };
 }
 

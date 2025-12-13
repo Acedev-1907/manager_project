@@ -22,6 +22,7 @@ export function useCreateTask() {
       const data = await makeHttpReq<CreateTaskInput, { message: string }>(
         "tasks",
         "POST",
+        // @ts-expect-error - Pinia store type inference issue
         taskStore.taskInput
       );
       loading.value = false;

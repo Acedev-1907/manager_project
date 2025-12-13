@@ -16,16 +16,24 @@ export default defineComponent({
         useAppGlobalRealtime();
 
 
-        const { setUser } = useUserStore();
-        // Lấy userId từ localStorage và dùng ref để reactive
+        const userStore = useUserStore();
+        // Lấy userId từ user-store hoặc userData (backward compatibility)
         const userId = ref<string | number | null>(null);
+        // Ưu tiên lấy từ user-store (đã được persist)
+        // @ts-expect-error - Pinia store type inference issue
+        if (userStore.user?.id) {
+            // @ts-expect-error - Pinia store type inference issue
+            userId.value = userStore.user.id;
+        } else {
+            // Fallback: lấy từ userData (backward compatibility)
         const userDataStr = localStorage.getItem("userData");
         if (userDataStr) {
             try {
                 const userData = JSON.parse(userDataStr);
-                userId.value = userData.id || (userData.user && userData.user.id) || null;
+                    userId.value = userData.userId || (userData.user && userData.user.id) || null;
             } catch (err) {
                 // ignore parse error
+                }
             }
         }
         // Khởi tạo lắng nghe Echo toàn cục với userId là ref
@@ -47,21 +55,14 @@ export default defineComponent({
             if (token) {
                 try {
                     const res = await makeHttpReq<undefined, any>('user', 'GET');
-                    setUser({ 
+                    // Chỉ cập nhật user-store, không cập nhật userData (chỉ lưu token)
+                    // @ts-expect-error - Pinia store type inference issue
+                    userStore.setUser({ 
                         id: res.data.id,
                         name: res.data.name, 
                         avatar: res.data.avatar || '', 
                         friend_code: res.data.friend_code || null 
                     });
-                    // Cập nhật lại localStorage
-                    const userData = userDataStr ? JSON.parse(userDataStr) : {};
-                    userData.user = { 
-                        id: res.data.id,
-                        name: res.data.name, 
-                        avatar: res.data.avatar || '', 
-                        friend_code: res.data.friend_code || null 
-                    };
-                    localStorage.setItem("userData", JSON.stringify(userData));
                 } catch (err) {
                     // ignore fetch error
                 }

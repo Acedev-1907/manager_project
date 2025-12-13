@@ -20,7 +20,8 @@ export const useAuthStore = defineStore('auth', {
     isLoggedIn: () => {
       // Always check from localStorage for accuracy
       const userData = getUserData();
-      return !!(userData?.token && userData?.user);
+      // Chỉ cần token là đủ (user info đã được lưu trong user-store)
+      return !!(userData?.token);
     },
 
     /**
@@ -38,7 +39,8 @@ export const useAuthStore = defineStore('auth', {
      */
     updateAuthState() {
       const userData = getUserData();
-      this.isAuthenticated = !!(userData?.token && userData?.user);
+      // Chỉ cần token là đủ (user info đã được lưu trong user-store)
+      this.isAuthenticated = !!(userData?.token);
       this.token = userData?.token || null;
     },
 

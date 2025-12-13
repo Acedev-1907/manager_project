@@ -21,9 +21,21 @@ const emit = defineEmits<{
 const query = ref("");
 const currentUserId = ref<number | null>(null);
 
+// Lấy userId từ user-store (ưu tiên) hoặc userData (fallback)
+import { useUserStore } from '../../../../state/userStore';
+const userStore = useUserStore();
+
 onMounted(() => {
+    // Ưu tiên lấy từ user-store
+    // @ts-expect-error - Pinia store type inference issue
+    const userId = userStore.user?.id;
+    currentUserId.value = userId ? Number(userId) : null;
+    // Fallback: lấy từ userData (backward compatibility)
+    if (!currentUserId.value) {
     const userData = getUserData();
-    currentUserId.value = userData?.user?.id ?? null;
+        const fallbackId = (userData?.user as any)?.id;
+        currentUserId.value = fallbackId ? Number(fallbackId) : null;
+    }
 });
 
 const handleSearch = async (searchQuery: string) => {

@@ -207,14 +207,17 @@ import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import BaseInput from '../../../../components/BaseInput.vue';
 import DateInput from '../../../../components/DateInput.vue';
 import { useGetMembers } from '../../member/actions/getMember';
-import { projectStore } from '../store/projectStore';
+import { useProjectStore } from '../store/projectStore';
 import { getAvatarSrc } from '../../../../helper/avatar';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
+import { useUserStore } from '../../../../state/userStore';
 
 const props = defineProps<{ isEdit: boolean, projectInput: any, loading: boolean }>()
 const emit = defineEmits(['close', 'submit'])
 
 const { getMembers } = useGetMembers();
+const projectStore = useProjectStore();
+const userStore = useUserStore();
 const selectedMembers = ref<number[]>([]);
 const currentUserId = ref<number | null>(null);
 const searchQuery = ref('');
@@ -232,10 +235,18 @@ const hasMoreData = ref(true);
 const allMembers = ref<any[]>([]);
 
 onMounted(async () => {
+    // @ts-expect-error - Pinia store type inference issue
     projectStore.edit = props.isEdit;
     await getMembers(1, '');
+    // Lấy userId từ user-store (ưu tiên) hoặc userData (fallback)
+    // @ts-expect-error - Pinia store type inference issue
+    const userId = userStore.user?.id;
+    currentUserId.value = userId ? Number(userId) : null;
+    if (!currentUserId.value) {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    currentUserId.value = userData.id;
+        const fallbackId = userData.userId || userData.id;
+        currentUserId.value = fallbackId ? Number(fallbackId) : null;
+    }
 
     // Initialize selectedMembers from project data
     if (props.projectInput.members && Array.isArray(props.projectInput.members)) {
@@ -413,8 +424,11 @@ function clearAllMembers() {
 }
 
 // Automatically clear end date if new start date > old end date
+// @ts-expect-error - Pinia store type inference issue
 watch(() => projectStore.projectInput.startDate, (newStart) => {
+    // @ts-expect-error - Pinia store type inference issue
     if (projectStore.projectInput.endDate && newStart && projectStore.projectInput.endDate < newStart) {
+        // @ts-expect-error - Pinia store type inference issue
         projectStore.projectInput.endDate = '';
     }
 });

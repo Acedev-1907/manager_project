@@ -9,7 +9,7 @@ type MemberType = Member;
 
 export async function fetchMembers(
   friendsList: Ref<GetMemberType>,
-  memberCache: Ref<{ [key: string]: GetMemberType }>,
+  memberCache: { value: Ref<{ [key: string]: GetMemberType }> },
   isLoading: Ref<boolean>,
   query = "",
   page = 1,
@@ -19,8 +19,8 @@ export async function fetchMembers(
   const cacheKey = `member_page_${query}_${page}`;
 
   // Check cache before calling API
-  if (!force && memberCache.value[cacheKey] && !append) {
-    friendsList.value = memberCache.value[cacheKey];
+  if (!force && memberCache.value.value[cacheKey] && !append) {
+    friendsList.value = memberCache.value.value[cacheKey];
     isLoading.value = false;
     return;
   }
@@ -66,20 +66,16 @@ export async function fetchMembers(
         friendsList.value = mergedData;
         // Always update cache for page 1 with complete merged list
         const firstPageKey = `member_page_${query}_1`;
-        memberCache.value[firstPageKey] = mergedData;
-        memberCache.value[cacheKey] = mergedData;
+        memberCache.value.value[firstPageKey] = mergedData;
+        memberCache.value.value[cacheKey] = mergedData;
       }
     } else {
       friendsList.value = data;
-      memberCache.value[cacheKey] = data;
+      memberCache.value.value[cacheKey] = data;
     }
 
-    // Save cache to localStorage safely
-    try {
-      localStorage.setItem("memberCache", JSON.stringify(memberCache.value));
-    } catch (e) {
-      console.warn("Failed to save member cache to localStorage:", e);
-    }
+    // Cache được quản lý tự động bởi useStorage (memory storage)
+    // Không cần lưu vào localStorage nữa
   } catch (e) {
     // Log error for easier debugging
     console.error("Error when fetchMembers:", e);
@@ -148,7 +144,7 @@ export async function fetchReceivedInvitations(
 
 export async function handleRemoveMember(
   member: MemberType,
-  memberCache: Ref<{ [key: string]: GetMemberType }>,
+  memberCache: { value: Ref<{ [key: string]: GetMemberType }> },
   searchQuery: Ref<string>,
   friendsList: Ref<GetMemberType>,
   isLoading: Ref<boolean>
@@ -163,8 +159,7 @@ export async function handleRemoveMember(
   });
   if (result.isConfirmed) {
     await makeHttpReq<undefined, any>(`members/${member.id}`, "DELETE");
-    memberCache.value = {};
-    localStorage.removeItem("memberCache");
+    memberCache.value.value = {}; // useStorage tự động save
     await fetchMembers(friendsList, memberCache, isLoading, searchQuery.value);
     showSuccess("Removed from contact list");
   }

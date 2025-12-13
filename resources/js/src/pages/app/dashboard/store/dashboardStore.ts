@@ -2,15 +2,15 @@ import { defineStore } from "pinia";
 
 export const useDashboardStore = defineStore("dashboard", {
   state: () => ({
-    pinnedProject: null as any,
-    countProject: null as any,
-    chartData: null as any,
+    pinnedProject: null as any, // Runtime cache only - use memory cache
+    countProject: null as any, // Runtime cache only - use memory cache
+    chartData: null as any, // Runtime cache only - use memory cache
   }),
   
   getters: {
-    hasPinnedProject: (state) => state.pinnedProject !== null,
-    hasChartData: (state) => state.chartData !== null,
-    projectCount: (state) => state.countProject?.count || 0,
+    hasPinnedProject: (state: { pinnedProject: any }) => state.pinnedProject !== null,
+    hasChartData: (state: { chartData: any }) => state.chartData !== null,
+    projectCount: (state: { countProject: any }) => state.countProject?.count || 0,
   },
   
   actions: {
@@ -39,4 +39,7 @@ export const useDashboardStore = defineStore("dashboard", {
     },
   },
   
+  // Không persist dashboard data - nên dùng memory cache với TTL ngắn
+  // Dashboard data thay đổi thường xuyên và không cần persist
+  // persist: false, // Explicitly disable persistence
 });
