@@ -40,15 +40,19 @@ onBeforeUnmount(() => {
     if (window.innerWidth <= 767) document.body.style.overflow = '';
 });
 
-function toggleBell(event?: MouseEvent) {
+async function toggleBell(event?: MouseEvent) {
     if (event) event.stopPropagation();
     eventBus.emit('close-avatar-dropdown');
     if (bellOpen.value) {
         closeBell();
     } else {
         bellOpen.value = true;
+        // Đảm bảo notifications được load nếu chưa có
+        if (notifications.value.length === 0) {
+            await fetchAllNotifications();
+        }
         // Đánh dấu tất cả thông báo là đã đọc (badge biến mất ngay)
-        markAllAsRead();
+        await markAllAsRead();
     }
 }
 

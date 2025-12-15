@@ -412,16 +412,8 @@ onUnmounted(() => {
         <LoadingPage v-if="isLoading" />
         <div v-if="!isLoading" class="project-page-content">
             <!-- Summary section (moved from Dashboard) -->
-            <div class="info-bar">
+            <div class="info-bar" v-if="pinnedProject && pinnedProject.id">
                 <div class="info-chip">
-                    <div class="chip-label">
-                        <i class="bi bi-folder2-open"></i>
-                        <span>Total Projects</span>
-                    </div>
-                    <div class="chip-value">{{ totalProjects }}</div>
-                </div>
-
-                <div class="info-chip" v-if="pinnedProject && pinnedProject.id">
                     <div class="chip-label">
                         <i class="bi bi-pie-chart-fill"></i>
                         <span>Tasks</span>
@@ -606,7 +598,7 @@ onUnmounted(() => {
 }
 
 .chart-empty {
-    max-width: 1220px;
+    max-width: fit-content;
     margin: 0.25rem auto 1rem auto;
     display: flex;
     align-items: center;
@@ -616,7 +608,7 @@ onUnmounted(() => {
     border-radius: 0.7rem;
     color: #6b7280;
     font-weight: 600;
-    padding: 1rem;
+    padding: 1rem 2rem;
 }
 
 /* Projects Section */

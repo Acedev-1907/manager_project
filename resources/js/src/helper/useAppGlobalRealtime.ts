@@ -30,6 +30,24 @@ export function useAppGlobalRealtime() {
             timestamp: Date.now(),
             userId: e.userId,
           });
+        })
+        .listen("ColumnAdded", (e: any) => {
+          // Emit event for column added updates
+          eventBus.emit("column-added", {
+            projectId,
+            column: e.column,
+            timestamp: Date.now(),
+            userId: e.userId,
+          });
+        })
+        .listen("ColumnDeleted", (e: any) => {
+          // Emit event for column deleted updates
+          eventBus.emit("column-deleted", {
+            projectId,
+            columnId: e.columnId,
+            timestamp: Date.now(),
+            userId: e.userId,
+          });
         });
 
       activeProjectListeners.add(projectId);

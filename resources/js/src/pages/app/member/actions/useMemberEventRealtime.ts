@@ -52,37 +52,88 @@ export function handleMemberEvent(
   if (e.action === "invitation_sent") {
     const data = JSON.parse(localStorage.getItem("userData") || "{}");
     const userId = data.user?.id;
+    
+    console.log('🔔 MemberEvent invitation_sent:', {
+      userId,
+      invitation: e.payload?.invitation,
+      receiver_id: e.payload?.invitation?.receiver_id,
+      sender_id: e.payload?.invitation?.sender_id
+    });
+    
     // Receiver: update receivedInvitations
     if (
       e.payload &&
       e.payload.invitation &&
-      e.payload.invitation.receiver_id === userId &&
-      receivedInvitations.value &&
-      receivedInvitations.value.data
+      e.payload.invitation.receiver_id &&
+      String(e.payload.invitation.receiver_id) === String(userId)
     ) {
-      let arr = Array.isArray(receivedInvitations.value.data)
-        ? receivedInvitations.value.data
-        : receivedInvitations.value.data.data || [];
-      if (!arr.some((m: any) => m.id === e.payload.invitation.id)) {
-        arr = [e.payload.invitation, ...arr];
+      // Đảm bảo receivedInvitations.value được khởi tạo
+      if (!receivedInvitations.value) {
+        receivedInvitations.value = { data: [], total: 0, current_page: 1, last_page: 1, per_page: 10 };
       }
-      receivedInvitations.value.data = arr;
+      
+      // Đảm bảo data là array
+      if (!Array.isArray(receivedInvitations.value.data)) {
+        receivedInvitations.value.data = [];
+      }
+      
+      // Kiểm tra xem invitation đã tồn tại chưa
+      const existingIndex = receivedInvitations.value.data.findIndex(
+        (inv: any) => inv.id === e.payload.invitation.id || 
+        (inv.invitation_id && e.payload.invitation.id && inv.invitation_id === e.payload.invitation.id)
+      );
+      
+      if (existingIndex === -1) {
+        // Thêm invitation mới vào đầu danh sách
+        const newInvitation = {
+          ...e.payload.invitation,
+          id: e.payload.invitation.id || e.payload.invitation.invitation_id
+        };
+        receivedInvitations.value.data = [newInvitation, ...receivedInvitations.value.data];
+        receivedInvitations.value.total = (receivedInvitations.value.total || 0) + 1;
+        
+        console.log('✅ Added invitation to receivedInvitations:', newInvitation);
+      } else {
+        console.log('⚠️ Invitation already exists in receivedInvitations');
+      }
     }
+    
     // Sender: update sentInvitations
     if (
       e.payload &&
       e.payload.invitation &&
-      e.payload.invitation.sender_id === userId &&
-      sentInvitations.value &&
-      sentInvitations.value.data
+      e.payload.invitation.sender_id &&
+      String(e.payload.invitation.sender_id) === String(userId)
     ) {
-      let arr = Array.isArray(sentInvitations.value.data)
-        ? sentInvitations.value.data
-        : sentInvitations.value.data.data || [];
-      if (!arr.some((m: any) => m.id === e.payload.invitation.id)) {
-        arr = [e.payload.invitation, ...arr];
+      // Đảm bảo sentInvitations.value được khởi tạo
+      if (!sentInvitations.value) {
+        sentInvitations.value = { data: [], total: 0, current_page: 1, last_page: 1, per_page: 10 };
       }
-      sentInvitations.value.data = arr;
+      
+      // Đảm bảo data là array
+      if (!Array.isArray(sentInvitations.value.data)) {
+        sentInvitations.value.data = [];
+      }
+      
+      // Kiểm tra xem invitation đã tồn tại chưa
+      const existingIndex = sentInvitations.value.data.findIndex(
+        (inv: any) => inv.id === e.payload.invitation.id || 
+        (inv.invitation_id && e.payload.invitation.id && inv.invitation_id === e.payload.invitation.id)
+      );
+      
+      if (existingIndex === -1) {
+        // Thêm invitation mới vào đầu danh sách
+        const newInvitation = {
+          ...e.payload.invitation,
+          id: e.payload.invitation.id || e.payload.invitation.invitation_id
+        };
+        sentInvitations.value.data = [newInvitation, ...sentInvitations.value.data];
+        sentInvitations.value.total = (sentInvitations.value.total || 0) + 1;
+        
+        console.log('✅ Added invitation to sentInvitations:', newInvitation);
+      } else {
+        console.log('⚠️ Invitation already exists in sentInvitations');
+      }
     }
   }
 

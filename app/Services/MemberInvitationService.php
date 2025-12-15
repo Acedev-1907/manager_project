@@ -28,15 +28,33 @@ class MemberInvitationService
             'receiver_id' => $receiver->id,
             'status' => 'pending',
         ]);
-        // Trước khi gửi notification, kiểm tra đã có notification 'sent' chưa đọc chưa
+        // Luôn gửi notification cho receiver để đảm bảo realtime notification được broadcast
+        // Kiểm tra và xóa notification cũ nếu có (tránh duplicate)
         $oldNoti = $receiver->notifications()
             ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.invitation_id')) = ?", [$invitation->id])
             ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(`data`, '$.type')) = 'sent'")
             ->whereNull('read_at')
             ->first();
-        if (!$oldNoti) {
-            // Gửi notification cho receiver
-            $receiver->notify(new \App\Notifications\MemberInvitationNotification($invitation));
+        if ($oldNoti) {
+            // Xóa notification cũ để tránh duplicate
+            $oldNoti->delete();
+        }
+        // Luôn gửi notification mới để đảm bảo realtime broadcast
+        try {
+            $notification = new \App\Notifications\MemberInvitationNotification($invitation);
+            $receiver->notify($notification);
+            Log::info('Notification sent', [
+                'receiver_id' => $receiver->id,
+                'sender_id' => $sender->id,
+                'invitation_id' => $invitation->id,
+                'channel' => 'user-notification.' . $receiver->id
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to send notification', [
+                'error' => $e->getMessage(),
+                'receiver_id' => $receiver->id,
+                'invitation_id' => $invitation->id
+            ]);
         }
         // Broadcast event tới receiver
         broadcast(new MemberEvent($receiver->id, $sender->id, 'invitation_sent', [

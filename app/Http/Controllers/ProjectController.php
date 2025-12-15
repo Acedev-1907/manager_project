@@ -166,6 +166,9 @@ class ProjectController extends ApiController
                 $columnData['icon'] ?? 'fas fa-columns'
             );
 
+            // Broadcast event để các user khác nhận được cột mới
+            broadcast(new \App\Events\ColumnAdded($column, $projectId, $user->id));
+
             return $this->respondWithData($column, 'Column added successfully');
         } catch (\Exception $e) {
             return $this->setStatusCode(500)
@@ -265,6 +268,9 @@ class ProjectController extends ApiController
 
             $deleted = $project->deleteColumn($columnId);
             if ($deleted) {
+                // Broadcast event để các user khác nhận được cột đã bị xóa
+                broadcast(new \App\Events\ColumnDeleted($columnId, $projectId, $user->id));
+
                 return $this->respondWithMessage('Column deleted successfully');
             } else {
                 return $this->respondNotFound('Column not found');

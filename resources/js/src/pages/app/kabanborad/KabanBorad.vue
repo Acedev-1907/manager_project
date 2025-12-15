@@ -137,6 +137,21 @@ function scrollToAddColumnButton() {
     }
 }
 
+// Helper function to transform column from BE to FE format
+function transformColumnData(column: any, index?: number): any {
+    return {
+        key: column.key_name || `column-${column.id}`,
+        title: column.name,
+        icon: column.icon,
+        iconBg: `linear-gradient(135deg, ${column.color} 0%, ${column.color}80 100%)`,
+        status: column.position ?? index ?? 0,
+        color: column.color,
+        colorLight: column.color + '80',
+        id: column.id,
+        position: column.position ?? index ?? 0
+    };
+}
+
 // Function to fetch columns from API
 async function getProjectColumns() {
     try {
@@ -160,17 +175,9 @@ async function getProjectColumns() {
 
             if (columnsArray.length > 0) {
                 // Transform data from BE to FE format
-                columns.value = columnsArray.map((column: any, index: number) => ({
-                    key: column.key_name || `column-${column.id}`,
-                    title: column.name,
-                    icon: column.icon,
-                    iconBg: `linear-gradient(135deg, ${column.color} 0%, ${column.color}80 100%)`,
-                    status: column.position || index,
-                    color: column.color,
-                    colorLight: column.color + '80',
-                    id: column.id,
-                    position: column.position || index
-                })).sort((a: any, b: any) => a.position - b.position); // Sort by position
+                columns.value = columnsArray.map((column: any, index: number) => 
+                    transformColumnData(column, index)
+                ).sort((a: any, b: any) => a.position - b.position); // Sort by position
             } else {
                 // Fallback: create default columns if no data
                 columns.value = [...DEFAULT_COLUMNS];
@@ -282,6 +289,74 @@ onMounted(async () => {
                 if (!isCurrentUser(eventData.userId)) {
                     // Refresh project data to get updated progress
                     await getProjectDetail(slug, false);
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Listen for column added events - Optimized: Update directly from event data (no API call)
+    eventBus.on('column-added', async (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                if (!isCurrentUser(eventData.userId) && eventData.column) {
+                    // Optimistic update: Add column directly from event data (instant UI update)
+                    const newColumn = transformColumnData(eventData.column, columns.value.length);
+                    
+                    // Add to columns array and sort
+                    columns.value.push(newColumn);
+                    columns.value.sort((a: any, b: any) => a.position - b.position);
+                    
+                    // Update ProjectData to keep sync
+                    if (ProjectData.value?.data) {
+                        const boardColumns = ProjectData.value.data.board_columns || [];
+                        if (Array.isArray(boardColumns)) {
+                            boardColumns.push(eventData.column);
+                        } else if (typeof boardColumns === 'object') {
+                            ProjectData.value.data.board_columns = [...Object.values(boardColumns), eventData.column];
+                        } else {
+                            ProjectData.value.data.board_columns = [eventData.column];
+                        }
+                    }
+                    
+                    // Setup drop listeners for new column (immediate, no delay)
+                    await nextTick();
+                    setupAllDropListeners();
+                    forceScrollbar();
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Listen for column deleted events - Optimized: Remove directly from array (no API call)
+    eventBus.on('column-deleted', async (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                if (!isCurrentUser(eventData.userId) && eventData.columnId) {
+                    // Optimistic update: Remove column directly from array (instant UI update)
+                    const columnIndex = columns.value.findIndex((col: any) => col.id === eventData.columnId);
+                    if (columnIndex !== -1) {
+                        columns.value.splice(columnIndex, 1);
+                    }
+                    
+                    // Update ProjectData to keep sync
+                    if (ProjectData.value?.data?.board_columns) {
+                        const boardColumns = ProjectData.value.data.board_columns;
+                        if (Array.isArray(boardColumns)) {
+                            ProjectData.value.data.board_columns = boardColumns.filter((col: any) => col.id !== eventData.columnId);
+                        } else if (typeof boardColumns === 'object') {
+                            const columnsArray = Object.values(boardColumns);
+                            ProjectData.value.data.board_columns = columnsArray.filter((col: any) => col.id !== eventData.columnId);
+                        }
+                    }
+                    
+                    // Setup drop listeners after column deletion (immediate, no delay)
+                    await nextTick();
+                    setupAllDropListeners();
+                    forceScrollbar();
                 }
             }
         } catch (error) {

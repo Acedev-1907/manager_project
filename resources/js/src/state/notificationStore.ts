@@ -30,33 +30,81 @@ function setupNotificationListener(userId: string | number | null) {
   }
   const channelName = `user-notification.${userId}`;
   if (currentChannel && window.Echo) {
-    window.Echo.leave(currentChannel);
+    try {
+      window.Echo.leave(currentChannel);
+    } catch (e) {
+      // Ignore leave errors
+    }
   }
   currentChannel = channelName;
-  window.Echo.private(channelName).notification(async (notification: any) => {
-    // Bổ sung project_id, slug nếu thiếu
-    if (
-      (!notification.project_id || !notification.slug) &&
-      notification.project
-    ) {
-      if (!notification.project_id && notification.project.id) {
-        notification.project_id = notification.project.id;
+  
+  try {
+    const channel = window.Echo.private(channelName);
+    
+    // Listen for notification events
+    channel.notification(async (notification: any) => {
+      console.log('📬 Notification received:', notification);
+      
+      // Cập nhật unread count ngay lập tức từ notification data
+      if (typeof notification.unread_count === 'number') {
+        notificationCount.value = notification.unread_count;
       }
-      if (!notification.slug && notification.project.slug) {
-        notification.slug = notification.project.slug;
+      
+      // Bổ sung project_id, slug nếu thiếu
+      if (
+        (!notification.project_id || !notification.slug) &&
+        notification.project
+      ) {
+        if (!notification.project_id && notification.project.id) {
+          notification.project_id = notification.project.id;
+        }
+        if (!notification.slug && notification.project.slug) {
+          notification.slug = notification.project.slug;
+        }
       }
-    }
-    // Luôn fetch lại notification từ API để đồng bộ
-    await fetchNotifications();
-    // Phát âm thanh nếu user đã từng tương tác
-    if (userInteracted) {
-      try {
-        new Audio("/sounds/new-notification.mp3").play();
-      } catch (e) {
-        // ignore audio play errors
+      
+      // Thêm notification vào đầu danh sách ngay lập tức (optimistic update)
+      if (notification.id || notification.invitation_id) {
+        const mappedNoti = mapNotificationDataFromBroadcast(notification);
+        // Kiểm tra xem notification đã tồn tại chưa
+        const existingIndex = notifications.value.findIndex(
+          (n: any) => n.id === mappedNoti.id || 
+          (n.invitation_id && mappedNoti.invitation_id && n.invitation_id === mappedNoti.invitation_id)
+        );
+        if (existingIndex === -1) {
+          // Thêm vào đầu danh sách
+          notifications.value.unshift(mappedNoti);
+        }
       }
-    }
-  });
+      
+      // Fetch lại từ API sau một chút delay để đảm bảo DB đã được cập nhật
+      // Nhưng merge với notifications hiện có thay vì ghi đè
+      setTimeout(async () => {
+        await fetchNotifications(true); // true = merge mode
+      }, 1000);
+      
+      // Phát âm thanh nếu user đã từng tương tác
+      if (userInteracted) {
+        try {
+          new Audio("/sounds/new-notification.mp3").play();
+        } catch (e) {
+          // ignore audio play errors
+        }
+      }
+    });
+    
+    // Listen for connection events để debug
+    channel.subscribed(() => {
+      console.log('✅ Subscribed to notification channel:', channelName);
+    });
+    
+    channel.error((error: any) => {
+      console.error('❌ Notification channel error:', error);
+    });
+    
+  } catch (error) {
+    console.error('❌ Error setting up notification listener:', error);
+  }
 }
 
 // Khởi tạo lắng nghe realtime khi user đăng nhập
@@ -93,45 +141,95 @@ interface NotificationApiResponse {
 }
 
 // Lấy 10 thông báo mới nhất
-export async function fetchNotifications() {
-  const res = await makeHttpReq<unknown, NotificationApiResponse>(
+export async function fetchNotifications(mergeMode: boolean = false) {
+  const res = await makeHttpReq<unknown, any>(
     "notifications",
     "GET"
   );
+  
+  // Backend trả về: { code, data: { notifications, unread_count }, message }
+  const responseData = (res as any)?.data || res;
+  
   if (
-    res &&
-    typeof res === "object" &&
-    Array.isArray((res as NotificationApiResponse).notifications) &&
-    typeof (res as NotificationApiResponse).unread_count === "number"
+    responseData &&
+    typeof responseData === "object" &&
+    Array.isArray(responseData.notifications) &&
+    typeof responseData.unread_count === "number"
   ) {
-    const data = res as NotificationApiResponse;
-    notifications.value = data.notifications.map(mapNotificationData);
+    const data = responseData as NotificationApiResponse;
+    const mappedNotifications = data.notifications.map(mapNotificationData);
+    
+    if (mergeMode) {
+      // Merge mode: Giữ lại notifications hiện có và thêm/cập nhật từ API
+      // Match theo cả id và invitation_id để xử lý trường hợp temp id
+      mappedNotifications.forEach((apiNoti: any) => {
+        // Tìm notification đã có theo id hoặc invitation_id
+        const existingIndex = notifications.value.findIndex(
+          (n: any) => 
+            n.id === apiNoti.id || 
+            (apiNoti.invitation_id && n.invitation_id && n.invitation_id === apiNoti.invitation_id)
+        );
+        
+        if (existingIndex !== -1) {
+          // Cập nhật notification đã có (thay thế temp id bằng id thật từ DB)
+          notifications.value[existingIndex] = apiNoti;
+        } else {
+          // Thêm notification mới vào đầu danh sách
+          notifications.value.unshift(apiNoti);
+        }
+      });
+      
+      // Loại bỏ duplicate (theo invitation_id)
+      const seen = new Set();
+      notifications.value = notifications.value.filter((n: any) => {
+        const key = n.invitation_id ? `inv_${n.invitation_id}` : n.id;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      
+      // Giới hạn số lượng notifications (giữ 20 mới nhất)
+      if (notifications.value.length > 20) {
+        notifications.value = notifications.value.slice(0, 20);
+      }
+    } else {
+      // Normal mode: Ghi đè toàn bộ
+      notifications.value = mappedNotifications;
+    }
+    
     notificationCount.value = data.unread_count;
   } else {
-    notifications.value = Array.isArray(res) ? (res as any[]) : [];
-    notificationCount.value = notifications.value.filter(
-      (n) => !n.read_at
-    ).length;
+    if (!mergeMode) {
+      notifications.value = Array.isArray(res) ? (res as any[]) : [];
+      notificationCount.value = notifications.value.filter(
+        (n) => !n.read_at
+      ).length;
+    }
+    // Nếu mergeMode, không thay đổi notifications.value nếu API lỗi
   }
 }
 
 // Lấy toàn bộ thông báo
 export async function fetchAllNotifications() {
-  const res = await makeHttpReq<unknown, NotificationApiResponse>(
+  const res = await makeHttpReq<unknown, any>(
     "notifications/all",
     "GET"
   );
+  
+  // Backend trả về: { code, data: { notifications, unread_count }, message }
+  const responseData = (res as any)?.data || res;
+  
   if (
-    res &&
-    typeof res === "object" &&
-    Array.isArray((res as NotificationApiResponse).notifications) &&
-    typeof (res as NotificationApiResponse).unread_count === "number"
+    responseData &&
+    typeof responseData === "object" &&
+    Array.isArray(responseData.notifications) &&
+    typeof responseData.unread_count === "number"
   ) {
-    const data = res as NotificationApiResponse;
+    const data = responseData as NotificationApiResponse;
     notifications.value = data.notifications.map(mapNotificationData);
     notificationCount.value = data.unread_count;
   } else {
-    notifications.value = Array.isArray(res) ? (res as any[]) : [];
+    notifications.value = Array.isArray(responseData) ? (responseData as any[]) : [];
     notificationCount.value = notifications.value.filter(
       (n) => !n.read_at
     ).length;
@@ -148,8 +246,35 @@ export async function markAsRead(id: string) {
 
 // Đánh dấu tất cả thông báo là đã đọc
 export async function markAllAsRead() {
-  await makeHttpReq<any, any>(`notifications/read-all`, "POST");
-  await fetchNotifications();
+  try {
+    // Lưu lại notifications hiện có trước khi mark as read
+    const currentNotifications = [...notifications.value];
+    
+    // Cập nhật read_at cho tất cả notifications hiện có (optimistic update)
+    currentNotifications.forEach((noti: any) => {
+      if (!noti.read_at) {
+        noti.read_at = new Date().toISOString();
+      }
+    });
+    
+    // Cập nhật notifications ngay lập tức
+    notifications.value = currentNotifications;
+    
+    // Cập nhật unread count về 0
+    notificationCount.value = 0;
+    
+    // Gọi API để đánh dấu đã đọc (không đợi kết quả)
+    makeHttpReq<any, any>(`notifications/read-all`, "POST").catch((error) => {
+      console.error('Error marking all as read:', error);
+      // Nếu lỗi, rollback unread count
+      notificationCount.value = currentNotifications.filter((n: any) => !n.read_at).length;
+    });
+    
+    // Không fetch lại để tránh mất notifications
+    // Notifications đã được cập nhật ở trên rồi
+  } catch (error) {
+    console.error('Error marking all as read:', error);
+  }
 }
 
 // Xóa 1 thông báo
@@ -159,7 +284,42 @@ export async function removeNotification(id: string) {
   await fetchNotifications();
 }
 
-// Helper: Chuẩn hóa dữ liệu notification cho FE
+// Helper: Map notification từ broadcast event (realtime)
+function mapNotificationDataFromBroadcast(notification: any) {
+  const lang = localStorage.getItem("lang") || "en";
+  let message = notification.message || "";
+  
+  // Xử lý message dựa trên type
+  if (notification.type === "sent") {
+    message = tNotification("sent", lang as "en" | "vi", {
+      name: notification.sender_name || "",
+    });
+  } else if (notification.type === "accepted") {
+    message = tNotification("accepted", lang as "en" | "vi", {
+      name: notification.sender_name || "",
+    });
+  } else if (notification.type === "declined") {
+    message = tNotification("declined", lang as "en" | "vi", {
+      name: notification.sender_name || "",
+    });
+  }
+  
+  return {
+    id: notification.id || `temp-${notification.invitation_id || Date.now()}`,
+    message,
+    avatar: notification.sender_avatar || notification.avatar || "",
+    created_at: notification.created_at || new Date().toISOString(),
+    slug: notification.slug || "",
+    project_id: notification.project_id || "",
+    read_at: null, // Mới nhận nên chưa đọc
+    invitation_id: notification.invitation_id || null,
+    sender_name: notification.sender_name || null,
+    sender_avatar: notification.sender_avatar || null,
+    type: notification.type || null,
+  };
+}
+
+// Helper: Chuẩn hóa dữ liệu notification cho FE (từ database)
 function mapNotificationData(n: any) {
   const userId = JSON.parse(localStorage.getItem("userData") || "{}").id;
   const lang = localStorage.getItem("lang") || "en";
