@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Events\TaskCommentCreated;
+use App\Events\TaskDragStarted;
+use App\Events\TaskDragEnded;
+use App\Events\TaskDragOverColumn;
 use App\Models\Task;
 use App\Services\TaskService;
 use App\Services\TaskCommentService;
@@ -207,5 +210,166 @@ class TaskController extends ApiController
         event(new TaskCommentCreated($comment, $id));
         
         return $this->respondCreated('Comment added successfully', $comment->id);
+    }
+
+    /**
+     * Broadcast task drag started event
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function broadcastDragStarted(Request $request)
+    {
+        $user = $request->user();
+        $taskId = $request->input('task_id');
+        $projectId = $request->input('project_id');
+
+        // Debug log để kiểm tra payload và user
+        \Log::info('DragStarted request', [
+            'task_id' => $taskId,
+            'project_id' => $projectId,
+            'user_id' => $user?->id,
+            'ip' => $request->ip(),
+        ]);
+
+        if (!$taskId || !$projectId) {
+            return $this->respondValidationError('Task ID and Project ID are required');
+        }
+
+        // Verify user has access to project
+        $task = Task::find($taskId);
+        if (!$task || $task->project_id != $projectId) {
+            \Log::warning('DragStarted task not found or not in project', [
+                'task_id' => $taskId,
+                'project_id' => $projectId,
+                'task_project' => $task?->project_id,
+            ]);
+            // Vẫn broadcast tối thiểu để FE hiển thị overlay
+            broadcast(new TaskDragStarted(
+                $taskId,
+                $projectId,
+                $user?->id,
+                $user?->name,
+                $user?->avatar
+            ));
+            return $this->respondWithMessage('Task not found or not in project (drag-started broadcasted minimal)');
+        }
+
+        // Broadcast event
+        broadcast(new TaskDragStarted(
+            $taskId,
+            $projectId,
+            $user->id,
+            $user->name,
+            $user->avatar
+        ));
+
+        return $this->respondWithMessage('Drag started event broadcasted');
+    }
+
+    /**
+     * Broadcast task drag ended event
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function broadcastDragEnded(Request $request)
+    {
+        $user = $request->user();
+        $taskId = $request->input('task_id');
+        $projectId = $request->input('project_id');
+
+        // Debug log để kiểm tra payload và user
+        \Log::info('DragEnded request', [
+            'task_id' => $taskId,
+            'project_id' => $projectId,
+            'user_id' => $user?->id,
+            'ip' => $request->ip(),
+        ]);
+
+        if (!$taskId || !$projectId) {
+            return $this->respondValidationError('Task ID and Project ID are required');
+        }
+
+        // Verify user has access to project
+        $task = Task::find($taskId);
+        if (!$task || $task->project_id != $projectId) {
+            \Log::warning('DragEnded task not found or not in project', [
+                'task_id' => $taskId,
+                'project_id' => $projectId,
+                'task_project' => $task?->project_id,
+            ]);
+            // Vẫn broadcast tối thiểu để FE gỡ overlay
+            broadcast(new TaskDragEnded($taskId, $projectId, $user?->id));
+            return $this->respondWithMessage('Task not found or not in project (drag-ended broadcasted minimal)');
+        }
+
+        // Broadcast event
+        broadcast(new TaskDragEnded($taskId, $projectId, $user->id));
+
+        return $this->respondWithMessage('Drag ended event broadcasted');
+    }
+
+    /**
+     * Broadcast task drag over column event
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function broadcastDragOverColumn(Request $request)
+    {
+        $user = $request->user();
+        $taskId = $request->input('task_id');
+        $projectId = $request->input('project_id');
+        $columnId = $request->input('column_id');
+        $columnStatus = $request->input('column_status');
+
+        // Debug log để kiểm tra payload và user
+        \Log::info('DragOverColumn request', [
+            'task_id' => $taskId,
+            'project_id' => $projectId,
+            'column_id' => $columnId,
+            'column_status' => $columnStatus,
+            'user_id' => $user?->id,
+            'ip' => $request->ip(),
+        ]);
+
+        if (!$taskId || !$projectId || !$columnId || $columnStatus === null) {
+            return $this->respondValidationError('Task ID, Project ID, Column ID and Column Status are required');
+        }
+
+        // Verify user has access to project
+        $task = Task::find($taskId);
+        if (!$task || $task->project_id != $projectId) {
+            \Log::warning('DragOverColumn task not found or not in project', [
+                'task_id' => $taskId,
+                'project_id' => $projectId,
+                'task_project' => $task?->project_id,
+            ]);
+            // Vẫn broadcast tối thiểu để FE highlight cột
+            broadcast(new TaskDragOverColumn(
+                $taskId,
+                $projectId,
+                $columnId,
+                $columnStatus,
+                $user?->id,
+                $user?->name,
+                $user?->avatar
+            ));
+            return $this->respondWithMessage('Task not found or not in project (drag-over broadcasted minimal)');
+        }
+
+        // Broadcast event
+        broadcast(new TaskDragOverColumn(
+            $taskId,
+            $projectId,
+            $columnId,
+            $columnStatus,
+            $user->id,
+            $user->name,
+            $user->avatar
+        ));
+
+        return $this->respondWithMessage('Drag over column event broadcasted');
     }
 }

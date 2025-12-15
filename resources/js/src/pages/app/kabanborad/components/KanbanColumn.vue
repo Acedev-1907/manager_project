@@ -29,7 +29,22 @@ const props = defineProps({
     default: false
   },
   menuState: Object,
-  setMenuState: Function
+  setMenuState: Function,
+  lockedTasks: {
+    type: Object as () => Map<number, { userId: number, userName: string, userAvatar: string | null }>,
+    default: () => new Map()
+  },
+  draggingTasks: {
+    type: Object as () => Map<number, { 
+      userId: number, 
+      userName: string, 
+      userAvatar: string | null,
+      columnId: string,
+      columnStatus: string,
+      taskName: string
+    }>,
+    default: () => new Map()
+  }
 });
 
 const emit = defineEmits(['viewTask', 'deleteTask', 'addTask', 'updateColumnTitle', 'updateColumnColor', 'editColumn', 'deleteColumn', 'completeTask']);
@@ -38,6 +53,17 @@ const filteredTasks = computed(() => {
   const filtered = props.tasks.filter(task => String(task.status) === String(props.config.status));
   return filtered;
 });
+
+function taskCardStyle(taskObj: any) {
+  const isLocked = props.lockedTasks.has(taskObj.id);
+  const isMenuOpen = props.menuState && props.menuState.column === props.config.key && props.menuState.taskId === taskObj.id;
+  return {
+    zIndex: isMenuOpen ? 3000 : 0,
+    position: isLocked ? 'relative' : undefined,
+    cursor: isLocked ? 'not-allowed' : undefined,
+    opacity: isLocked ? '0.6' : undefined
+  } as Record<string, string | number | undefined>;
+}
 
 const canEditColumn = computed(() => {
   return props.config.key !== 'not-started';
@@ -170,10 +196,11 @@ onBeforeUnmount(() => {
           </template>
         </div>
         <div v-else class="task-list">
-          <div v-for="taskObj in filteredTasks" :key="taskObj.id" class="task-card" draggable="true"
+          <div v-for="taskObj in filteredTasks" :key="taskObj.id" class="task-card" 
+            :draggable="!props.lockedTasks.has(taskObj.id)"
             :data-task-id="taskObj.id" :data-project-id="projectId" @mouseenter="handleCardMouseEnter"
             @mouseleave="handleCardMouseLeave(taskObj.id)" @dragstart="closeMenu"
-            :style="{ zIndex: props.menuState && props.menuState.column === config.key && props.menuState.taskId === taskObj.id ? 3000 : 0 }">
+            :style="taskCardStyle(taskObj)">
             <div class="task-header">
               <h4 class="task-title">{{ taskObj.name }}</h4>
               <div class="task-actions">
@@ -218,6 +245,25 @@ onBeforeUnmount(() => {
                 </button>
               </div>
             </div>
+            <!-- Lock overlay for tasks being dragged by other users -->
+            <div v-if="props.lockedTasks.has(taskObj.id)" class="task-lock-overlay">
+              <div class="lock-indicator">
+                <div class="lock-avatar">
+                  <img
+                    v-if="props.lockedTasks.get(taskObj.id)?.userAvatar"
+                    :src="props.lockedTasks.get(taskObj.id)?.userAvatar || undefined"
+                    alt="avatar"
+                  />
+                  <div v-else class="lock-avatar-fallback">
+                    {{ (props.lockedTasks.get(taskObj.id)?.userName || 'U').slice(0,1) }}
+                  </div>
+                </div>
+                <div class="lock-text">
+                  <div class="lock-user">{{ props.lockedTasks.get(taskObj.id)?.userName || 'Someone' }}</div>
+                  <div class="lock-action">is moving this task</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -237,11 +283,13 @@ onBeforeUnmount(() => {
   max-height: 600px;
   display: flex;
   flex-direction: column;
+  border: none;
 }
 
 .kanban-column.empty-column {
   min-height: 200px;
   max-height: 250px;
+  border: none;
 }
 
 .kanban-column.empty-column .column-content {
@@ -994,4 +1042,86 @@ onBeforeUnmount(() => {
     font-size: 8px;
   }
 }
+
+/* Task lock overlay styles */
+.task-lock-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+  pointer-events: none; /* Không chặn thao tác khác */
+}
+
+.lock-indicator {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.lock-indicator i {
+  color: #f59e0b;
+  font-size: 0.875rem;
+}
+
+.lock-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff7ed;
+  flex-shrink: 0;
+}
+
+.lock-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lock-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.lock-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.lock-user {
+  font-weight: 700;
+  color: #111827;
+}
+
+.lock-action {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+/* Drag over column indicator */
 </style>

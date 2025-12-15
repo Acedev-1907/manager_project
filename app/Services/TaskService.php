@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Repositories\Task\TaskRepository;
 use App\Repositories\Task\TaskMemberRepository;
 use Illuminate\Support\Facades\Validator;
+use App\Events\TaskStatusChanged;
 
 class TaskService
 {
@@ -104,6 +105,10 @@ class TaskService
 
         if ($updated) {
             Task::handleProjectProgress($projectId, $userId);
+
+            // Broadcast realtime task status changed
+            $task = $this->taskRepository->find($taskId);
+            broadcast(new TaskStatusChanged($task, $projectId, $status, $userId));
         }
 
         return $updated;

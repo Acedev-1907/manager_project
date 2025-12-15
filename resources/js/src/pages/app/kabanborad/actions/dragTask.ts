@@ -1,12 +1,12 @@
 import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { emitForceCacheClear } from "../../../../helper/eventBus";
 import eventBus from "../../../../helper/eventBus";
-import { getCurrentUserId } from "../../../../helper/getUserData";
+import { getCurrentUserId, getUserData } from "../../../../helper/getUserData";
 
 // Constants
 const DRAG_CONFIG = {
   threshold: 5,
-  apiDebounceTime: 500,
+  apiDebounceTime: 10,
   // Auto-scroll constants
   horizontalScrollThreshold: 150,
   horizontalScrollSpeed: 15,
@@ -85,6 +85,50 @@ export function debouncedChangeTaskStatus(
   }, DRAG_CONFIG.apiDebounceTime);
 }
 
+// Debounced broadcast drag over column (throttle để không broadcast quá nhiều)
+let dragOverColumnTimeout: any = null;
+
+// Throttle whisper realtime (không qua HTTP) để báo nhanh cho user khác
+const whisperTimeouts = new Map<string, any>();
+function whisperDrag(eventName: string, payload: any, throttleMs = 10) {
+  if (!window.Echo || !payload?.project_id) return;
+  const key = `${eventName}-${payload.project_id}`;
+  const prev = whisperTimeouts.get(key);
+  if (prev) clearTimeout(prev);
+  const t = setTimeout(() => {
+    try {
+      window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
+    } catch (_) {
+      // ignore whisper errors
+    }
+  }, throttleMs);
+  whisperTimeouts.set(key, t);
+}
+
+export function debouncedBroadcastDragOverColumn(
+  taskId: number,
+  projectId: number,
+  columnId: string,
+  columnStatus: string
+) {
+  if (dragOverColumnTimeout) {
+    clearTimeout(dragOverColumnTimeout);
+  }
+
+  dragOverColumnTimeout = setTimeout(async () => {
+    try {
+      await makeHttpReq("tasks/drag-over-column", "POST", {
+        task_id: taskId,
+        project_id: projectId,
+        column_id: columnId,
+        column_status: columnStatus
+      });
+    } catch (error) {
+      // Silent error handling
+    }
+  }, 10); // Throttle 10ms để nhanh hơn
+}
+
 export async function changeTaskStatus(
   taskId: number,
   projectId: number,
@@ -110,6 +154,10 @@ export function cleanupDrag() {
   if (apiCallTimeout) {
     clearTimeout(apiCallTimeout);
     apiCallTimeout = null;
+  }
+  if (dragOverColumnTimeout) {
+    clearTimeout(dragOverColumnTimeout);
+    dragOverColumnTimeout = null;
   }
 }
 
@@ -263,11 +311,25 @@ export function useDragTask(ProjectData?: any) {
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        targetColumn.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
-        targetColumn.style.borderColor = "#3b82f6";
-      } else {
-        targetColumn.style.backgroundColor = "";
-        targetColumn.style.borderColor = "";
+        // Broadcast drag over column event
+        const taskId = parseInt(draggedElement.dataset.taskId || "0");
+        const projectId = parseInt(draggedElement.dataset.projectId || "0");
+        const columnId = targetColumn.dataset.columnId || "";
+        const columnStatus = targetColumn.dataset.columnStatus || "";
+        
+        if (taskId && projectId && columnId && columnStatus) {
+          debouncedBroadcastDragOverColumn(taskId, projectId, columnId, columnStatus);
+          const user = getUserData();
+          whisperDrag("drag-over-column", {
+            task_id: taskId,
+            project_id: projectId,
+            column_id: columnId,
+            column_status: columnStatus,
+            user_id: user?.user?.id,
+            user_name: user?.user?.name,
+            user_avatar: user?.user?.avatar,
+        }, 8);
+        }
       }
     }
 
@@ -281,8 +343,7 @@ export function useDragTask(ProjectData?: any) {
 
       // Only remove highlight if mouse actually left the column
       if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-        targetColumn.style.backgroundColor = "";
-        targetColumn.style.borderColor = "";
+        // no-op: no highlight styling
       }
     }
 
@@ -319,8 +380,7 @@ export function useDragTask(ProjectData?: any) {
       }
 
       // Reset column styling
-      targetColumn.style.backgroundColor = "";
-      targetColumn.style.borderColor = "";
+      // no highlight to reset
     }
 
     targetColumn.addEventListener("dragover", handleDragOver);
@@ -473,6 +533,18 @@ export function useDragTask(ProjectData?: any) {
           createMobileGhost(currentX, currentY);
         }
 
+        // Broadcast drag started event (fire and forget)
+        const taskId = parseInt(draggedElement.dataset.taskId || "0");
+        const projectId = parseInt(draggedElement.dataset.projectId || "0");
+        if (taskId && projectId) {
+          makeHttpReq("tasks/drag-started", "POST", {
+            task_id: taskId,
+            project_id: projectId
+          }).catch(() => {
+            // Silent error handling
+          });
+        }
+
         // Only prevent default when we start dragging
         if (event.cancelable) {
           event.preventDefault();
@@ -543,8 +615,31 @@ export function useDragTask(ProjectData?: any) {
             newStatus.toString(),
             ProjectData
           );
+          // Whisper optimistic status to other users for instant UI
+          const user = getUserData();
+          whisperDrag("task-status-optimistic", {
+            task_id: taskId,
+            project_id: projectId,
+            status: newStatus,
+            user_id: user?.user?.id,
+          }, 5);
         }
       }
+
+      // Broadcast drag ended event (fire and forget)
+      makeHttpReq("tasks/drag-ended", "POST", {
+        task_id: taskId,
+        project_id: projectId
+      }).catch(() => {
+        // Silent error handling
+      });
+
+      const user = getUserData();
+      whisperDrag("drag-ended", {
+        task_id: taskId,
+        project_id: projectId,
+        user_id: user?.user?.id,
+      }, 5);
     }
 
     cleanupDragVisuals();
@@ -582,11 +677,32 @@ export function useDragTask(ProjectData?: any) {
       dragEvent.dataTransfer.effectAllowed = "move";
       dragEvent.dataTransfer.setDragImage(target, 0, 0);
     }
+
+    // Broadcast drag started event (fire and forget)
+    makeHttpReq("tasks/drag-started", "POST", {
+      task_id: taskId,
+      project_id: projectId
+    }).catch(() => {
+      // Silent error handling
+    });
+
+    // Whisper nhanh tới các user khác để hiển thị overlay tức thì
+    const user = getUserData();
+    whisperDrag("drag-started", {
+      task_id: taskId,
+      project_id: projectId,
+      user_id: user?.user?.id,
+      user_name: user?.user?.name,
+      user_avatar: user?.user?.avatar,
+    }, 10);
   }
 
   function handleDragEnd(event: Event) {
     const target = event.target as HTMLElement;
     if (!target.classList.contains("task-card")) return;
+
+    const taskId = parseInt(target.dataset.taskId || "0");
+    const projectId = parseInt(target.dataset.projectId || "0");
 
     isDragging = false;
     draggedElement = null;
@@ -609,6 +725,16 @@ export function useDragTask(ProjectData?: any) {
 
     // Reset flags
     hasProcessedDrop = false;
+
+    // Broadcast drag ended event (fire and forget)
+    if (taskId && projectId) {
+      makeHttpReq("tasks/drag-ended", "POST", {
+        task_id: taskId,
+        project_id: projectId
+      }).catch(() => {
+        // Silent error handling
+      });
+    }
   }
 
   function handleTouchStart(event: Event) {
@@ -717,6 +843,14 @@ export function useDragTask(ProjectData?: any) {
             newStatus.toString(),
             ProjectData
           );
+          // Whisper optimistic status to other users for instant UI
+          const user = getUserData();
+          whisperDrag("task-status-optimistic", {
+            task_id: taskId,
+            project_id: projectId,
+            status: newStatus,
+            user_id: user?.user?.id,
+          }, 20);
         }
       }
     }
@@ -736,11 +870,17 @@ export function useDragTask(ProjectData?: any) {
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        columnElement.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
-        columnElement.style.borderColor = "#3b82f6";
-      } else {
-        columnElement.style.backgroundColor = "";
-        columnElement.style.borderColor = "";
+        // Broadcast drag over column event (for mobile/touch)
+        if (isDragging && draggedElement) {
+          const taskId = parseInt(draggedElement.dataset.taskId || "0");
+          const projectId = parseInt(draggedElement.dataset.projectId || "0");
+          const columnId = columnElement.dataset.columnId || "";
+          const columnStatus = columnElement.dataset.columnStatus || "";
+          
+          if (taskId && projectId && columnId && columnStatus) {
+            debouncedBroadcastDragOverColumn(taskId, projectId, columnId, columnStatus);
+          }
+        }
       }
     });
   }

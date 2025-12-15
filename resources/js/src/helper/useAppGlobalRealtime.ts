@@ -48,6 +48,90 @@ export function useAppGlobalRealtime() {
             timestamp: Date.now(),
             userId: e.userId,
           });
+        })
+        .listen("TaskDragStarted", (e: any) => {
+          // Emit event for task drag started
+          eventBus.emit("task-drag-started", {
+            projectId,
+            taskId: e.taskId,
+            userId: e.userId,
+            userName: e.userName,
+            userAvatar: e.userAvatar,
+            timestamp: Date.now(),
+          });
+        })
+        .listen("TaskDragEnded", (e: any) => {
+          // Emit event for task drag ended
+          eventBus.emit("task-drag-ended", {
+            projectId,
+            taskId: e.taskId,
+            userId: e.userId,
+            timestamp: Date.now(),
+          });
+        })
+        .listen("TaskDragOverColumn", (e: any) => {
+          // Emit event for task drag over column
+          eventBus.emit("task-drag-over-column", {
+            projectId,
+            taskId: e.taskId,
+            columnId: e.columnId,
+            columnStatus: e.columnStatus,
+            userId: e.userId,
+            userName: e.userName,
+            userAvatar: e.userAvatar,
+            timestamp: Date.now(),
+          });
+        })
+        .listen("TaskStatusChanged", (e: any) => {
+          // Emit event for task status changed
+          eventBus.emit("task-status-changed-realtime", {
+            projectId,
+            task: e.task,
+            taskId: e.taskId,
+            status: e.status,
+            userId: e.userId,
+            timestamp: e.updatedAt || Date.now(),
+          });
+        })
+        // Whisper listener để hiển thị gần như tức thời khi drag
+        .listenForWhisper("drag-started", (e: any) => {
+          eventBus.emit("task-drag-started", {
+            projectId,
+            taskId: e.task_id,
+            userId: e.user_id,
+            userName: e.user_name,
+            userAvatar: e.user_avatar,
+            timestamp: Date.now(),
+          });
+        })
+        .listenForWhisper("drag-ended", (e: any) => {
+          eventBus.emit("task-drag-ended", {
+            projectId,
+            taskId: e.task_id,
+            userId: e.user_id,
+            timestamp: Date.now(),
+          });
+        })
+        .listenForWhisper("drag-over-column", (e: any) => {
+          eventBus.emit("task-drag-over-column", {
+            projectId,
+            taskId: e.task_id,
+            columnId: e.column_id,
+            columnStatus: e.column_status,
+            userId: e.user_id,
+            userName: e.user_name,
+            userAvatar: e.user_avatar,
+            timestamp: Date.now(),
+          });
+        })
+        .listenForWhisper("task-status-optimistic", (e: any) => {
+          eventBus.emit("task-status-optimistic", {
+            projectId,
+            taskId: e.task_id,
+            status: e.status,
+            userId: e.user_id,
+            timestamp: Date.now(),
+          });
         });
 
       activeProjectListeners.add(projectId);

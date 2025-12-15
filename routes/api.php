@@ -80,6 +80,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // API comment cho task
         Route::get('/tasks/{id}/comments', 'getTaskComments');
         Route::post('/tasks/{id}/comments', 'addTaskComment');
+        // API broadcast drag events
+        Route::post('/tasks/drag-started', 'broadcastDragStarted');
+        Route::post('/tasks/drag-ended', 'broadcastDragEnded');
+        Route::post('/tasks/drag-over-column', 'broadcastDragOverColumn');
     });
 
     // API notification cho user

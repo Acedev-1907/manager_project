@@ -47,6 +47,19 @@ const kanbanColumnsRef = ref<HTMLElement | null>(null);
 // Columns will be fetched from API
 const columns = ref<any[]>([]);
 
+// Track locked tasks (tasks being dragged by other users)
+const lockedTasks = ref<Map<number, { userId: number, userName: string, userAvatar: string | null }>>(new Map());
+
+// Track tasks being dragged by other users and their current column
+const draggingTasks = ref<Map<number, { 
+  userId: number, 
+  userName: string, 
+  userAvatar: string | null,
+  columnId: string,
+  columnStatus: string,
+  taskName: string
+}>>(new Map());
+
 // Default columns configuration
 const DEFAULT_COLUMNS = [
     {
@@ -310,13 +323,13 @@ onMounted(async () => {
                     
                     // Update ProjectData to keep sync
                     if (ProjectData.value?.data) {
-                        const boardColumns = ProjectData.value.data.board_columns || [];
+                        const boardColumns = (ProjectData.value.data as any).board_columns || [];
                         if (Array.isArray(boardColumns)) {
                             boardColumns.push(eventData.column);
                         } else if (typeof boardColumns === 'object') {
-                            ProjectData.value.data.board_columns = [...Object.values(boardColumns), eventData.column];
+                            (ProjectData.value.data as any).board_columns = [...Object.values(boardColumns), eventData.column];
                         } else {
-                            ProjectData.value.data.board_columns = [eventData.column];
+                            (ProjectData.value.data as any).board_columns = [eventData.column];
                         }
                     }
                     
@@ -343,13 +356,13 @@ onMounted(async () => {
                     }
                     
                     // Update ProjectData to keep sync
-                    if (ProjectData.value?.data?.board_columns) {
-                        const boardColumns = ProjectData.value.data.board_columns;
+                    if ((ProjectData.value?.data as any)?.board_columns) {
+                        const boardColumns = (ProjectData.value.data as any).board_columns;
                         if (Array.isArray(boardColumns)) {
-                            ProjectData.value.data.board_columns = boardColumns.filter((col: any) => col.id !== eventData.columnId);
+                            (ProjectData.value.data as any).board_columns = boardColumns.filter((col: any) => col.id !== eventData.columnId);
                         } else if (typeof boardColumns === 'object') {
                             const columnsArray = Object.values(boardColumns);
-                            ProjectData.value.data.board_columns = columnsArray.filter((col: any) => col.id !== eventData.columnId);
+                            (ProjectData.value.data as any).board_columns = columnsArray.filter((col: any) => col.id !== eventData.columnId);
                         }
                     }
                     
@@ -361,6 +374,144 @@ onMounted(async () => {
             }
         } catch (error) {
             // Silent error handling
+        }
+    });
+
+    // Listen for task drag started events - Lock task for other users
+    eventBus.on('task-drag-started', (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                if (!isCurrentUser(eventData.userId) && eventData.taskId) {
+                    // Lock task: Mark as being dragged by another user (Vue reactive)
+                    lockedTasks.value.set(eventData.taskId, {
+                        userId: eventData.userId,
+                        userName: eventData.userName || 'Someone',
+                        userAvatar: eventData.userAvatar || null
+                    });
+                    // Force reactivity update
+                    lockedTasks.value = new Map(lockedTasks.value);
+
+                    // Auto-clear lock after 5s nếu không có drag-ended
+                    setTimeout(() => {
+                        if (lockedTasks.value.has(eventData.taskId)) {
+                            lockedTasks.value.delete(eventData.taskId);
+                            lockedTasks.value = new Map(lockedTasks.value);
+                        }
+                        if (draggingTasks.value.has(eventData.taskId)) {
+                            draggingTasks.value.delete(eventData.taskId);
+                            draggingTasks.value = new Map(draggingTasks.value);
+                        }
+                    }, 5000);
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Listen for task drag ended events - Unlock task
+    eventBus.on('task-drag-ended', (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                if (eventData.taskId) {
+                    // Unlock task (Vue reactive)
+                    lockedTasks.value.delete(eventData.taskId);
+                    // Remove from dragging tasks
+                    draggingTasks.value.delete(eventData.taskId);
+                    // Force reactivity update
+                    lockedTasks.value = new Map(lockedTasks.value);
+                    draggingTasks.value = new Map(draggingTasks.value);
+
+                    // Clear column highlight (no-op now, kept for safety)
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Listen for task drag over column events - Show visual indicator
+    eventBus.on('task-drag-over-column', async (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                if (!isCurrentUser(eventData.userId) && eventData.taskId) {
+                    // Find task info
+                    const task = ProjectData.value?.data?.tasks?.find((t: any) => t.id === eventData.taskId);
+                    const taskName = task?.name || 'Task';
+                    
+                    // Update dragging task info
+                    draggingTasks.value.set(eventData.taskId, {
+                        userId: eventData.userId,
+                        userName: eventData.userName || 'Someone',
+                        userAvatar: eventData.userAvatar || null,
+                        columnId: eventData.columnId,
+                        columnStatus: eventData.columnStatus,
+                        taskName: taskName
+                    });
+                    
+                    // Force reactivity update
+                    draggingTasks.value = new Map(draggingTasks.value);
+                    
+                    // Highlight target column
+                    await nextTick();
+                    const targetColumn = document.querySelector(`[data-column-id="${eventData.columnId}"]`) as HTMLElement;
+                    if (targetColumn) {
+                            // (removed dashed highlight per request)
+                        
+                        // Remove highlight after a short delay if no new event
+                        setTimeout(() => {
+                            const currentDragging = draggingTasks.value.get(eventData.taskId);
+                            if (!currentDragging || currentDragging.columnId !== eventData.columnId) {
+                                    // no-op
+                            }
+                        }, 500);
+                    }
+                }
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Listen for task status changed events - Realtime update tasks
+    eventBus.on('task-status-changed-realtime', async (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                const updatedTask = eventData.task;
+                const tasks = ProjectData.value?.data?.tasks || [];
+                const idx = tasks.findIndex((t: any) => String(t.id) === String(eventData.taskId));
+                if (idx !== -1) {
+                    tasks[idx] = {
+                        ...tasks[idx],
+                        ...updatedTask,
+                        status: updatedTask?.status ?? eventData.status
+                    };
+                }
+                // Force reactivity update
+                ProjectData.value = { ...ProjectData.value };
+                await nextTick();
+            }
+        } catch (error) {
+            // Silent
+        }
+    });
+
+    // Listen for task status optimistic (whisper) - cực nhanh, không chờ API
+    eventBus.on('task-status-optimistic', async (eventData: any) => {
+        try {
+            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                const tasks = ProjectData.value?.data?.tasks || [];
+                const idx = tasks.findIndex((t: any) => String(t.id) === String(eventData.taskId));
+                if (idx !== -1) {
+                    tasks[idx] = {
+                        ...tasks[idx],
+                        status: eventData.status
+                    };
+                    ProjectData.value = { ...ProjectData.value };
+                }
+            }
+        } catch (_) {
+            // Silent
         }
     });
 });
@@ -876,7 +1027,9 @@ onUnmounted(() => {
                     <KanbanColumn v-for="column in columns" :key="column.key" :config="column"
                         :tasks="ProjectData?.data?.tasks || []" :projectId="ProjectData?.data?.id"
                         :showAddTask="column.key === 'not-started'" :menuState="menuState as any"
-                        :setMenuState="setMenuState" :isEditing="false" @viewTask="openTaskDetail"
+                        :setMenuState="setMenuState" :isEditing="false" :lockedTasks="lockedTasks"
+                        :draggingTasks="draggingTasks"
+                        @viewTask="openTaskDetail"
                         @deleteTask="handleDeleteTask" @addTask="openTaskModal" @editColumn="openEditColumnModal"
                         @deleteColumn="handleDeleteColumn" @updateColumnTitle="updateColumnTitle"
                         @updateColumnColor="updateColumnColor" @completeTask="handleCompleteTask" />
@@ -1449,5 +1602,39 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* Task lock overlay styles */
+.task-lock-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.lock-indicator {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 8px 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: #374151;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.lock-indicator i {
+    color: #f59e0b;
+    font-size: 0.875rem;
 }
 </style>
