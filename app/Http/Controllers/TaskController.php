@@ -120,44 +120,59 @@ class TaskController extends ApiController
      */
     public function transitionToStatus(Request $req, string $status)
     {
-        // Handle both numeric and string status
-        $newStatus = $status;
+        try {
+            // Handle both numeric and string status
+            $newStatus = $status;
 
-        // If status is numeric, convert to int for validation
-        if (is_numeric($status)) {
-            $newStatus = (int)$status;
-            // Validate status range (allow any non-negative integer)
-            if ($newStatus < 0) {
-                return $this->respondValidationError('Invalid status: ' . $status);
+            // If status is numeric, convert to int for validation
+            if (is_numeric($status)) {
+                $newStatus = (int)$status;
+                // Validate status range (allow any non-negative integer)
+                if ($newStatus < 0) {
+                    return $this->respondValidationError('Invalid status: ' . $status);
+                }
+            } else {
+                // For string status, only allow 'OK' for completed
+                if ($status !== 'OK') {
+                    return $this->respondValidationError('Invalid status: ' . $status);
+                }
             }
-        } else {
-            // For string status, only allow 'OK' for completed
-            if ($status !== 'OK') {
-                return $this->respondValidationError('Invalid status: ' . $status);
+
+            // Add userId to the data
+            $data = $req->all();
+            $data['userId'] = Auth::id();
+
+            if (!isset($data['taskId']) || !isset($data['projectId'])) {
+                return $this->respondValidationError('Task ID and Project ID are required');
             }
+
+            $checkUpdate = $this->taskService->updateTaskStatus($data, $newStatus);
+
+            if ($checkUpdate) {
+                // Map status to column name for response
+                $statusNames = [
+                    0 => 'Not Started',
+                    1 => 'Pending',
+                    2 => 'Column 2',
+                    3 => 'Column 3',
+                    4 => 'Column 4',
+                    'OK' => 'Completed'
+                ];
+                $statusName = $statusNames[$newStatus] ?? "Column {$newStatus}";
+                return $this->respondUpdated("Task moved to {$statusName}");
+            }
+
+            return $this->respondServerError('Failed to update task status');
+        } catch (\Exception $e) {
+            Log::error('Error in transitionToStatus: ' . $e->getMessage(), [
+                'status' => $status,
+                'data' => $req->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to transition task status');
         }
-
-        // Add userId to the data
-        $data = $req->all();
-        $data['userId'] = Auth::id();
-
-        $checkUpdate = $this->taskService->updateTaskStatus($data, $newStatus);
-
-        if ($checkUpdate) {
-            // Map status to column name for response
-            $statusNames = [
-                0 => 'Not Started',
-                1 => 'Pending',
-                2 => 'Column 2',
-                3 => 'Column 3',
-                4 => 'Column 4',
-                'OK' => 'Completed'
-            ];
-            $statusName = $statusNames[$newStatus] ?? "Column {$newStatus}";
-            return $this->respondUpdated("Task moved to {$statusName}");
-        }
-
-        return $this->respondServerError('Failed to update task status');
     }
 
     /**

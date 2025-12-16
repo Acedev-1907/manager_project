@@ -191,8 +191,13 @@ export function useDragTask(ProjectData?: any) {
   let ghostAnimationFrame: number | null = null;
   let touchStartTime = 0;
 
+  // Mouse drag start position (để track khoảng cách di chuyển)
+  let dragStartX = 0;
+  let dragStartY = 0;
+
   // Flag to prevent duplicate API calls
   let hasProcessedDrop = false;
+  let hasBroadcastDragStarted = false; // Track if drag-started đã được gọi
 
   // Auto-scroll state for horizontal scrolling
   let horizontalScrollInterval: number | null = null;
@@ -309,6 +314,30 @@ export function useDragTask(ProjectData?: any) {
       e.stopPropagation();
 
       if (!isDragging || !draggedElement) return;
+
+      // Chỉ gọi drag-started khi đã di chuyển một khoảng cách nhất định (ít nhất 20px)
+      // Để tránh gọi khi mới nắm giữ task
+      if (!hasBroadcastDragStarted) {
+        const distance = Math.sqrt(
+          Math.pow(e.clientX - dragStartX, 2) + Math.pow(e.clientY - dragStartY, 2)
+        );
+        
+        // Chỉ gọi khi đã di chuyển ít nhất 20px
+        if (distance >= 20) {
+          const taskId = parseInt(draggedElement.dataset.taskId || "0");
+          const projectId = parseInt(draggedElement.dataset.projectId || "0");
+          if (taskId && projectId) {
+            hasBroadcastDragStarted = true;
+            // Gọi API drag-started khi thực sự bắt đầu drag (đã di chuyển)
+            makeHttpReq("tasks/drag-started", "POST", {
+              task_id: taskId,
+              project_id: projectId
+            }).catch(() => {
+              // Silent error handling
+            });
+          }
+        }
+      }
 
       const rect = targetColumn.getBoundingClientRect();
       const x = e.clientX;
@@ -538,22 +567,26 @@ export function useDragTask(ProjectData?: any) {
       if (touchDuration > 50 && touchDuration < 2000) {
         isDragging = true;
         hasProcessedDrop = false;
+        hasBroadcastDragStarted = false; // Reset flag khi bắt đầu drag mới
 
         // Create ghost element when starting drag
         if (!ghostElement) {
           createMobileGhost(currentX, currentY);
         }
 
-        // Broadcast drag started event (fire and forget)
-        const taskId = parseInt(draggedElement.dataset.taskId || "0");
-        const projectId = parseInt(draggedElement.dataset.projectId || "0");
-        if (taskId && projectId) {
-          makeHttpReq("tasks/drag-started", "POST", {
-            task_id: taskId,
-            project_id: projectId
-          }).catch(() => {
-            // Silent error handling
-          });
+        // Broadcast drag started event (fire and forget) - chỉ gọi 1 lần
+        if (!hasBroadcastDragStarted) {
+          const taskId = parseInt(draggedElement.dataset.taskId || "0");
+          const projectId = parseInt(draggedElement.dataset.projectId || "0");
+          if (taskId && projectId) {
+            hasBroadcastDragStarted = true;
+            makeHttpReq("tasks/drag-started", "POST", {
+              task_id: taskId,
+              project_id: projectId
+            }).catch(() => {
+              // Silent error handling
+            });
+          }
         }
 
         // Only prevent default when we start dragging
@@ -668,6 +701,13 @@ export function useDragTask(ProjectData?: any) {
     isDragging = true;
     draggedElement = target;
     hasProcessedDrop = false;
+    hasBroadcastDragStarted = false; // Reset flag
+
+    // Store drag start position (nếu có mouse event)
+    if (event instanceof MouseEvent) {
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+    }
 
     // Store original styles
     originalTransform = target.style.transform;
@@ -689,15 +729,9 @@ export function useDragTask(ProjectData?: any) {
       dragEvent.dataTransfer.setDragImage(target, 0, 0);
     }
 
-    // Broadcast drag started event (fire and forget)
-    makeHttpReq("tasks/drag-started", "POST", {
-      task_id: taskId,
-      project_id: projectId
-    }).catch(() => {
-      // Silent error handling
-    });
-
-    // Whisper nhanh tới các user khác để hiển thị overlay tức thì
+    // KHÔNG gọi drag-started ngay ở đây
+    // Sẽ gọi khi thực sự bắt đầu drag (trong dragover handler sau khi di chuyển)
+    // Chỉ whisper để realtime update nhanh
     const user = getUserData();
     whisperDrag("drag-started", {
       task_id: taskId,
@@ -736,6 +770,7 @@ export function useDragTask(ProjectData?: any) {
 
     // Reset flags
     hasProcessedDrop = false;
+    hasBroadcastDragStarted = false; // Reset để lần drag tiếp theo có thể gọi lại
 
     // Broadcast drag ended event (fire and forget)
     if (taskId && projectId) {
@@ -911,6 +946,7 @@ export function useDragTask(ProjectData?: any) {
     isDragging = false;
     draggedElement = null;
     hasProcessedDrop = false;
+    hasBroadcastDragStarted = false; // Reset flag
 
     // Reset all column highlights
     const columns = document.querySelectorAll(".kanban-column");
