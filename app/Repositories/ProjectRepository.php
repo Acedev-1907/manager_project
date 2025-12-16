@@ -27,10 +27,12 @@ class ProjectRepository extends BaseRepository
             'tasks' => function ($q) {
                 $q->orderBy('created_at', 'desc');
             },
-            'tasks.task_members.user',
+            'tasks.task_members' => function ($q) {
+                $q->with('user:id,name,avatar');
+            },
             'task_progress',
-            'users',
-            'creator',
+            'users:id,name,email,avatar',
+            'creator:id,name,email,avatar',
             // boardColumns không cần eager load vì đã được lưu trong JSON field
         ])->where('slug', $slug)->first();
     }

@@ -33,16 +33,37 @@ class ProjectController extends ApiController
      */
     public function getProject(string $slug)
     {
-        $project = $this->service->getProjectBySlug($slug);
-        $user = request()->user();
+        try {
+            // Set execution time limit for this request
+            set_time_limit(30);
+            
+            $project = $this->service->getProjectBySlug($slug);
+            $user = request()->user();
 
-        if (!$project || !$project->users->contains('id', $user->id)) {
-            return $this->setStatusCode(403)
-                ->setReturnCode(self::ERROR_FORBIDDEN)
-                ->respondWithError('You do not have permission to access this project');
+            if (!$project) {
+                return $this->setStatusCode(404)
+                    ->setReturnCode(self::ERROR_NOT_FOUND)
+                    ->respondWithError('Project not found');
+            }
+
+            if (!$project->users->contains('id', $user->id)) {
+                return $this->setStatusCode(403)
+                    ->setReturnCode(self::ERROR_FORBIDDEN)
+                    ->respondWithError('You do not have permission to access this project');
+            }
+
+            return $this->respondWithData($project, 'Project retrieved successfully');
+        } catch (\Exception $e) {
+            \Log::error('Error fetching project: ' . $e->getMessage(), [
+                'slug' => $slug,
+                'user_id' => request()->user()?->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to retrieve project. Please try again later.');
         }
-
-        return $this->respondWithData($project, 'Project retrieved successfully');
     }
 
     /**
