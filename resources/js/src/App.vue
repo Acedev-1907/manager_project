@@ -43,7 +43,7 @@ export default defineComponent({
 
         onMounted(async () => {
             const userDataStr = localStorage.getItem("userData");
-            let token = null;
+            let token: string | null = null;
             if (userDataStr) {
                 try {
                     const userData = JSON.parse(userDataStr);
@@ -52,7 +52,16 @@ export default defineComponent({
                     // ignore parse error
                 }
             }
+
+            // Nếu có token (user đã đăng nhập), luôn khởi tạo Echo sau mỗi lần reload
             if (token) {
+                try {
+                    const { initEcho } = await import('../echo.js');
+                    initEcho();
+                } catch (err) {
+                    console.warn('Failed to initialize Echo on App mount:', err);
+                }
+
                 try {
                     const res = await makeHttpReq<undefined, any>('user', 'GET');
                     // Chỉ cập nhật user-store, không cập nhật userData (chỉ lưu token)
