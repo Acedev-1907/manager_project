@@ -26,7 +26,7 @@ export function initEcho() {
 
         forceTLS: (import.meta.env.VITE_REVERB_SCHEME === 'https'),
         enabledTransports: ['ws', 'wss'],
-
+        wsPath: '/app',
         authEndpoint: '/broadcasting/auth',
 
         auth: {
