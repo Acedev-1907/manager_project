@@ -236,7 +236,7 @@ onMounted(async () => {
     window.addEventListener('resize', forceScrollbar);
 
     const userId = getCurrentUserId();
-    if (userId) {
+    if (userId && window.Echo) {
         window.Echo.private(`user.${userId}`)
             .listen('UserRemovedFromProject', (e: { projectId: number }) => {
                 if (e.projectId && ProjectData.value?.data?.id === e.projectId) {
