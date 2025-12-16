@@ -87,6 +87,7 @@ export function debouncedChangeTaskStatus(
 
 // Debounced broadcast drag over column (throttle để không broadcast quá nhiều)
 let dragOverColumnTimeout: any = null;
+let lastBroadcastedColumnId: string | null = null; // Track column đã broadcast để tránh spam
 
 // Throttle whisper realtime (không qua HTTP) để báo nhanh cho user khác
 const whisperTimeouts = new Map<string, any>();
@@ -111,6 +112,11 @@ export function debouncedBroadcastDragOverColumn(
   columnId: string,
   columnStatus: string
 ) {
+  // Chỉ broadcast khi chuyển sang cột mới, không phải mỗi lần drag over
+  if (lastBroadcastedColumnId === columnId) {
+    return; // Đã broadcast cho cột này rồi, skip
+  }
+
   if (dragOverColumnTimeout) {
     clearTimeout(dragOverColumnTimeout);
   }
@@ -123,10 +129,12 @@ export function debouncedBroadcastDragOverColumn(
         column_id: columnId,
         column_status: columnStatus
       });
+      // Đánh dấu đã broadcast cho cột này
+      lastBroadcastedColumnId = columnId;
     } catch (error) {
       // Silent error handling
     }
-  }, 10); // Throttle 10ms để nhanh hơn
+  }, 300); // Tăng debounce lên 300ms để giảm spam
 }
 
 export async function changeTaskStatus(
@@ -159,6 +167,8 @@ export function cleanupDrag() {
     clearTimeout(dragOverColumnTimeout);
     dragOverColumnTimeout = null;
   }
+  // Reset column tracking khi cleanup
+  lastBroadcastedColumnId = null;
 }
 
 interface changeTaskInput {
@@ -311,14 +321,15 @@ export function useDragTask(ProjectData?: any) {
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        // Broadcast drag over column event
+        // Chỉ dùng whisper (realtime) để báo nhanh cho user khác, không gọi HTTP API
+        // API sẽ chỉ được gọi khi drop vào cột (trong handleDrop)
         const taskId = parseInt(draggedElement.dataset.taskId || "0");
         const projectId = parseInt(draggedElement.dataset.projectId || "0");
         const columnId = targetColumn.dataset.columnId || "";
         const columnStatus = targetColumn.dataset.columnStatus || "";
         
         if (taskId && projectId && columnId && columnStatus) {
-          debouncedBroadcastDragOverColumn(taskId, projectId, columnId, columnStatus);
+          // Chỉ dùng whisper để realtime update cho user khác (không qua HTTP)
           const user = getUserData();
           whisperDrag("drag-over-column", {
             task_id: taskId,
@@ -328,7 +339,7 @@ export function useDragTask(ProjectData?: any) {
             user_id: user?.user?.id,
             user_name: user?.user?.name,
             user_avatar: user?.user?.avatar,
-        }, 8);
+        }, 100); // Throttle whisper 100ms để giảm spam
         }
       }
     }
@@ -870,15 +881,26 @@ export function useDragTask(ProjectData?: any) {
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        // Broadcast drag over column event (for mobile/touch)
+        // Chỉ dùng whisper (realtime) để báo nhanh cho user khác, không gọi HTTP API
+        // API sẽ chỉ được gọi khi drop vào cột
         if (isDragging && draggedElement) {
           const taskId = parseInt(draggedElement.dataset.taskId || "0");
           const projectId = parseInt(draggedElement.dataset.projectId || "0");
           const columnId = columnElement.dataset.columnId || "";
           const columnStatus = columnElement.dataset.columnStatus || "";
-          
+
           if (taskId && projectId && columnId && columnStatus) {
-            debouncedBroadcastDragOverColumn(taskId, projectId, columnId, columnStatus);
+            // Chỉ dùng whisper để realtime update cho user khác (không qua HTTP)
+            const user = getUserData();
+            whisperDrag("drag-over-column", {
+              task_id: taskId,
+              project_id: projectId,
+              column_id: columnId,
+              column_status: columnStatus,
+              user_id: user?.user?.id,
+              user_name: user?.user?.name,
+              user_avatar: user?.user?.avatar,
+            }, 100); // Throttle whisper 100ms để giảm spam
           }
         }
       }
