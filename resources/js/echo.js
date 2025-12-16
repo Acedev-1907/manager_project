@@ -1,4 +1,9 @@
 import Echo from 'laravel-echo'
+import Pusher from 'pusher-js'
+
+if (typeof window !== 'undefined') {
+    window.Pusher = Pusher
+}
 
 function getCurrentToken() {
     const raw = localStorage.getItem('userData')
