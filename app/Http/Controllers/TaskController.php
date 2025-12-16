@@ -11,6 +11,7 @@ use App\Services\TaskService;
 use App\Services\TaskCommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Api\ApiController;
 
 /**
@@ -220,51 +221,74 @@ class TaskController extends ApiController
      */
     public function broadcastDragStarted(Request $request)
     {
-        $user = $request->user();
-        $taskId = $request->input('task_id');
-        $projectId = $request->input('project_id');
+        try {
+            $user = $request->user();
+            $taskId = $request->input('task_id');
+            $projectId = $request->input('project_id');
 
-        // Debug log để kiểm tra payload và user
-        \Log::info('DragStarted request', [
-            'task_id' => $taskId,
-            'project_id' => $projectId,
-            'user_id' => $user?->id,
-            'ip' => $request->ip(),
-        ]);
-
-        if (!$taskId || !$projectId) {
-            return $this->respondValidationError('Task ID and Project ID are required');
-        }
-
-        // Verify user has access to project
-        $task = Task::find($taskId);
-        if (!$task || $task->project_id != $projectId) {
-            \Log::warning('DragStarted task not found or not in project', [
+            // Debug log để kiểm tra payload và user
+            Log::info('DragStarted request', [
                 'task_id' => $taskId,
                 'project_id' => $projectId,
-                'task_project' => $task?->project_id,
+                'user_id' => $user?->id,
+                'ip' => $request->ip(),
             ]);
-            // Vẫn broadcast tối thiểu để FE hiển thị overlay
-            broadcast(new TaskDragStarted(
-                $taskId,
-                $projectId,
-                $user?->id,
-                $user?->name,
-                $user?->avatar
-            ));
-            return $this->respondWithMessage('Task not found or not in project (drag-started broadcasted minimal)');
+
+            if (!$taskId || !$projectId) {
+                return $this->respondValidationError('Task ID and Project ID are required');
+            }
+
+            // Verify user has access to project
+            $task = Task::find($taskId);
+            if (!$task || $task->projectId != $projectId) {
+                Log::warning('DragStarted task not found or not in project', [
+                    'task_id' => $taskId,
+                    'project_id' => $projectId,
+                    'task_project' => $task?->projectId,
+                ]);
+                // Vẫn broadcast tối thiểu để FE hiển thị overlay
+                try {
+                    broadcast(new TaskDragStarted(
+                        $taskId,
+                        $projectId,
+                        $user?->id,
+                        $user?->name,
+                        $user?->avatar
+                    ));
+                } catch (\Exception $e) {
+                    Log::warning('Failed to broadcast drag started (task not found): ' . $e->getMessage());
+                }
+                return $this->respondWithMessage('Task not found or not in project (drag-started broadcasted minimal)');
+            }
+
+            // Broadcast event
+            try {
+                broadcast(new TaskDragStarted(
+                    $taskId,
+                    $projectId,
+                    $user->id,
+                    $user->name,
+                    $user->avatar
+                ));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast drag started: ' . $e->getMessage(), [
+                    'task_id' => $taskId,
+                    'project_id' => $projectId,
+                    'user_id' => $user->id,
+                ]);
+                // Vẫn trả về success để FE không bị block
+                return $this->respondWithMessage('Drag started event (broadcast may have failed)');
+            }
+
+            return $this->respondWithMessage('Drag started event broadcasted');
+        } catch (\Exception $e) {
+            Log::error('Error in broadcastDragStarted: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to broadcast drag started event');
         }
-
-        // Broadcast event
-        broadcast(new TaskDragStarted(
-            $taskId,
-            $projectId,
-            $user->id,
-            $user->name,
-            $user->avatar
-        ));
-
-        return $this->respondWithMessage('Drag started event broadcasted');
     }
 
     /**
@@ -275,39 +299,62 @@ class TaskController extends ApiController
      */
     public function broadcastDragEnded(Request $request)
     {
-        $user = $request->user();
-        $taskId = $request->input('task_id');
-        $projectId = $request->input('project_id');
+        try {
+            $user = $request->user();
+            $taskId = $request->input('task_id');
+            $projectId = $request->input('project_id');
 
-        // Debug log để kiểm tra payload và user
-        \Log::info('DragEnded request', [
-            'task_id' => $taskId,
-            'project_id' => $projectId,
-            'user_id' => $user?->id,
-            'ip' => $request->ip(),
-        ]);
-
-        if (!$taskId || !$projectId) {
-            return $this->respondValidationError('Task ID and Project ID are required');
-        }
-
-        // Verify user has access to project
-        $task = Task::find($taskId);
-        if (!$task || $task->project_id != $projectId) {
-            \Log::warning('DragEnded task not found or not in project', [
+            // Debug log để kiểm tra payload và user
+            Log::info('DragEnded request', [
                 'task_id' => $taskId,
                 'project_id' => $projectId,
-                'task_project' => $task?->project_id,
+                'user_id' => $user?->id,
+                'ip' => $request->ip(),
             ]);
-            // Vẫn broadcast tối thiểu để FE gỡ overlay
-            broadcast(new TaskDragEnded($taskId, $projectId, $user?->id));
-            return $this->respondWithMessage('Task not found or not in project (drag-ended broadcasted minimal)');
+
+            if (!$taskId || !$projectId) {
+                return $this->respondValidationError('Task ID and Project ID are required');
+            }
+
+            // Verify user has access to project
+            $task = Task::find($taskId);
+            if (!$task || $task->projectId != $projectId) {
+                Log::warning('DragEnded task not found or not in project', [
+                    'task_id' => $taskId,
+                    'project_id' => $projectId,
+                    'task_project' => $task?->projectId,
+                ]);
+                // Vẫn broadcast tối thiểu để FE gỡ overlay
+                try {
+                    broadcast(new TaskDragEnded($taskId, $projectId, $user?->id));
+                } catch (\Exception $e) {
+                    Log::warning('Failed to broadcast drag ended (task not found): ' . $e->getMessage());
+                }
+                return $this->respondWithMessage('Task not found or not in project (drag-ended broadcasted minimal)');
+            }
+
+            // Broadcast event
+            try {
+                broadcast(new TaskDragEnded($taskId, $projectId, $user->id));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast drag ended: ' . $e->getMessage(), [
+                    'task_id' => $taskId,
+                    'project_id' => $projectId,
+                    'user_id' => $user->id,
+                ]);
+                // Vẫn trả về success để FE không bị block
+                return $this->respondWithMessage('Drag ended event (broadcast may have failed)');
+            }
+
+            return $this->respondWithMessage('Drag ended event broadcasted');
+        } catch (\Exception $e) {
+            Log::error('Error in broadcastDragEnded: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to broadcast drag ended event');
         }
-
-        // Broadcast event
-        broadcast(new TaskDragEnded($taskId, $projectId, $user->id));
-
-        return $this->respondWithMessage('Drag ended event broadcasted');
     }
 
     /**
@@ -318,58 +365,82 @@ class TaskController extends ApiController
      */
     public function broadcastDragOverColumn(Request $request)
     {
-        $user = $request->user();
-        $taskId = $request->input('task_id');
-        $projectId = $request->input('project_id');
-        $columnId = $request->input('column_id');
-        $columnStatus = $request->input('column_status');
+        try {
+            $user = $request->user();
+            $taskId = $request->input('task_id');
+            $projectId = $request->input('project_id');
+            $columnId = $request->input('column_id');
+            $columnStatus = $request->input('column_status');
 
-        // Debug log để kiểm tra payload và user
-        \Log::info('DragOverColumn request', [
-            'task_id' => $taskId,
-            'project_id' => $projectId,
-            'column_id' => $columnId,
-            'column_status' => $columnStatus,
-            'user_id' => $user?->id,
-            'ip' => $request->ip(),
-        ]);
-
-        if (!$taskId || !$projectId || !$columnId || $columnStatus === null) {
-            return $this->respondValidationError('Task ID, Project ID, Column ID and Column Status are required');
-        }
-
-        // Verify user has access to project
-        $task = Task::find($taskId);
-        if (!$task || $task->project_id != $projectId) {
-            \Log::warning('DragOverColumn task not found or not in project', [
+            // Debug log để kiểm tra payload và user
+            Log::info('DragOverColumn request', [
                 'task_id' => $taskId,
                 'project_id' => $projectId,
-                'task_project' => $task?->project_id,
+                'column_id' => $columnId,
+                'column_status' => $columnStatus,
+                'user_id' => $user?->id,
+                'ip' => $request->ip(),
             ]);
-            // Vẫn broadcast tối thiểu để FE highlight cột
-            broadcast(new TaskDragOverColumn(
-                $taskId,
-                $projectId,
-                $columnId,
-                $columnStatus,
-                $user?->id,
-                $user?->name,
-                $user?->avatar
-            ));
-            return $this->respondWithMessage('Task not found or not in project (drag-over broadcasted minimal)');
+
+            if (!$taskId || !$projectId || !$columnId || $columnStatus === null) {
+                return $this->respondValidationError('Task ID, Project ID, Column ID and Column Status are required');
+            }
+
+            // Verify user has access to project
+            $task = Task::find($taskId);
+            if (!$task || $task->projectId != $projectId) {
+                Log::warning('DragOverColumn task not found or not in project', [
+                    'task_id' => $taskId,
+                    'project_id' => $projectId,
+                    'task_project' => $task?->projectId,
+                ]);
+                // Vẫn broadcast tối thiểu để FE highlight cột
+                try {
+                    broadcast(new TaskDragOverColumn(
+                        $taskId,
+                        $projectId,
+                        $columnId,
+                        $columnStatus,
+                        $user?->id,
+                        $user?->name,
+                        $user?->avatar
+                    ));
+                } catch (\Exception $e) {
+                    Log::warning('Failed to broadcast drag over column (task not found): ' . $e->getMessage());
+                }
+                return $this->respondWithMessage('Task not found or not in project (drag-over broadcasted minimal)');
+            }
+
+            // Broadcast event
+            try {
+                broadcast(new TaskDragOverColumn(
+                    $taskId,
+                    $projectId,
+                    $columnId,
+                    $columnStatus,
+                    $user->id,
+                    $user->name,
+                    $user->avatar
+                ));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast drag over column: ' . $e->getMessage(), [
+                    'task_id' => $taskId,
+                    'project_id' => $projectId,
+                    'column_id' => $columnId,
+                    'user_id' => $user->id,
+                ]);
+                // Vẫn trả về success để FE không bị block
+                return $this->respondWithMessage('Drag over column event (broadcast may have failed)');
+            }
+
+            return $this->respondWithMessage('Drag over column event broadcasted');
+        } catch (\Exception $e) {
+            Log::error('Error in broadcastDragOverColumn: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to broadcast drag over column event');
         }
-
-        // Broadcast event
-        broadcast(new TaskDragOverColumn(
-            $taskId,
-            $projectId,
-            $columnId,
-            $columnStatus,
-            $user->id,
-            $user->name,
-            $user->avatar
-        ));
-
-        return $this->respondWithMessage('Drag over column event broadcasted');
     }
 }
