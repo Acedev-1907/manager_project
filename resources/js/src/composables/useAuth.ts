@@ -61,8 +61,11 @@ export function useAuth() {
         avatar: userData.user.avatar || '',
         friend_code: null, // Will be fetched from API if needed
       });
+    }
 
-      // Initialize Echo if needed
+    // Luôn luôn khởi tạo Echo nếu có token (kể cả khi user-store đã có user),
+    // để đảm bảo sau khi F5 / Ctrl+Shift+R thì websocket được connect lại.
+    if (userData?.token) {
       try {
         const { initEcho } = await import('../../echo.js');
         initEcho();
