@@ -27,6 +27,15 @@ class TaskCommentCreated implements ShouldBroadcastNow
         return [new PrivateChannel('task.' . $this->taskId)];
     }
 
+    /**
+     * The event's broadcast name.
+     * Frontend listens for 'TaskCommentCreated' (not 'App\Events\TaskCommentCreated')
+     */
+    public function broadcastAs()
+    {
+        return 'TaskCommentCreated';
+    }
+
     public function broadcastWith()
     {
         return [
