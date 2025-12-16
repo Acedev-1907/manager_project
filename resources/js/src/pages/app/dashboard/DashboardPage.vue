@@ -135,17 +135,21 @@ const refreshPinnedProjectOnce = async () => {
 const setupCountProjectListener = () => {
     try {
         const currentUserId = getCurrentUserId();
-        if (currentUserId) {
-            window.Echo.private(`user.${currentUserId}`).listen(
-                "UserProjectCountUpdated",
-                (e: { countProject: number; userId: number }) => {
-                    const newCount = { count: e.countProject };
-                    // @ts-expect-error - Pinia store type inference issue
-                    dashboardStore.setCountProject(newCount);
-                    saveToCache('count_project', newCount);
-                }
-            );
+        if (!currentUserId) return;
+        if (typeof window === 'undefined' || !window.Echo) {
+            // Echo chưa sẵn sàng -> bỏ qua realtime, chỉ dùng dữ liệu API/cache
+            return;
         }
+
+        window.Echo.private(`user.${currentUserId}`).listen(
+            "UserProjectCountUpdated",
+            (e: { countProject: number; userId: number }) => {
+                const newCount = { count: e.countProject };
+                // @ts-expect-error - Pinia store type inference issue
+                dashboardStore.setCountProject(newCount);
+                saveToCache('count_project', newCount);
+            }
+        );
     } catch (error) {
         // Silent error handling
     }

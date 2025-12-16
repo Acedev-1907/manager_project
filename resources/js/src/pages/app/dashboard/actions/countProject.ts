@@ -28,8 +28,13 @@ export function useGetTotalProject() {
   function updateData() {
     // Listen to user-specific project count updates
     const currentUserId = getCurrentUserId();
-    if (currentUserId) {
-      window.Echo.private(`user.${currentUserId}`).listen(
+    if (!currentUserId) return;
+    if (typeof window === "undefined" || !window.Echo) {
+      // Echo chưa sẵn sàng -> không đăng ký realtime, chỉ dùng dữ liệu API
+      return;
+    }
+
+    window.Echo.private(`user.${currentUserId}`).listen(
         "UserProjectCountUpdated",
         (e: { countProject: number; userId: number }) => {
           const newCount = { count: e.countProject };
@@ -50,7 +55,6 @@ export function useGetTotalProject() {
           }
         }
       );
-    }
   }
   return { countProject, getTotalProject };
 }

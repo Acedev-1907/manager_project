@@ -7,8 +7,13 @@ export function useAppGlobalRealtime() {
   const activeTaskListeners = new Set<number>();
 
   function setupProjectListener(projectId: number) {
-    if (activeProjectListeners.has(projectId)) {
+  if (activeProjectListeners.has(projectId)) {
       return; // Already listening
+    }
+
+    if (typeof window === "undefined" || !window.Echo) {
+      // Echo chưa sẵn sàng -> không đăng ký realtime
+      return;
     }
 
     try {
@@ -143,6 +148,10 @@ export function useAppGlobalRealtime() {
   function setupTaskListener(taskId: number) {
     if (activeTaskListeners.has(taskId)) {
       return; // Already listening
+    }
+
+    if (typeof window === "undefined" || !window.Echo) {
+      return;
     }
 
     try {

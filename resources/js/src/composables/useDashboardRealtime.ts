@@ -26,6 +26,10 @@ export function useDashboardRealtime(
         try {
             const currentUserId = getCurrentUserId();
             if (!currentUserId) return;
+            if (typeof window === 'undefined' || !window.Echo) {
+                // Echo chưa sẵn sàng -> không đăng ký realtime
+                return;
+            }
 
             window.Echo.private(`user.${currentUserId}`).listen(
                 "UserProjectCountUpdated",

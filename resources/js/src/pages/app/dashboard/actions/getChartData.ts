@@ -29,6 +29,10 @@ export function useGetChartData() {
 
   function updateData() {
     if (!currentProjectId) return;
+    if (typeof window === "undefined" || !window.Echo) {
+      // Nếu Echo chưa sẵn sàng thì bỏ qua phần realtime, chỉ dùng dữ liệu API
+      return;
+    }
 
     // Sử dụng private channels với projectId động
     window.Echo.private(`project.${currentProjectId}`).listen(
