@@ -659,11 +659,14 @@ export function useDragTask(ProjectData?: any) {
     // Reset grab mode
     isGrabbing = false;
 
-    // Set drag image
+    // Set drag image: để con trỏ nằm giữa task thay vì góc trên bên trái
     const dragEvent = event as DragEvent;
     if (dragEvent.dataTransfer) {
       dragEvent.dataTransfer.effectAllowed = "move";
-      dragEvent.dataTransfer.setDragImage(target, 0, 0);
+      const rect = target.getBoundingClientRect();
+      const offsetX = rect.width / 2;
+      const offsetY = rect.height / 2;
+      dragEvent.dataTransfer.setDragImage(target, offsetX, offsetY);
     }
 
     // KHÔNG gọi drag-started ngay ở đây
