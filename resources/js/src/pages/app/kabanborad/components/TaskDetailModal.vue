@@ -43,42 +43,113 @@ const currentUser = computed(() => {
 
 let channel: any = null;
 
+// Cleanup channel helper function
+function cleanupChannel() {
+    if (channel) {
+        try {
+            // Stop listening cả 2 cách
+            channel.stopListening('TaskCommentCreated');
+            channel.stopListening('App\\Events\\TaskCommentCreated');
+            const taskId = getTaskId();
+            if (taskId) {
+                window.Echo?.leave(`task.${taskId}`);
+            }
+        } catch (e) {
+            // Silent error handling
+        }
+        channel = null;
+    }
+}
+
 // Theo dõi khi modal mở và taskId thay đổi để mount/unmount channel realtime
 watch([
     () => props.visible,
     () => props.task?.id
 ], ([visible, taskId]) => {
-    if (channel) {
-        channel.stopListening('TaskCommentCreated');
-        channel = null;
-    }
+    // Cleanup channel cũ
+    cleanupChannel();
+    
+    // Setup channel mới khi modal mở và có taskId
     if (visible && taskId && window.Echo) {
-        channel = window.Echo.private('task.' + taskId)
-            .listen('TaskCommentCreated', (e: any) => {
-                const commentUserId = String(e.comment.user?.id || e.comment.user_id);
-                if (commentUserId !== String(currentUserId.value)) {
-                    handleNewRealtimeComment(e.comment, false);
-                }
+        console.log(`[TaskComment] Setting up channel for task.${taskId}`, { visible, taskId, hasEcho: !!window.Echo });
+        try {
+            const privateChannel = window.Echo.private(`task.${taskId}`);
+            
+            // Log khi channel được subscribe thành công
+            privateChannel.subscribed(() => {
+                console.log(`[TaskComment] Successfully subscribed to task.${taskId}`);
             });
+            
+            // Log khi có lỗi subscription
+            privateChannel.error((error: any) => {
+                console.error(`[TaskComment] Channel error for task.${taskId}:`, error);
+            });
+            
+            // Listen với tên từ broadcastAs() - 'TaskCommentCreated'
+            privateChannel.listen('TaskCommentCreated', (e: any) => {
+                // console.log('[TaskComment] ✅ Event received (TaskCommentCreated):', e);
+                handleCommentEvent(e);
+            });
+            
+            // Fallback: Listen với namespace đầy đủ (nếu không có broadcastAs)
+            privateChannel.listen('App\\Events\\TaskCommentCreated', (e: any) => {
+                // console.log('[TaskComment] ✅ Event received (App\\Events\\TaskCommentCreated):', e);
+                handleCommentEvent(e);
+            });
+            
+            // Debug: Listen tất cả events trên channel này để xem event name thực tế
+            // Laravel Echo có thể broadcast với format khác
+            privateChannel.listen('.', (eventName: string, e: any) => {
+                console.log(`[TaskComment] 🔍 All events on channel task.${taskId}:`, {
+                    eventName,
+                    eventData: e,
+                    eventKeys: Object.keys(e || {}),
+                    fullEvent: e
+                });
+            });
+            
+            // Thử listen với format khác (Laravel Reverb có thể dùng format khác)
+            // Một số trường hợp Laravel broadcast với tên class đầy đủ
+            const possibleEventNames = [
+                'TaskCommentCreated',
+                'App\\Events\\TaskCommentCreated',
+                'App.Events.TaskCommentCreated',
+                '.TaskCommentCreated',
+                'task-comment-created'
+            ];
+            
+            possibleEventNames.forEach(eventName => {
+                privateChannel.listen(eventName, (e: any) => {
+                    // console.log(`[TaskComment] ✅ Event received (${eventName}):`, e);
+                    handleCommentEvent(e);
+                });
+            });
+            
+            channel = privateChannel;
+            console.log(`[TaskComment] Channel setup completed for task.${taskId}`);
+        } catch (error) {
+            console.error('[TaskComment] Failed to setup channel:', error);
+        }
+    } else {
+        console.log(`[TaskComment] Skipping channel setup:`, { visible, taskId, hasEcho: !!window.Echo });
     }
-});
+}, { immediate: true });
 
 // Khóa cuộn body khi modal mở, khôi phục khi đóng
 watch(() => props.visible, (visible) => {
     if (visible) {
         document.body.style.overflow = 'hidden';
-        // Add class to body when modal is opened
         document.body.classList.add('modal-open');
     } else {
         document.body.style.overflow = '';
-        // Remove class from body when modal is closed
         document.body.classList.remove('modal-open');
     }
 });
 
+// Cleanup khi component unmount
 onUnmounted(() => {
+    cleanupChannel();
     document.body.style.overflow = '';
-    // Remove class from body when component is unmounted
     document.body.classList.remove('modal-open');
 });
 
@@ -141,6 +212,30 @@ function scrollToBottom() {
     // Scroll cho mobile
     if (mobileCommentsListRef.value) {
         mobileCommentsListRef.value.scrollTop = mobileCommentsListRef.value.scrollHeight;
+    }
+}
+
+// Function để xử lý comment event từ realtime
+function handleCommentEvent(e: any) {
+    // console.log('[TaskComment] handleCommentEvent called with:', e);
+    
+    const comment = e.comment || e;
+    if (!comment) {
+        console.warn('[TaskComment] No comment data in event:', e);
+        return;
+    }
+    
+    const commentUserId = String(comment.user?.id || comment.user_id || '');
+    const currentUserIdStr = String(currentUserId.value || '');
+    
+    // console.log('[TaskComment] Comment userId:', commentUserId, 'Current userId:', currentUserIdStr);
+    
+    // Chỉ hiển thị comment từ user khác (không phải của chính mình)
+    if (commentUserId && commentUserId !== currentUserIdStr) {
+        // console.log('[TaskComment] Adding comment from other user:', comment);
+        handleNewRealtimeComment(comment, false);
+    } else {
+        console.warn('[TaskComment] Ignoring own comment or invalid userId');
     }
 }
 

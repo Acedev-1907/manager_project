@@ -23,13 +23,16 @@ class TaskCommentCreated implements ShouldBroadcastNow
 
     public function broadcastOn()
     {
-        // Log::info('Broadcasting TaskCommentCreated event for task', ['taskId' => $this->taskId, 'comment_id' => $this->comment->id ?? null]);
+        // \Illuminate\Support\Facades\Log::info('TaskCommentCreated broadcastOn called', [
+        //     'taskId' => $this->taskId,
+        //     'channel' => 'task.' . $this->taskId
+        // ]);
         return [new PrivateChannel('task.' . $this->taskId)];
     }
 
     /**
-     * The event's broadcast name.
-     * Frontend listens for 'TaskCommentCreated' (not 'App\Events\TaskCommentCreated')
+     * Event name để frontend listen
+     * Frontend sẽ listen với tên 'TaskCommentCreated'
      */
     public function broadcastAs()
     {
@@ -38,8 +41,22 @@ class TaskCommentCreated implements ShouldBroadcastNow
 
     public function broadcastWith()
     {
-        return [
-            'comment' => $this->comment->load('user')
+        // Đảm bảo user relationship được load trước khi broadcast
+        if (!$this->comment->relationLoaded('user')) {
+            $this->comment->load('user');
+        }
+        
+        $data = [
+            'comment' => $this->comment->toArray()
         ];
+        
+        // Log::info('TaskCommentCreated broadcastWith data', [
+        //     'taskId' => $this->taskId,
+        //     'commentId' => $this->comment->id ?? null,
+        //     'hasComment' => isset($data['comment']),
+        //     'hasUser' => isset($data['comment']['user'])
+        // ]);
+        
+        return $data;
     }
 }

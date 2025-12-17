@@ -222,8 +222,29 @@ class TaskController extends ApiController
         
         $comment = $this->taskCommentService->createComment($id, $userId, $content);
         
+        // Load user relationship trước khi broadcast để đảm bảo data đầy đủ
+        $comment->load('user');
+        
         // Broadcast realtime event
-        event(new TaskCommentCreated($comment, $id));
+        try {
+            $event = new TaskCommentCreated($comment, $id);
+           broadcast($event);
+            // Log::info('TaskCommentCreated broadcasted', [
+            //     'taskId' => $id,
+            //     'commentId' => $comment->id,
+            //     'userId' => $userId,
+            //     'channel' => 'task.' . $id,
+            //     'eventName' => 'TaskCommentCreated',
+            //     'broadcastResult' => $broadcastResult ? 'success' : 'failed'
+            // ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to broadcast TaskCommentCreated', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'taskId' => $id,
+                'commentId' => $comment->id
+            ]);
+        }
         
         return $this->respondCreated('Comment added successfully', $comment->id);
     }

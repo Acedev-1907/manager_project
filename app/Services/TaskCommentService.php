@@ -49,11 +49,16 @@ class TaskCommentService
      */
     public function createComment(int $taskId, int $userId, string $content)
     {
-        return $this->taskCommentRepo->create([
+        $comment = $this->taskCommentRepo->create([
             'task_id' => $taskId,
             'user_id' => $userId,
             'content' => $content,
         ]);
+        
+        // Load user relationship ngay sau khi tạo để đảm bảo data đầy đủ
+        $comment->load('user');
+        
+        return $comment;
     }
 }
 
