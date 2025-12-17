@@ -50,8 +50,9 @@ export function handleAuthError() {
  */
 export function isAuthError(error: any): boolean {
   // Check HTTP status codes
-  if (error?.status === 401 || error?.status === 403) return true;
-  if (error?.response?.status === 401 || error?.response?.status === 403) return true;
+  // Chỉ coi 401 là lỗi auth (hết hạn / chưa đăng nhập)
+  if (error?.status === 401) return true;
+  if (error?.response?.status === 401) return true;
 
   // Check error messages
   if (error?.message === "Not authenticated") return true;

@@ -103,14 +103,16 @@ export async function makeHttpReq<TInput, TResponse>(
           data = await response.json();
         } else {
         // Non-JSON response - likely HTML redirect or error page
-        if (response.status === 401 || response.status === 403) {
+        // Nếu là lỗi 401 (chưa đăng nhập / token hết hạn) thì xử lý auth
+        if (response.status === 401) {
           handleAuthError();
           throw new Error("Not authenticated");
         }
         throw new Error("Invalid response format");
         }
       } catch (e) {
-      if (response.status === 401 || response.status === 403) {
+      // Lỗi parse JSON nhưng status là 401 → coi như lỗi auth
+      if (response.status === 401) {
         handleAuthError();
         throw new Error("Not authenticated");
       }
