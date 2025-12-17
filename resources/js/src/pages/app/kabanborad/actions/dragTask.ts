@@ -64,7 +64,7 @@ export function updateTaskOptimistically(
   }
 }
 
-// Debounced API call
+// Debounced API call + optimistic UI cho chính user đang kéo
 let apiCallTimeout: any = null;
 export function debouncedChangeTaskStatus(
   taskId: number,
@@ -77,13 +77,14 @@ export function debouncedChangeTaskStatus(
     clearTimeout(apiCallTimeout);
   }
 
+  // Cập nhật UI ngay khi drop (optimistic) để task "ở luôn" cột mới
   updateTaskOptimistically(taskId, newStatus, projectData);
 
   apiCallTimeout = setTimeout(async () => {
     try {
       await changeTaskStatus(taskId, projectId, endPoint);
     } catch (error) {
-      // Silent error handling
+      // Nếu lỗi, tạm thời giữ nguyên UI; backend realtime sau đó sẽ đồng bộ lại
     }
   }, DRAG_CONFIG.apiDebounceTime);
 }
@@ -261,11 +262,7 @@ export function useDragTask(ProjectData?: any) {
     }
   }
 
-  function addDropListener(
-    targetColumn: ExtendedHTMLElement,
-    endpoint: string,
-    newStatus: number
-  ) {
+  function addDropListener(targetColumn: ExtendedHTMLElement, endpoint: string) {
     if (attachedColumns.has(targetColumn)) {
       return;
     }
@@ -281,6 +278,15 @@ export function useDragTask(ProjectData?: any) {
       const rect = targetColumn.getBoundingClientRect();
       const x = e.clientX;
       const y = e.clientY;
+
+      // Cập nhật vị trí ghost rõ nét cho desktop khi đang drag
+      if (isDragging) {
+        if (!ghostElement) {
+          createMobileGhost(x, y);
+        } else {
+          updateMobileGhost(x, y);
+        }
+      }
 
       // Check if mouse is within column bounds
       if (
@@ -346,14 +352,15 @@ export function useDragTask(ProjectData?: any) {
       ) {
         const taskId = parseInt(draggedElement.dataset.taskId || "0");
         const projectId = parseInt(draggedElement.dataset.projectId || "0");
+        const columnStatus = targetColumn.dataset.columnStatus;
 
-        if (taskId && projectId) {
+        if (taskId && projectId && columnStatus !== undefined) {
           hasProcessedDrop = true;
           debouncedChangeTaskStatus(
             taskId,
             projectId,
             endpoint,
-            newStatus.toString(),
+            columnStatus.toString(),
             ProjectData
           );
         }
@@ -394,8 +401,7 @@ export function useDragTask(ProjectData?: any) {
 
       if (columnId && columnStatus !== undefined) {
         const endpoint = `task/transition_to_${columnStatus}`;
-        const newStatus = parseInt(columnStatus);
-        addDropListener(columnElement, endpoint, newStatus);
+        addDropListener(columnElement, endpoint);
       }
     });
   }
@@ -507,6 +513,13 @@ export function useDragTask(ProjectData?: any) {
       if (touchDuration > 50 && touchDuration < 2000) {
         isDragging = true;
         hasProcessedDrop = false;
+
+        // Làm nổi bật task đang được kéo trên mobile
+        try {
+          draggedElement?.classList.add("task-card-dragging");
+        } catch (_) {
+          // ignore
+        }
 
         // Create ghost element when starting drag
         if (!ghostElement) {
@@ -654,19 +667,41 @@ export function useDragTask(ProjectData?: any) {
     // Apply drag styles
     target.style.transform = "rotate(5deg) scale(1.05)";
     target.style.zIndex = "9999";
-    target.style.opacity = "0.8";
+    // Để card rõ nét, không bị mờ khi đang kéo
+    target.style.opacity = "1";
+
+    // Thêm class để CSS làm nổi bật card đang được kéo
+    try {
+      target.classList.add("task-card-dragging");
+    } catch (_) {
+      // ignore
+    }
 
     // Reset grab mode
     isGrabbing = false;
 
-    // Set drag image: để con trỏ nằm giữa task thay vì góc trên bên trái
+    // Set drag image: dùng hình trong suốt để ẩn preview mặc định (vốn hay bị mờ trên laptop)
     const dragEvent = event as DragEvent;
     if (dragEvent.dataTransfer) {
       dragEvent.dataTransfer.effectAllowed = "move";
       const rect = target.getBoundingClientRect();
       const offsetX = rect.width / 2;
       const offsetY = rect.height / 2;
-      dragEvent.dataTransfer.setDragImage(target, offsetX, offsetY);
+
+      try {
+        const img = new Image();
+        img.src =
+          "data:image/gif;base64,R0lGODlhAQABAAAAACw="; // 1x1 transparent
+        dragEvent.dataTransfer.setDragImage(img, offsetX, offsetY);
+      } catch {
+        // fallback: vẫn dùng target nếu có lỗi
+        dragEvent.dataTransfer.setDragImage(target, offsetX, offsetY);
+      }
+
+      // Tạo ghost rõ nét cho desktop (dùng chung với mobile ghost)
+      createMobileGhost(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      // Ẩn card gốc trong lúc kéo để chỉ còn ghost
+      target.style.opacity = "0";
     }
 
     // KHÔNG gọi drag-started ngay ở đây
@@ -697,6 +732,13 @@ export function useDragTask(ProjectData?: any) {
     target.style.zIndex = originalZIndex;
     target.style.opacity = originalOpacity;
 
+    // Bỏ class highlight khi thả xong
+    try {
+      target.classList.remove("task-card-dragging");
+    } catch (_) {
+      // ignore
+    }
+
     // Reset all column highlights
     const columns = document.querySelectorAll(".kanban-column");
     columns.forEach((column) => {
@@ -707,6 +749,9 @@ export function useDragTask(ProjectData?: any) {
 
     // Stop horizontal scroll
     stopHorizontalScroll();
+
+    // Dọn toàn bộ state/ghost còn lại (desktop + mobile)
+    cleanupDragVisuals();
 
     // Chỉ broadcast drag ended khi đã drop vào cột (hasProcessedDrop === true)
     // Nếu chưa drop vào cột, không broadcast để overlay vẫn hiện cho đến khi:
@@ -892,6 +937,15 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function cleanupDragVisuals() {
+    // Bỏ highlight nếu còn
+    if (draggedElement) {
+      try {
+        draggedElement.classList.remove("task-card-dragging");
+      } catch (_) {
+        // ignore
+      }
+    }
+
     isDragging = false;
     draggedElement = null;
     hasProcessedDrop = false;

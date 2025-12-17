@@ -504,10 +504,16 @@ onMounted(async () => {
         }
     });
 
-    // Listen for task status optimistic (whisper) - cực nhanh, không chờ API
+    // Listen for task status optimistic (whisper)
+    // Chỉ dùng cho *user khác*, không áp dụng cho chính người kéo task.
+    // Người kéo sẽ chờ backend broadcast (task-status-changed-realtime) rồi mới nhảy cột.
     eventBus.on('task-status-optimistic', async (eventData: any) => {
         try {
-            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+            if (
+                ProjectData.value?.data?.id &&
+                eventData?.projectId === ProjectData.value.data.id &&
+                !isCurrentUser(eventData.userId) // Bỏ qua nếu là chính user hiện tại
+            ) {
                 const tasks = ProjectData.value?.data?.tasks || [];
                 const idx = tasks.findIndex((t: any) => String(t.id) === String(eventData.taskId));
                 if (idx !== -1) {
@@ -517,8 +523,7 @@ onMounted(async () => {
                     };
                     ProjectData.value = { ...ProjectData.value };
                     
-                    // Tắt overlay ngay khi nhận optimistic update (whisper - realtime nhanh)
-                    // Để UX mượt mà: overlay tắt cùng lúc với task nhảy qua cột mới
+                    // Tắt overlay cho user khác khi nhận optimistic update
                     if (eventData.taskId) {
                         lockedTasks.value.delete(eventData.taskId);
                         draggingTasks.value.delete(eventData.taskId);

@@ -655,6 +655,14 @@ onBeforeUnmount(() => {
   transform: translateY(-2px) scale(1.01);
 }
 
+/* Trạng thái đang nắm/kéo task: làm rõ hơn so với hover bình thường */
+.task-card.task-card-dragging {
+  border-color: var(--column-color, #10b981);
+  box-shadow: 0 10px 30px rgba(15, 118, 110, 0.45);
+  transform: translateY(-4px) scale(1.04) rotate(2deg);
+  background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 55%);
+}
+
 .task-header {
   display: flex;
   justify-content: space-between;
