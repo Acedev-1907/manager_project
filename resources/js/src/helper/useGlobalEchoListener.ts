@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted, ref, watch, Ref } from "vue";
 import eventBus from "./eventBus";
 import { getCurrentUserId } from "./getUserData";
+import { subscribeTaskComments, unsubscribeTaskComments } from "./taskCommentsRealtime";
 
 let joinedUserChannel: string | number | null = null;
 const joinedProjectChannels: Set<number> = new Set();
@@ -80,33 +81,16 @@ export function useGlobalEchoListener(userId: Ref<string | number | null>) {
   // Global task listeners
   function setupTaskListener(taskId: number) {
     if (!taskId || joinedTaskChannels.has(taskId)) return;
-    if (!window.Echo) {
-      setTimeout(() => setupTaskListener(taskId), 200);
-      return;
-    }
 
-    try {
-      window.Echo.private(`task.${taskId}`).listen(
-        "TaskCommentCreated",
-        (e: any) => {
-          eventBus.emit("task-comment-created", {
-            taskId: taskId,
-            comment: e.comment,
-            timestamp: Date.now(),
-          });
-        }
-      );
-      joinedTaskChannels.add(taskId);
-    } catch (error) {
-      // Silent error handling
-    }
+    // Dùng helper realtime dùng chung thay vì tự listen Echo
+    subscribeTaskComments(taskId);
+    joinedTaskChannels.add(taskId);
   }
 
   function leaveTaskChannel(taskId: number) {
-    if (window.Echo && joinedTaskChannels.has(taskId)) {
-      window.Echo.leave(`task.${taskId}`);
-      joinedTaskChannels.delete(taskId);
-    }
+    if (!joinedTaskChannels.has(taskId)) return;
+    unsubscribeTaskComments(taskId);
+    joinedTaskChannels.delete(taskId);
   }
 
   // Cleanup all channels
@@ -126,7 +110,7 @@ export function useGlobalEchoListener(userId: Ref<string | number | null>) {
 
       // Leave all task channels
       joinedTaskChannels.forEach((taskId) => {
-        window.Echo.leave(`task.${taskId}`);
+        unsubscribeTaskComments(taskId);
       });
       joinedTaskChannels.clear();
     }

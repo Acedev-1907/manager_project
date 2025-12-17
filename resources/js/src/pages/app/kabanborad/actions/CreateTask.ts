@@ -1,9 +1,9 @@
 import { ref } from "vue";
-import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { taskStore } from "../store/kabanStore";
 import { showSuccess } from "../../../../helper/alert";
 import { showErrorResponse } from "../../../../helper/utils";
 import eventBus from "../../../../helper/eventBus";
+import { createTaskApi } from "../../../../services/taskService";
 
 export type CreateTaskInput = {
   name: string;
@@ -19,12 +19,8 @@ export function useCreateTask() {
     try {
       loading.value = true;
 
-      const data = await makeHttpReq<CreateTaskInput, { message: string }>(
-        "tasks",
-        "POST",
-        // @ts-expect-error - Pinia store type inference issue
-        taskStore.taskInput
-      );
+      // @ts-expect-error - Pinia store type inference issue
+      const data = await createTaskApi(taskStore.taskInput);
       loading.value = false;
       showSuccess(data.message);
       eventBus.emit("taskCreated");

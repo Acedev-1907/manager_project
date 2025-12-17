@@ -6,6 +6,7 @@ import { useTaskStore } from "../store/kabanStore";
 import { useCreateTask } from "../actions/CreateTask";
 import BaseInput from "../../../../components/BaseInput.vue";
 import { getAvatarSrc } from '../../../../helper/avatar';
+import { getCurrentUserData } from "../../../../helper/getUserData";
 
 const props = defineProps<{
     members: Array<{ id: number; name: string; email: string; avatar?: string }>;
@@ -90,8 +91,8 @@ const taskInput = computed({
 });
 
 onMounted(() => {
-    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    currentUser.value = userData;
+    const userData = getCurrentUserData();
+    currentUser.value = userData?.user || null;
     // @ts-expect-error - Pinia store type inference issue
     selectedMembers.value = Array.isArray(taskStore.taskInput.memberIds) ? [...taskStore.taskInput.memberIds] : [];
 });

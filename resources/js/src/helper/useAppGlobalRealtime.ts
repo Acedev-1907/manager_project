@@ -1,5 +1,6 @@
 import { onMounted, onUnmounted } from "vue";
 import eventBus from "./eventBus";
+import { subscribeTaskComments, unsubscribeTaskComments } from "./taskCommentsRealtime";
 
 // Global real-time manager for app-wide event handling
 export function useAppGlobalRealtime() {
@@ -149,28 +150,11 @@ export function useAppGlobalRealtime() {
     if (activeTaskListeners.has(taskId)) {
       return; // Already listening
     }
+    if (!taskId) return;
 
-    if (typeof window === "undefined" || !window.Echo) {
-      return;
-    }
-
-    try {
-      window.Echo.private(`task.${taskId}`).listen(
-        "TaskCommentCreated",
-        (e: any) => {
-          // Emit event for task comment updates
-          eventBus.emit("task-comment-created", {
-            taskId,
-            comment: e.comment,
-            timestamp: Date.now(),
-          });
-        }
-      );
-
-      activeTaskListeners.add(taskId);
-    } catch (error) {
-      // Silent error handling
-    }
+    // Ủy quyền cho helper realtime dùng chung
+    subscribeTaskComments(taskId);
+    activeTaskListeners.add(taskId);
   }
 
   function setupMultipleTaskListeners(taskIds: number[]) {
@@ -191,12 +175,9 @@ export function useAppGlobalRealtime() {
   }
 
   function removeTaskListener(taskId: number) {
-    try {
-      window.Echo.leave(`task.${taskId}`);
-      activeTaskListeners.delete(taskId);
-    } catch (error) {
-      // Silent error handling
-    }
+    if (!activeTaskListeners.has(taskId)) return;
+    unsubscribeTaskComments(taskId);
+    activeTaskListeners.delete(taskId);
   }
 
   function cleanupAllListeners() {
@@ -212,11 +193,7 @@ export function useAppGlobalRealtime() {
 
     // Clean up all task listeners
     activeTaskListeners.forEach((taskId) => {
-      try {
-        window.Echo.leave(`task.${taskId}`);
-      } catch (error) {
-        // Silent error handling
-      }
+      unsubscribeTaskComments(taskId);
     });
     activeTaskListeners.clear();
   }

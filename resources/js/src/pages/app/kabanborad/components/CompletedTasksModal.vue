@@ -99,8 +99,11 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { makeHttpReq } from '../../../../helper/makeHttpReq';
 import { getAvatarSrc } from '../../../../helper/avatar';
+import eventBus from '../../../../helper/eventBus';
+import { showError } from '../../../../helper/alert';
+import { getCompletedTasks } from '../../../../services/taskService';
+import { lockBodyScroll, unlockBodyScroll } from '../../../../helper/bodyScrollLock';
 
 const props = defineProps<{
     visible: boolean;
@@ -116,10 +119,10 @@ watch(() => props.visible, async (newVisible) => {
     if (newVisible && props.projectId) {
         await fetchCompletedTasks();
         // Add class to body when modal is opened
-        document.body.classList.add('modal-open');
+        lockBodyScroll();
     } else {
         // Remove class from body when modal is closed
-        document.body.classList.remove('modal-open');
+        unlockBodyScroll();
     }
 });
 
@@ -128,15 +131,10 @@ async function fetchCompletedTasks() {
 
     loading.value = true;
     try {
-        const response = await makeHttpReq<any, any>(`projects/${props.projectId}/completed-tasks`, 'GET');
-
-        if (response.code === 1000 || response.code === 1002) {
-            completedTasks.value = response.data || [];
-        } else {
-            completedTasks.value = [];
-        }
+        completedTasks.value = await getCompletedTasks(props.projectId);
     } catch (error: any) {
         completedTasks.value = [];
+        showError(error?.message || 'Failed to load completed tasks');
     } finally {
         loading.value = false;
     }
@@ -161,7 +159,7 @@ function onBackTask(taskId: number) {
     emit('backTask', taskId);
 }
 
-// Listen for refresh event
+// Listen for refresh event bằng eventBus để đồng bộ với các phần khác của app
 function handleRefreshEvent() {
     if (props.visible && props.projectId) {
         fetchCompletedTasks();
@@ -169,13 +167,13 @@ function handleRefreshEvent() {
 }
 
 onMounted(() => {
-    window.addEventListener('refreshCompletedTasks', handleRefreshEvent);
+    eventBus.on('refreshCompletedTasks', handleRefreshEvent);
 });
 
 onUnmounted(() => {
-    window.removeEventListener('refreshCompletedTasks', handleRefreshEvent);
+    eventBus.off('refreshCompletedTasks', handleRefreshEvent);
     // Remove class from body when component is unmounted
-    document.body.classList.remove('modal-open');
+    unlockBodyScroll();
 });
 </script>
 

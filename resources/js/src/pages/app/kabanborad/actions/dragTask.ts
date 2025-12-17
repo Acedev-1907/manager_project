@@ -1,7 +1,10 @@
-import { makeHttpReq } from "../../../../helper/makeHttpReq";
 import { emitForceCacheClear } from "../../../../helper/eventBus";
 import eventBus from "../../../../helper/eventBus";
 import { getCurrentUserId, getUserData } from "../../../../helper/getUserData";
+import {
+  changeTaskStatusApi,
+  notifyTaskDragEnded,
+} from "../../../../services/taskService";
 
 // Constants
 const DRAG_CONFIG = {
@@ -85,10 +88,6 @@ export function debouncedChangeTaskStatus(
   }, DRAG_CONFIG.apiDebounceTime);
 }
 
-// Debounced broadcast drag over column (throttle để không broadcast quá nhiều)
-let dragOverColumnTimeout: any = null;
-let lastBroadcastedColumnId: string | null = null; // Track column đã broadcast để tránh spam
-
 // Throttle whisper realtime (không qua HTTP) để báo nhanh cho user khác
 const whisperTimeouts = new Map<string, any>();
 function whisperDrag(eventName: string, payload: any, throttleMs = 0) {
@@ -117,46 +116,15 @@ function whisperDrag(eventName: string, payload: any, throttleMs = 0) {
   whisperTimeouts.set(key, t);
 }
 
-export function debouncedBroadcastDragOverColumn(
-  taskId: number,
-  projectId: number,
-  columnId: string,
-  columnStatus: string
-) {
-  // Chỉ broadcast khi chuyển sang cột mới, không phải mỗi lần drag over
-  if (lastBroadcastedColumnId === columnId) {
-    return; // Đã broadcast cho cột này rồi, skip
-  }
-
-  if (dragOverColumnTimeout) {
-    clearTimeout(dragOverColumnTimeout);
-  }
-
-  dragOverColumnTimeout = setTimeout(async () => {
-    try {
-      await makeHttpReq("tasks/drag-over-column", "POST", {
-        task_id: taskId,
-        project_id: projectId,
-        column_id: columnId,
-        column_status: columnStatus
-      });
-      // Đánh dấu đã broadcast cho cột này
-      lastBroadcastedColumnId = columnId;
-    } catch (error) {
-      // Silent error handling
-    }
-  }, 150); // Giảm từ 300ms xuống 150ms để tối ưu hiệu năng
-}
-
 export async function changeTaskStatus(
   taskId: number,
   projectId: number,
   endPoint: string
 ) {
   try {
-    await makeHttpReq<changeTaskInput, { message: string }>(endPoint, "POST", {
-      taskId: taskId,
-      projectId: projectId,
+    await changeTaskStatusApi(endPoint, {
+      taskId,
+      projectId,
     });
 
     emitForceCacheClear(
@@ -174,17 +142,6 @@ export function cleanupDrag() {
     clearTimeout(apiCallTimeout);
     apiCallTimeout = null;
   }
-  if (dragOverColumnTimeout) {
-    clearTimeout(dragOverColumnTimeout);
-    dragOverColumnTimeout = null;
-  }
-  // Reset column tracking khi cleanup
-  lastBroadcastedColumnId = null;
-}
-
-interface changeTaskInput {
-  taskId: number;
-  projectId: number;
 }
 
 export function useDragTask(ProjectData?: any) {
@@ -664,10 +621,7 @@ export function useDragTask(ProjectData?: any) {
           }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
           
           // Gọi API ngay lập tức (không debounce) để đảm bảo event được broadcast qua Laravel realtime
-          makeHttpReq("tasks/drag-ended", "POST", {
-            task_id: taskId,
-            project_id: projectId,
-          }).catch(() => {
+          notifyTaskDragEnded(taskId, projectId).catch(() => {
             // Silent error handling - whisper đã gửi rồi nên không cần lo
           });
         }
@@ -765,10 +719,7 @@ export function useDragTask(ProjectData?: any) {
       }, 5);
       
       // Gọi API để đảm bảo event được broadcast qua Laravel realtime
-      makeHttpReq("tasks/drag-ended", "POST", {
-        task_id: taskId,
-        project_id: projectId,
-      }).catch(() => {
+      notifyTaskDragEnded(taskId, projectId).catch(() => {
         // Silent error handling - whisper đã gửi rồi nên không cần lo
       });
     }

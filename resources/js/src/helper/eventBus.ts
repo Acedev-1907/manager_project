@@ -1,7 +1,8 @@
 import mitt from "mitt";
 import { getCurrentUserId } from "./getUserData";
 
-const eventBus = mitt();
+// Dùng generic rộng để handler nhận được payload kiểu any (dễ bảo trì hơn unknown)
+const eventBus = mitt<Record<string, any>>();
 
 // Event replay mechanism - store recent events for replay
 const recentEvents: Array<{ event: string; data: any; timestamp: number }> = [];
