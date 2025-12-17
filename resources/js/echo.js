@@ -1,69 +1,86 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 
-// Đảm bảo Pusher được gán global để Echo (và Reverb connector) có thể sử dụng
+// Constants
+const STORAGE_KEY = 'userData'
+const AUTH_ENDPOINT = '/broadcasting/auth'
+
+// State management
+let isInitializing = false
+let lastInitToken = null
+let initPromise = null
+
+// Setup Pusher global
 if (typeof window !== 'undefined') {
     window.Pusher = Pusher
 }
 
-function getCurrentToken() {
-    const userDataRaw = localStorage.getItem('userData')
-    const token = userDataRaw ? JSON.parse(userDataRaw)?.token : ''
-
-    return token
+/**
+ * Lấy token từ localStorage
+ */
+function getToken() {
+    try {
+        const data = localStorage.getItem(STORAGE_KEY)
+        return data ? JSON.parse(data)?.token : null
+    } catch {
+        return null
+    }
 }
 
-export function initEcho() {
-    // Kiểm tra xem có đủ env variables không
-    const appKey = import.meta.env.VITE_REVERB_APP_KEY
-    if (!appKey) {
-        console.warn('VITE_REVERB_APP_KEY is not set. Echo will not be initialized.')
-        return
-    }
-
-    // Disconnect Echo cũ nếu có
-    if (window.Echo) {
-        try {
-            window.Echo.disconnect()
-        } catch (err) {
-            // Ignore disconnect errors
-        }
+/**
+ * Disconnect Echo instance hiện tại
+ */
+function disconnectEcho() {
+    if (!window.Echo) return
+    try {
+        window.Echo.disconnect()
+    } catch {
+        // Ignore disconnect errors
+    } finally {
         window.Echo = null
     }
+}
 
-    const token = getCurrentToken()
-    if (!token) {
-        console.warn('No token found. Echo will not be initialized.')
-        return
+/**
+ * Lấy cấu hình Reverb từ environment
+ */
+function getConfig() {
+    const appKey = import.meta.env.VITE_REVERB_APP_KEY
+    if (!appKey) {
+        console.warn('VITE_REVERB_APP_KEY is not set')
+        return null
     }
 
-    // Lấy config từ env, với fallback hợp lý
     const isProd = import.meta.env.PROD
     const wsHost = import.meta.env.VITE_REVERB_HOST || window.location.hostname
-    const wsPort = Number(import.meta.env.VITE_REVERB_PORT) || (window.location.protocol === 'https:' ? 443 : 80)
+    const defaultPort = window.location.protocol === 'https:' ? 443 : 80
+    const wsPort = Number(import.meta.env.VITE_REVERB_PORT) || defaultPort
     const scheme = import.meta.env.VITE_REVERB_SCHEME || window.location.protocol.replace(':', '')
-    const forceTLS = scheme === 'https'
+    
+    return {
+        appKey,
+        wsHost,
+        wsPort,
+        forceTLS: scheme === 'https',
+        wsPath: isProd ? '/ws' : '',
+    }
+}
 
-    // LƯU Ý:
-    // - Ở môi trường production phía sau Nginx, client sẽ gọi /ws/app/... rồi Nginx mới strip /ws.
-    // - Ở local (kết nối trực tiếp tới Reverb server port 8080), URL đúng là /app/... (không có /ws).
-    const wsPath = isProd ? '/ws' : '' // '' nghĩa là để mặc định /app/{key}
-
+/**
+ * Tạo Echo instance
+ */
+function createEcho(config, token) {
     try {
-        // Cấu hình Reverb client dùng giao thức Pusher
-        window.Echo = new Echo({
+        return new Echo({
             broadcaster: 'reverb',
-            key: appKey,
-
-            // QUAN TRỌNG: wsPath phải là '/ws' (không có '/app'), Reverb sẽ tự thêm '/app/{key}'
-            wsHost,
-            wsPort,
-            wssPort: wsPort,
-            forceTLS,
-            wsPath,
+            key: config.appKey,
+            wsHost: config.wsHost,
+            wsPort: config.wsPort,
+            wssPort: config.wsPort,
+            forceTLS: config.forceTLS,
+            wsPath: config.wsPath,
             enabledTransports: ['ws', 'wss'],
-
-            authEndpoint: '/broadcasting/auth',
+            authEndpoint: AUTH_ENDPOINT,
             auth: {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -71,20 +88,66 @@ export function initEcho() {
                 },
             },
         })
-
-        // Log để debug (chỉ trong dev)
-        if (import.meta.env.DEV) {
-            console.log('Echo initialized:', {
-                wsHost,
-                wsPort,
-                scheme,
-                wsPath,
-            })
-        }
     } catch (error) {
-        console.error('Failed to initialize Echo:', error)
-        window.Echo = null
+        console.error('Failed to create Echo:', error)
+        return null
     }
+}
+
+/**
+ * Khởi tạo Laravel Echo với Reverb
+ * @returns {Promise<boolean>}
+ */
+export function initEcho() {
+    const token = getToken()
+    if (!token) {
+        console.warn('No token found')
+        return Promise.resolve(false)
+    }
+
+    // Đang khởi tạo với cùng token → đợi
+    if (isInitializing && lastInitToken === token && initPromise) {
+        return initPromise
+    }
+
+    // Đã khởi tạo với cùng token → skip
+    if (window.Echo && lastInitToken === token) {
+        return Promise.resolve(true)
+    }
+
+    // Bắt đầu khởi tạo
+    isInitializing = true
+    lastInitToken = token
+
+    initPromise = (async () => {
+        try {
+            const config = getConfig()
+            if (!config) return false
+
+            disconnectEcho()
+            
+            const echo = createEcho(config, token)
+            if (!echo) return false
+
+            window.Echo = echo
+
+            if (import.meta.env.DEV) {
+                console.log('Echo initialized:', { wsHost: config.wsHost, wsPort: config.wsPort })
+            }
+
+            return true
+        } catch (error) {
+            console.error('Error initializing Echo:', error)
+            return false
+        } finally {
+            setTimeout(() => {
+                isInitializing = false
+                initPromise = null
+            }, 1000)
+        }
+    })()
+
+    return initPromise
 }
 
 export default initEcho

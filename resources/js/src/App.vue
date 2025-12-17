@@ -53,11 +53,13 @@ export default defineComponent({
                 }
             }
 
-            // Nếu có token (user đã đăng nhập), luôn khởi tạo Echo sau mỗi lần reload
+            // Nếu có token (user đã đăng nhập), khởi tạo Echo và fetch user info
+            // Logic trong echo.js đã được cải thiện để tránh duplicate connections
             if (token) {
                 try {
+                    // Khởi tạo Echo (sẽ tự động skip nếu đã được khởi tạo)
                     const { initEcho } = await import('../echo.js');
-                    initEcho();
+                    await initEcho();
                 } catch (err) {
                     console.warn('Failed to initialize Echo on App mount:', err);
                 }
