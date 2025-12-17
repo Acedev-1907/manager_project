@@ -391,7 +391,8 @@ onMounted(async () => {
                     // Force reactivity update
                     lockedTasks.value = new Map(lockedTasks.value);
 
-                    // Auto-clear lock after 5s nếu không có drag-ended
+                    // Auto-clear lock after 30s nếu không có drag-ended
+                    // Tăng timeout để phù hợp với trường hợp user nắm giữ lâu chưa drop vào cột
                     setTimeout(() => {
                         if (lockedTasks.value.has(eventData.taskId)) {
                             lockedTasks.value.delete(eventData.taskId);
@@ -401,7 +402,7 @@ onMounted(async () => {
                             draggingTasks.value.delete(eventData.taskId);
                             draggingTasks.value = new Map(draggingTasks.value);
                         }
-                    }, 5000);
+                    }, 30000); // 30 giây
                 }
             }
         } catch (error) {
@@ -409,20 +410,17 @@ onMounted(async () => {
         }
     });
 
-    // Listen for task drag ended events - Unlock task
+    // Listen for task drag ended events - Không tắt overlay ngay
+    // Overlay sẽ được tắt khi nhận TaskStatusChanged (task đã được update thành công)
     eventBus.on('task-drag-ended', (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+                // Không tắt overlay ngay ở đây
+                // Chờ TaskStatusChanged để đảm bảo task đã được update trước khi tắt overlay
+                // Chỉ xóa draggingTasks để cleanup
                 if (eventData.taskId) {
-                    // Unlock task (Vue reactive)
-                    lockedTasks.value.delete(eventData.taskId);
-                    // Remove from dragging tasks
                     draggingTasks.value.delete(eventData.taskId);
-                    // Force reactivity update
-                    lockedTasks.value = new Map(lockedTasks.value);
                     draggingTasks.value = new Map(draggingTasks.value);
-
-                    // Clear column highlight (no-op now, kept for safety)
                 }
             }
         } catch (error) {
@@ -487,9 +485,19 @@ onMounted(async () => {
                         status: updatedTask?.status ?? eventData.status
                     };
                 }
-                // Force reactivity update
+                // Force reactivity update (không cần await nextTick - Vue tự động update)
                 ProjectData.value = { ...ProjectData.value };
-                await nextTick();
+                
+                // Tắt overlay "Someone is moving this task" sau khi task đã được update thành công
+                // Đảm bảo UX: overlay chỉ tắt khi task đã nhảy qua cột mới
+                // Tắt ngay lập tức để giảm độ trễ
+                if (eventData.taskId) {
+                    lockedTasks.value.delete(eventData.taskId);
+                    draggingTasks.value.delete(eventData.taskId);
+                    // Force reactivity update
+                    lockedTasks.value = new Map(lockedTasks.value);
+                    draggingTasks.value = new Map(draggingTasks.value);
+                }
             }
         } catch (error) {
             // Silent
@@ -508,6 +516,16 @@ onMounted(async () => {
                         status: eventData.status
                     };
                     ProjectData.value = { ...ProjectData.value };
+                    
+                    // Tắt overlay ngay khi nhận optimistic update (whisper - realtime nhanh)
+                    // Để UX mượt mà: overlay tắt cùng lúc với task nhảy qua cột mới
+                    if (eventData.taskId) {
+                        lockedTasks.value.delete(eventData.taskId);
+                        draggingTasks.value.delete(eventData.taskId);
+                        // Force reactivity update
+                        lockedTasks.value = new Map(lockedTasks.value);
+                        draggingTasks.value = new Map(draggingTasks.value);
+                    }
                 }
             }
         } catch (_) {

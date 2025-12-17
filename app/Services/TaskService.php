@@ -8,6 +8,7 @@ use App\Repositories\Task\TaskMemberRepository;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use App\Events\TaskStatusChanged;
+use App\Events\TaskDragEnded;
 
 class TaskService
 {
@@ -110,28 +111,35 @@ class TaskService
             // Chỉ thêm column_id nếu cột này tồn tại trong bảng
             // (kiểm tra schema hoặc bỏ qua nếu không có)
             
-            $updated = $this->taskRepository->updateById($taskId, $updateData);
+            // updateById đã return task object với fresh() - không cần query lại
+            $task = $this->taskRepository->updateById($taskId, $updateData);
 
-            if ($updated) {
+            if ($task) {
+                // Broadcast realtime task status changed NGAY LẬP TỨC
+                // Trước khi xử lý project progress để giảm độ trễ cho user khác
+                // Sử dụng task object đã có từ updateById() - tránh query DB thêm 1 lần
+                try {
+                    // Broadcast ngay để user khác nhận update nhanh nhất
+                    broadcast(new TaskStatusChanged($task, $projectId, $status, $userId));
+                    
+                    // Broadcast drag ended để tắt overlay "Someone is moving this task"
+                    // Khi task được drop vào cột và status đã được update
+                    broadcast(new TaskDragEnded($taskId, $projectId, $userId));
+                } catch (\Exception $e) {
+                    Log::warning('Failed to broadcast task status changed: ' . $e->getMessage());
+                    // Không fail toàn bộ request nếu broadcast fail
+                }
+
+                // Xử lý project progress sau khi broadcast (không block realtime update)
+                // Chạy async để không block response
                 try {
                     Task::handleProjectProgress($projectId, $userId);
                 } catch (\Exception $e) {
                     Log::warning('Failed to handle project progress: ' . $e->getMessage());
                 }
-
-                // Broadcast realtime task status changed
-                try {
-                    $task = $this->taskRepository->find($taskId);
-                    if ($task) {
-                        broadcast(new TaskStatusChanged($task, $projectId, $status, $userId));
-                    }
-                } catch (\Exception $e) {
-                    Log::warning('Failed to broadcast task status changed: ' . $e->getMessage());
-                    // Không fail toàn bộ request nếu broadcast fail
-                }
             }
 
-            return $updated;
+            return $task !== null;
         } catch (\Exception $e) {
             Log::error('Error in updateTaskStatus: ' . $e->getMessage(), [
                 'data' => $data,

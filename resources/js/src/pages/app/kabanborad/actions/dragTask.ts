@@ -6,7 +6,7 @@ import { getCurrentUserId, getUserData } from "../../../../helper/getUserData";
 // Constants
 const DRAG_CONFIG = {
   threshold: 5,
-  apiDebounceTime: 10,
+  apiDebounceTime: 0, // Gọi API ngay lập tức khi drop để giảm độ trễ
   // Auto-scroll constants
   horizontalScrollThreshold: 150,
   horizontalScrollSpeed: 15,
@@ -91,11 +91,22 @@ let lastBroadcastedColumnId: string | null = null; // Track column đã broadcas
 
 // Throttle whisper realtime (không qua HTTP) để báo nhanh cho user khác
 const whisperTimeouts = new Map<string, any>();
-function whisperDrag(eventName: string, payload: any, throttleMs = 10) {
+function whisperDrag(eventName: string, payload: any, throttleMs = 0) {
   if (!window.Echo || !payload?.project_id) return;
   const key = `${eventName}-${payload.project_id}`;
   const prev = whisperTimeouts.get(key);
   if (prev) clearTimeout(prev);
+  
+  // Nếu throttleMs = 0, gửi ngay lập tức để tối ưu hiệu năng
+  if (throttleMs === 0) {
+    try {
+      window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
+    } catch (_) {
+      // ignore whisper errors
+    }
+    return;
+  }
+  
   const t = setTimeout(() => {
     try {
       window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
@@ -134,7 +145,7 @@ export function debouncedBroadcastDragOverColumn(
     } catch (error) {
       // Silent error handling
     }
-  }, 300); // Tăng debounce lên 300ms để giảm spam
+  }, 150); // Giảm từ 300ms xuống 150ms để tối ưu hiệu năng
 }
 
 export async function changeTaskStatus(
@@ -330,6 +341,7 @@ export function useDragTask(ProjectData?: any) {
         
         if (taskId && projectId && columnId && columnStatus) {
           // Chỉ dùng whisper để realtime update cho user khác (không qua HTTP)
+          // Throttle nhẹ 50ms để giảm spam nhưng vẫn đảm bảo realtime nhanh
           const user = getUserData();
           whisperDrag("drag-over-column", {
             task_id: taskId,
@@ -339,7 +351,7 @@ export function useDragTask(ProjectData?: any) {
             user_id: user?.user?.id,
             user_name: user?.user?.name,
             user_avatar: user?.user?.avatar,
-        }, 100); // Throttle whisper 100ms để giảm spam
+          }, 50); // Giảm từ 100ms xuống 50ms để tối ưu hiệu năng
         }
       }
     }
@@ -545,6 +557,7 @@ export function useDragTask(ProjectData?: any) {
         }
 
         // Broadcast drag started event (realtime only, không gọi HTTP API)
+        // Gửi ngay lập tức để tối ưu hiệu năng
         const taskId = parseInt(draggedElement.dataset.taskId || "0");
         const projectId = parseInt(draggedElement.dataset.projectId || "0");
         if (taskId && projectId) {
@@ -558,7 +571,7 @@ export function useDragTask(ProjectData?: any) {
               user_name: user?.user?.name,
               user_avatar: user?.user?.avatar,
             },
-            10
+            0 // 0ms = gửi ngay lập tức để tối ưu hiệu năng
           );
         }
 
@@ -632,23 +645,35 @@ export function useDragTask(ProjectData?: any) {
             newStatus.toString(),
             ProjectData
           );
-          // Whisper optimistic status to other users for instant UI
+          // Whisper optimistic status to other users for instant UI (gửi ngay lập tức)
           const user = getUserData();
           whisperDrag("task-status-optimistic", {
             task_id: taskId,
             project_id: projectId,
             status: newStatus,
             user_id: user?.user?.id,
-          }, 5);
+          }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
+          
+          // Chỉ broadcast drag ended khi đã drop vào cột
+          // Backend sẽ broadcast TaskDragEnded sau khi update status thành công
+          // Nhưng cũng gọi ở đây để đảm bảo realtime nhanh
+          whisperDrag("drag-ended", {
+            task_id: taskId,
+            project_id: projectId,
+            user_id: user?.user?.id,
+          }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
+          
+          // Gọi API ngay lập tức (không debounce) để đảm bảo event được broadcast qua Laravel realtime
+          makeHttpReq("tasks/drag-ended", "POST", {
+            task_id: taskId,
+            project_id: projectId,
+          }).catch(() => {
+            // Silent error handling - whisper đã gửi rồi nên không cần lo
+          });
         }
       }
-
-      const user = getUserData();
-      whisperDrag("drag-ended", {
-        task_id: taskId,
-        project_id: projectId,
-        user_id: user?.user?.id,
-      }, 5);
+      // Nếu chưa drop vào cột, không broadcast drag-ended
+      // Để overlay vẫn hiện cho đến khi backend xử lý xong hoặc timeout
     }
 
     cleanupDragVisuals();
@@ -689,7 +714,7 @@ export function useDragTask(ProjectData?: any) {
 
     // KHÔNG gọi drag-started ngay ở đây
     // Sẽ gọi khi thực sự bắt đầu drag (trong dragover handler sau khi di chuyển)
-    // Chỉ whisper để realtime update nhanh
+    // Chỉ whisper để realtime update nhanh (gửi ngay lập tức)
     const user = getUserData();
     whisperDrag("drag-started", {
       task_id: taskId,
@@ -697,7 +722,7 @@ export function useDragTask(ProjectData?: any) {
       user_id: user?.user?.id,
       user_name: user?.user?.name,
       user_avatar: user?.user?.avatar,
-    }, 10);
+    }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
   }
 
   function handleDragEnd(event: Event) {
@@ -725,6 +750,28 @@ export function useDragTask(ProjectData?: any) {
 
     // Stop horizontal scroll
     stopHorizontalScroll();
+
+    // Chỉ broadcast drag ended khi đã drop vào cột (hasProcessedDrop === true)
+    // Nếu chưa drop vào cột, không broadcast để overlay vẫn hiện cho đến khi:
+    // 1. Backend xử lý xong và broadcast TaskDragEnded
+    // 2. Hoặc timeout 5s tự động clear
+    if (taskId && projectId && hasProcessedDrop) {
+      const user = getUserData();
+      // Whisper để realtime nhanh
+      whisperDrag("drag-ended", {
+        task_id: taskId,
+        project_id: projectId,
+        user_id: user?.user?.id,
+      }, 5);
+      
+      // Gọi API để đảm bảo event được broadcast qua Laravel realtime
+      makeHttpReq("tasks/drag-ended", "POST", {
+        task_id: taskId,
+        project_id: projectId,
+      }).catch(() => {
+        // Silent error handling - whisper đã gửi rồi nên không cần lo
+      });
+    }
 
     // Reset flags
     hasProcessedDrop = false;
@@ -836,14 +883,14 @@ export function useDragTask(ProjectData?: any) {
             newStatus.toString(),
             ProjectData
           );
-          // Whisper optimistic status to other users for instant UI
+          // Whisper optimistic status to other users for instant UI (gửi ngay lập tức)
           const user = getUserData();
           whisperDrag("task-status-optimistic", {
             task_id: taskId,
             project_id: projectId,
             status: newStatus,
             user_id: user?.user?.id,
-          }, 20);
+          }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
         }
       }
     }
@@ -873,6 +920,7 @@ export function useDragTask(ProjectData?: any) {
 
           if (taskId && projectId && columnId && columnStatus) {
             // Chỉ dùng whisper để realtime update cho user khác (không qua HTTP)
+            // Throttle nhẹ 50ms để giảm spam nhưng vẫn đảm bảo realtime nhanh
             const user = getUserData();
             whisperDrag("drag-over-column", {
               task_id: taskId,
@@ -882,7 +930,7 @@ export function useDragTask(ProjectData?: any) {
               user_id: user?.user?.id,
               user_name: user?.user?.name,
               user_avatar: user?.user?.avatar,
-            }, 100); // Throttle whisper 100ms để giảm spam
+            }, 50); // Giảm từ 100ms xuống 50ms để tối ưu hiệu năng
           }
         }
       }
