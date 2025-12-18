@@ -13,8 +13,8 @@ const DRAG_CONFIG = {
   threshold: 5,
   apiDebounceTime: 0, // Gọi API ngay lập tức khi drop để giảm độ trễ
   // Auto-scroll constants
-  horizontalScrollThreshold: 150,
-  horizontalScrollSpeed: 15,
+  horizontalScrollThreshold: 100,
+  horizontalScrollSpeed: 12,
   horizontalScrollInterval: 16, // ~60fps
 } as const;
 
@@ -46,6 +46,7 @@ function getGhostElement(): HTMLElement | null {
     opacity: 0;
     background: transparent !important;
     will-change: transform;
+    perspective: 1000px;
     backface-visibility: hidden;
     transform-style: preserve-3d;
   `;
@@ -65,12 +66,25 @@ function getGhostElement(): HTMLElement | null {
   return globalGhostElement;
 }
 
-function showGhost(x: number, y: number, offsetX: number, offsetY: number) {
+function showGhost(x: number, y: number, offsetX: number, offsetY: number, flip: boolean = false) {
   const ghost = getGhostElement();
   if (!ghost) return;
   ghost.style.setProperty("display", "flex", "important");
   ghost.style.opacity = "1";
   ghost.style.visibility = "visible";
+  
+  // Lật hình ảnh 3D mượt mà hơn bằng rotateY
+  const img = ghost.querySelector("img");
+  if (img) {
+    // rotateY(180deg) tạo cảm giác xoay trong không gian 3D mượt hơn scaleX(-1)
+    const rotateY = flip ? 180 : 0;
+    const rotateZ = flip ? -12 : 12; // Nghiêng nhẹ để tạo cảm giác bay bổng
+    
+    img.style.transform = `rotateY(${rotateY}deg) rotateZ(${rotateZ}deg)`;
+    img.style.transition = "transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)"; // Hiệu ứng xoay có độ đàn hồi cao
+    img.style.transformOrigin = "center center";
+  }
+  
   ghost.style.transform = `translate3d(${x - offsetX}px, ${y - offsetY}px, 0)`;
 }
 
@@ -282,6 +296,8 @@ export function useDragTask(ProjectData?: any) {
   // Tọa độ và Offset dùng chung
   let startX = 0;
   let startY = 0;
+  let lastX = 0; // Để xác định hướng quay của phi hành gia
+  let isFlipped = false; // Trạng thái lật hiện tại để duy trì hướng
   let currentX = 0;
   let currentY = 0;
   let touchOffsetX = 0;
@@ -302,8 +318,7 @@ export function useDragTask(ProjectData?: any) {
   // Cache container và columns để tăng tốc xử lý DOM
   let cachedKanbanContainer: HTMLElement | null = null;
   let cachedContainerRect: DOMRect | null = null;
-  let cachedColumns: HTMLElement[] = [];
-  let cachedColumnRects: { element: HTMLElement; rect: DOMRect }[] = [];
+  let cachedColumnsElements: HTMLElement[] = [];
 
   // PC Grabbing state
   let isGrabbing = false;
@@ -321,14 +336,9 @@ export function useDragTask(ProjectData?: any) {
     if (cachedKanbanContainer) {
       cachedContainerRect = cachedKanbanContainer.getBoundingClientRect();
     }
-
-    cachedColumns = Array.from(
-      document.querySelectorAll(".kanban-column")
-    ) as HTMLElement[];
-    cachedColumnRects = cachedColumns.map((el) => ({
-      element: el,
-      rect: el.getBoundingClientRect(),
-    }));
+    
+    // Cache danh sách element cột một lần duy nhất khi bắt đầu drag
+    cachedColumnsElements = Array.from(document.querySelectorAll(".kanban-column")) as HTMLElement[];
   }
 
   // Auto-scroll functions for horizontal scrolling
@@ -340,6 +350,11 @@ export function useDragTask(ProjectData?: any) {
         const kanbanContainer = cachedKanbanContainer || document.querySelector(".kanban-grid-container") as HTMLElement;
         if (kanbanContainer) {
           kanbanContainer.scrollLeft += horizontalScrollSpeed;
+          
+          // Khi đang cuộn tự động, cần cập nhật lại hover để task nhận diện đúng cột bên dưới
+          if (isDragging) {
+            checkColumnHover(currentX, currentY);
+          }
         }
       }
     }, DRAG_CONFIG.horizontalScrollInterval);
@@ -394,54 +409,16 @@ export function useDragTask(ProjectData?: any) {
 
     function handleDragOver(e: DragEvent) {
       e.preventDefault();
-      e.stopPropagation();
-
-      if (!isDragging || !draggedElement) return;
-
-      const rect = targetColumn.getBoundingClientRect();
-      const x = e.clientX;
-      const y = e.clientY;
-
-      // Cập nhật vị trí ghost rõ nét cho desktop khi đang drag
-      if (isDragging) {
-        showGhost(x, y, touchOffsetX, touchOffsetY);
-      }
-
-      // Check if mouse is within column bounds
-      if (
-        x >= rect.left &&
-        x <= rect.right &&
-        y >= rect.top &&
-        y <= rect.bottom
-      ) {
-        const taskId = parseInt(draggedElement.dataset.taskId || "0");
-        const projectId = parseInt(draggedElement.dataset.projectId || "0");
-        const columnId = targetColumn.dataset.columnId || "";
-        const columnStatus = targetColumn.dataset.columnStatus || "";
-
-        if (taskId && projectId && columnId && columnStatus) {
-          notifyDragOver(taskId, projectId, columnId, columnStatus);
-        }
-      }
+      // Logic hover và auto-scroll đã được chuyển ra handleGlobalDragOver để tránh xung đột và giật lag
     }
 
     function handleDragLeave(e: DragEvent) {
       e.preventDefault();
-      e.stopPropagation();
-
-      const rect = targetColumn.getBoundingClientRect();
-      const x = e.clientX;
-      const y = e.clientY;
-
-      // Only remove highlight if mouse actually left the column
-      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-        // no-op: no highlight styling
-      }
+      // Logic highlight cột đã được tối ưu hóa thông qua checkColumnHover dùng chung
     }
 
     function handleDrop(e: DragEvent) {
       e.preventDefault();
-      e.stopPropagation();
 
       if (!isDragging || !draggedElement || hasProcessedDrop) return;
 
@@ -562,6 +539,7 @@ export function useDragTask(ProjectData?: any) {
     const touch = (event as TouchEvent).touches[0];
     startX = touch.clientX;
     startY = touch.clientY;
+    lastX = startX; // Khởi tạo vị trí X ban đầu để tính hướng quay
     currentX = startX;
     currentY = startY;
     touchStartTime = Date.now();
@@ -591,6 +569,13 @@ export function useDragTask(ProjectData?: any) {
     isDragging = false;
     hasProcessedDrop = false;
 
+    // Rung nhẹ ngay khi chạm vào task để "kích hoạt" và báo hiệu có thể kéo (UX)
+    try {
+      if (window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(10); 
+      }
+    } catch (_) { /* Silent */ }
+
     // Cache columns when starting drag
     updateCachedColumns();
 
@@ -618,11 +603,6 @@ export function useDragTask(ProjectData?: any) {
       if (touchDuration > 50 && touchDuration < 2000) {
         isDragging = true;
         hasProcessedDrop = false;
-
-        // Rung nhẹ trên điện thoại thật khi bắt đầu kéo (UX giống máy tính)
-        if (window.navigator && window.navigator.vibrate) {
-          window.navigator.vibrate(20);
-        }
 
         // Ẩn card gốc để không bị mờ đè lên hình ảnh
         try {
@@ -664,8 +644,18 @@ export function useDragTask(ProjectData?: any) {
       }
 
       ghostAnimationFrame = requestAnimationFrame(() => {
+        // Duy trì hướng quay cho đến khi có sự thay đổi rõ rệt (> 10px)
+        // Ngưỡng 10px giúp chuyển động xoay trông "đầm" và có ý đồ hơn
+        if (currentX > lastX + 10) {
+          isFlipped = true; // Đang di chuyển qua phải -> lật hình
+          lastX = currentX;
+        } else if (currentX < lastX - 10) {
+          isFlipped = false; // Đang di chuyển qua trái -> về mặc định
+          lastX = currentX;
+        }
+
         // Cập nhật vị trí và hiện ghost nếu đang kéo
-        showGhost(currentX, currentY, touchOffsetX, touchOffsetY);
+        showGhost(currentX, currentY, touchOffsetX, touchOffsetY, isFlipped);
         updateHorizontalScroll(currentX);
         checkColumnHover(currentX, currentY);
       });
@@ -678,16 +668,19 @@ export function useDragTask(ProjectData?: any) {
       return;
     }
 
+    // Cập nhật tọa độ cuối cùng trước khi xử lý drop
     const taskId = parseInt(draggedElement.dataset.taskId || "0");
     const projectId = parseInt(draggedElement.dataset.projectId || "0");
 
     if (taskId && projectId) {
-      // Find which column the task was dropped on
-      const columns = document.querySelectorAll(".kanban-column");
+      // Sử dụng danh sách cache elements cho mobile drop để nhanh và đồng bộ
+      if (cachedColumnsElements.length === 0) {
+        cachedColumnsElements = Array.from(document.querySelectorAll(".kanban-column")) as HTMLElement[];
+      }
+      
       let droppedOnColumn = null;
 
-      for (const column of columns) {
-        const columnElement = column as HTMLElement;
+      for (const columnElement of cachedColumnsElements) {
         const rect = columnElement.getBoundingClientRect();
 
         if (
@@ -737,11 +730,26 @@ export function useDragTask(ProjectData?: any) {
     if (!isDragging) return;
     e.preventDefault(); 
     
+    currentX = e.clientX;
+    currentY = e.clientY;
+
+    // Duy trì hướng quay cho desktop (> 10px)
+    if (currentX > lastX + 10) {
+      isFlipped = true;
+      lastX = currentX;
+    } else if (currentX < lastX - 10) {
+      isFlipped = false;
+      lastX = currentX;
+    }
+
     // Cập nhật vị trí ghost cho Desktop toàn cục (không bị giới hạn bởi cột)
-    showGhost(e.clientX, e.clientY, touchOffsetX, touchOffsetY);
+    showGhost(currentX, currentY, touchOffsetX, touchOffsetY, isFlipped);
     
     // Kiểm tra cuộn trang tự động
-    updateHorizontalScroll(e.clientX);
+    updateHorizontalScroll(currentX);
+
+    // Kiểm tra hover cột ngay trong global dragover để mượt mà hơn
+    checkColumnHover(currentX, currentY);
   }
 
   function handleDragStart(event: Event) {
@@ -810,7 +818,8 @@ export function useDragTask(ProjectData?: any) {
 
       // Tạo ghost rõ nét cho desktop (dùng chung với mobile ghost)
       const targetRect = target.getBoundingClientRect();
-      showGhost(targetRect.left + targetRect.width / 2, targetRect.top + targetRect.height / 2, touchOffsetX, touchOffsetY);
+      lastX = targetRect.left + targetRect.width / 2;
+      showGhost(lastX, targetRect.top + targetRect.height / 2, touchOffsetX, touchOffsetY, false);
       // Ẩn card gốc trong lúc kéo để chỉ còn ghost
       target.style.opacity = "0";
     }
@@ -847,8 +856,8 @@ export function useDragTask(ProjectData?: any) {
     }
 
     // Reset all column highlights
-    const columns = document.querySelectorAll(".kanban-column");
-    columns.forEach((column) => {
+    const columnsForReset = cachedColumnsElements.length > 0 ? cachedColumnsElements : Array.from(document.querySelectorAll(".kanban-column"));
+    columnsForReset.forEach((column) => {
       const columnElement = column as HTMLElement;
       columnElement.style.backgroundColor = "";
       columnElement.style.borderColor = "";
@@ -875,11 +884,14 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function checkColumnHover(x: number, y: number) {
-    if (cachedColumnRects.length === 0) {
-      updateCachedColumns();
+    // Sử dụng cache elements để tránh layout thrashing do querySelectorAll
+    if (cachedColumnsElements.length === 0) {
+      cachedColumnsElements = Array.from(document.querySelectorAll(".kanban-column")) as HTMLElement[];
     }
+    
+    for (const columnElement of cachedColumnsElements) {
+      const rect = columnElement.getBoundingClientRect();
 
-    cachedColumnRects.forEach(({ element: columnElement, rect }) => {
       if (
         x >= rect.left &&
         x <= rect.right &&
@@ -897,8 +909,9 @@ export function useDragTask(ProjectData?: any) {
             notifyDragOver(taskId, projectId, columnId, columnStatus);
           }
         }
+        break; // Tối ưu: Đã tìm thấy cột thì không cần loop tiếp
       }
-    });
+    }
   }
 
   function cleanupDragVisuals() {
@@ -947,8 +960,8 @@ export function useDragTask(ProjectData?: any) {
     hasProcessedDrop = false;
 
     // Reset all column highlights
-    const columns = document.querySelectorAll(".kanban-column");
-    columns.forEach((column) => {
+    const columnsForReset = cachedColumnsElements.length > 0 ? cachedColumnsElements : Array.from(document.querySelectorAll(".kanban-column"));
+    columnsForReset.forEach((column) => {
       const columnElement = column as HTMLElement;
       columnElement.style.backgroundColor = "";
       columnElement.style.borderColor = "";
@@ -969,14 +982,16 @@ export function useDragTask(ProjectData?: any) {
     // Reset touch state
     startX = 0;
     startY = 0;
+    lastX = 0;
+    isFlipped = false;
     currentX = 0;
     currentY = 0;
     touchStartTime = 0;
     touchOffsetX = 0;
     touchOffsetY = 0;
-    cachedColumnRects = [];
     cachedKanbanContainer = null;
     cachedContainerRect = null;
+    cachedColumnsElements = [];
   }
 
   function setupMouseDragListeners() {
