@@ -5,6 +5,7 @@ import { LoginResponseType } from '../pages/auth/action/login';
 import { useUserStore } from '../state/userStore';
 import { makeHttpReq } from '../helper/makeHttpReq';
 import { clearAllCache } from './useLocalStorage';
+import { initEcho } from '../../echo';
 
 /**
  * Centralized Authentication Composable
@@ -67,7 +68,6 @@ export function useAuth() {
     // để đảm bảo sau khi F5 / Ctrl+Shift+R thì websocket được connect lại.
     if (userData?.token) {
       try {
-        const { initEcho } = await import('../../echo.js');
         initEcho();
       } catch (error) {
         console.warn('Failed to initialize Echo:', error);
@@ -101,7 +101,6 @@ export function useAuth() {
 
     // Initialize Echo with new token
     try {
-      const { initEcho } = await import('../../echo.js');
       initEcho();
     } catch (error) {
       console.warn('Failed to initialize Echo:', error);

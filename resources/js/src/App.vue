@@ -8,6 +8,7 @@ import { makeHttpReq } from './helper/makeHttpReq';
 import { useGlobalEchoListener } from './helper/useGlobalEchoListener';
 import { useProjectRealtimeCacheClear } from './helper/useProjectRealtimeCacheClear';
 import { useAppGlobalRealtime } from './helper/useAppGlobalRealtime';
+import { initEcho } from '../echo';
 
 export default defineComponent({
     name: 'App',
@@ -58,7 +59,6 @@ export default defineComponent({
             if (token) {
                 try {
                     // Khởi tạo Echo (sẽ tự động skip nếu đã được khởi tạo)
-                    const { initEcho } = await import('../echo.js');
                     await initEcho();
                 } catch (err) {
                     console.warn('Failed to initialize Echo on App mount:', err);
