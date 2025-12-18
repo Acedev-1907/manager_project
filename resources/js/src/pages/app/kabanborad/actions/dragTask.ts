@@ -45,6 +45,11 @@ export function updateTaskOptimistically(
     // Replace the task in place instead of splice
     tasks[taskIndex] = updatedTask;
 
+    // Ép Vue cập nhật reactivity để task nhảy cột ngay lập tức
+    if (projectData && projectData.value) {
+      projectData.value = { ...projectData.value };
+    }
+
     // Emit optimistic update for dashboard immediately
     try {
       const allTasks = projectData.value.data.tasks || [];
@@ -166,6 +171,15 @@ export function useDragTask(ProjectData?: any) {
   // Auto-scroll state for horizontal scrolling
   let horizontalScrollInterval: number | null = null;
   let horizontalScrollSpeed = 0;
+
+  // Cache columns for performance
+  let cachedColumns: HTMLElement[] = [];
+
+  function updateCachedColumns() {
+    cachedColumns = Array.from(
+      document.querySelectorAll(".kanban-column")
+    ) as HTMLElement[];
+  }
 
   // Mouse drag state for auto-scroll without task
   let isGrabbing = false;
@@ -491,6 +505,9 @@ export function useDragTask(ProjectData?: any) {
     // Reset drag state
     isDragging = false;
     hasProcessedDrop = false;
+
+    // Cache columns when starting drag
+    updateCachedColumns();
   }
 
   function handleTouchMoveDelegation(event: Event) {
@@ -658,6 +675,9 @@ export function useDragTask(ProjectData?: any) {
     isDragging = true;
     draggedElement = target;
     hasProcessedDrop = false;
+
+    // Cache columns when starting drag
+    updateCachedColumns();
 
     // Store original styles
     originalTransform = target.style.transform;
@@ -898,9 +918,14 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function checkColumnHover(x: number, y: number) {
-    const columns = document.querySelectorAll(".kanban-column");
-    columns.forEach((column) => {
-      const columnElement = column as HTMLElement;
+    const columns =
+      cachedColumns.length > 0
+        ? cachedColumns
+        : (Array.from(
+            document.querySelectorAll(".kanban-column")
+          ) as HTMLElement[]);
+
+    columns.forEach((columnElement) => {
       const rect = columnElement.getBoundingClientRect();
 
       if (
@@ -1139,11 +1164,16 @@ export function useDragTask(ProjectData?: any) {
   function updateGhostTaskColor(x: number, y: number) {
     if (!ghostElement) return;
 
-    const columns = document.querySelectorAll(".kanban-column");
+    const columns =
+      cachedColumns.length > 0
+        ? cachedColumns
+        : (Array.from(
+            document.querySelectorAll(".kanban-column")
+          ) as HTMLElement[]);
+
     let isOverColumn = false;
 
-    columns.forEach((column) => {
-      const columnElement = column as HTMLElement;
+    columns.forEach((columnElement) => {
       const rect = columnElement.getBoundingClientRect();
 
       if (

@@ -1,5 +1,4 @@
 export const APP = {
-  // TODO: Api config FE
-  baseURL: import.meta.env.VITE_APP_URL,
-  apiBaseURL: import.meta.env.VITE_APP_URL + "/api",
+  baseURL: import.meta.env.APP_URL || window.location.origin,
+  apiBaseURL: (import.meta.env.APP_URL || window.location.origin) + "/api",
 };
