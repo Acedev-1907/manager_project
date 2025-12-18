@@ -164,6 +164,8 @@ export function useDragTask(ProjectData?: any) {
   let ghostElement: HTMLElement | null = null;
   let ghostAnimationFrame: number | null = null;
   let touchStartTime = 0;
+  let touchOffsetX = 0;
+  let touchOffsetY = 0;
 
   // Flag to prevent duplicate API calls
   let hasProcessedDrop = false;
@@ -172,13 +174,25 @@ export function useDragTask(ProjectData?: any) {
   let horizontalScrollInterval: number | null = null;
   let horizontalScrollSpeed = 0;
 
-  // Cache columns for performance
+  // Cache container and columns for performance
+  let cachedKanbanContainer: HTMLElement | null = null;
+  let cachedContainerRect: DOMRect | null = null;
   let cachedColumns: HTMLElement[] = [];
+  let cachedColumnRects: { element: HTMLElement; rect: DOMRect }[] = [];
 
   function updateCachedColumns() {
+    cachedKanbanContainer = document.querySelector(".kanban-grid-container");
+    if (cachedKanbanContainer) {
+      cachedContainerRect = cachedKanbanContainer.getBoundingClientRect();
+    }
+
     cachedColumns = Array.from(
       document.querySelectorAll(".kanban-column")
     ) as HTMLElement[];
+    cachedColumnRects = cachedColumns.map((el) => ({
+      element: el,
+      rect: el.getBoundingClientRect(),
+    }));
   }
 
   // Mouse drag state for auto-scroll without task
@@ -226,22 +240,17 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function updateHorizontalScroll(x: number) {
-    let kanbanContainer = document.querySelector(".kanban-grid-container");
-    if (!kanbanContainer) {
-      kanbanContainer = document.querySelector(
-        '[class*="kanban-grid-container"]'
-      );
-    }
-    if (!kanbanContainer) {
-      kanbanContainer = document.querySelector('[class*="kanban"]');
-    }
+    const kanbanContainer =
+      cachedKanbanContainer ||
+      (document.querySelector(".kanban-grid-container") as HTMLElement);
+    const containerRect =
+      cachedContainerRect || kanbanContainer.getBoundingClientRect();
 
-    if (!kanbanContainer) {
+    if (!kanbanContainer || !containerRect) {
       horizontalScrollSpeed = 0;
       return;
     }
 
-    const containerRect = kanbanContainer.getBoundingClientRect();
     const containerLeft = containerRect.left;
     const containerRight = containerRect.right;
 
@@ -502,6 +511,12 @@ export function useDragTask(ProjectData?: any) {
     // Store the task card for later use
     draggedElement = taskCard as HTMLElement;
 
+    // Tính toán offset để ghost nằm đúng vị trí ngón tay chạm
+    const rect = draggedElement.getBoundingClientRect();
+    const touchData = (event as TouchEvent).touches[0];
+    touchOffsetX = touchData.clientX - rect.left;
+    touchOffsetY = touchData.clientY - rect.top;
+
     // Reset drag state
     isDragging = false;
     hasProcessedDrop = false;
@@ -534,6 +549,9 @@ export function useDragTask(ProjectData?: any) {
         // Làm nổi bật task đang được kéo trên mobile
         try {
           draggedElement?.classList.add("task-card-dragging");
+          // Chặn các gesture mặc định của trình duyệt mobile
+          document.body.style.overflow = "hidden";
+          document.body.style.touchAction = "none";
         } catch (_) {
           // ignore
         }
@@ -570,6 +588,11 @@ export function useDragTask(ProjectData?: any) {
     }
 
     if (isDragging) {
+      // Chặn cuộn trang tuyệt đối khi đang kéo
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
       // Use requestAnimationFrame for smooth ghost movement
       if (ghostAnimationFrame) {
         cancelAnimationFrame(ghostAnimationFrame);
@@ -693,6 +716,8 @@ export function useDragTask(ProjectData?: any) {
     // Thêm class để CSS làm nổi bật card đang được kéo
     try {
       target.classList.add("task-card-dragging");
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
     } catch (_) {
       // ignore
     }
@@ -755,6 +780,8 @@ export function useDragTask(ProjectData?: any) {
     // Bỏ class highlight khi thả xong
     try {
       target.classList.remove("task-card-dragging");
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
     } catch (_) {
       // ignore
     }
@@ -919,15 +946,13 @@ export function useDragTask(ProjectData?: any) {
 
   function checkColumnHover(x: number, y: number) {
     const columns =
-      cachedColumns.length > 0
-        ? cachedColumns
-        : (Array.from(
-            document.querySelectorAll(".kanban-column")
-          ) as HTMLElement[]);
+      cachedColumnRects.length > 0
+        ? cachedColumnRects
+        : (Array.from(document.querySelectorAll(".kanban-column")) as any[]).map(
+            (el) => ({ element: el, rect: el.getBoundingClientRect() })
+          );
 
-    columns.forEach((columnElement) => {
-      const rect = columnElement.getBoundingClientRect();
-
+    columns.forEach(({ element: columnElement, rect }) => {
       if (
         x >= rect.left &&
         x <= rect.right &&
@@ -962,6 +987,14 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function cleanupDragVisuals() {
+    // Trả lại trạng thái scroll cho body
+    try {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    } catch (_) {
+      // ignore
+    }
+
     // Bỏ highlight nếu còn
     if (draggedElement) {
       try {
@@ -1004,12 +1037,20 @@ export function useDragTask(ProjectData?: any) {
     currentX = 0;
     currentY = 0;
     touchStartTime = 0;
+    touchOffsetX = 0;
+    touchOffsetY = 0;
+    cachedColumnRects = [];
+    cachedKanbanContainer = null;
+    cachedContainerRect = null;
   }
 
   function createMobileGhost(x: number, y: number) {
     if (!draggedElement) {
       return;
     }
+
+    // Lấy kích thước thật của task để ghost giống hệt
+    const originalRect = draggedElement.getBoundingClientRect();
 
     // Remove existing ghost
     if (ghostElement) {
@@ -1023,8 +1064,8 @@ export function useDragTask(ProjectData?: any) {
       position: fixed;
       top: 0;
       left: 0;
-      width: 160px;
-      height: 80px;
+      width: ${originalRect.width}px;
+      height: ${originalRect.height}px;
       background: #ffffff;
       border: 2px solid #3b82f6;
       border-radius: 12px;
@@ -1034,7 +1075,9 @@ export function useDragTask(ProjectData?: any) {
       display: flex;
       flex-direction: column;
       padding: 12px;
-      transform: translate(${x - 80}px, ${y - 40}px) rotate(3deg) scale(0.95);
+      transform: translate(${x - touchOffsetX}px, ${
+      y - touchOffsetY
+    }px) rotate(3deg) scale(0.95);
       transition: none;
       opacity: 1;
       visibility: visible;
@@ -1165,17 +1208,15 @@ export function useDragTask(ProjectData?: any) {
     if (!ghostElement) return;
 
     const columns =
-      cachedColumns.length > 0
-        ? cachedColumns
-        : (Array.from(
-            document.querySelectorAll(".kanban-column")
-          ) as HTMLElement[]);
+      cachedColumnRects.length > 0
+        ? cachedColumnRects
+        : (Array.from(document.querySelectorAll(".kanban-column")) as any[]).map(
+            (el) => ({ element: el, rect: el.getBoundingClientRect() })
+          );
 
     let isOverColumn = false;
 
-    columns.forEach((columnElement) => {
-      const rect = columnElement.getBoundingClientRect();
-
+    columns.forEach(({ element: columnElement, rect }) => {
       if (
         x >= rect.left &&
         x <= rect.right &&
@@ -1236,9 +1277,9 @@ export function useDragTask(ProjectData?: any) {
       return;
     }
 
-    // Use transform for better performance instead of top/left
-    ghostElement.style.transform = `translate(${x - 80}px, ${
-      y - 40
+    // Sử dụng offset đã tính để ghost bám sát ngón tay
+    ghostElement.style.transform = `translate(${x - touchOffsetX}px, ${
+      y - touchOffsetY
     }px) rotate(3deg) scale(0.95)`;
     ghostElement.style.opacity = "1";
     ghostElement.style.visibility = "visible";

@@ -19,7 +19,7 @@ export default defineConfig({
     //     host: '0.0.0.0',        // để máy khác truy cập
     //     port: 5173,
     //     hmr: {
-    //         host: '192.168.1.84', // 👈 IP máy bạn
+    //         host: '192.168.1.84',
     //     },
     // },
 });
