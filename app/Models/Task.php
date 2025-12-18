@@ -35,37 +35,24 @@ class Task extends Model
      */
     protected static function booted()
     {
-        // When task is updated (especially status changes)
         static::updated(function ($task) {
-            // Only dispatch event when status changes
             if ($task->wasChanged('status')) {
                 try {
-                    // Dispatch events for project progress tracking
-                    self::handleProjectProgress($task->projectId, Auth::id(), $task->id);
-                } catch (\Exception $e) {
-                    // Silent error handling for event dispatch
-                }
+                    self::handleProjectProgress($task->projectId, Auth::id(), $task->id, false);
+                } catch (\Exception $e) { }
             }
         });
 
-        // When task is created
         static::created(function ($task) {
             try {
-                // Dispatch events for project progress tracking
-                self::handleProjectProgress($task->projectId, Auth::id(), $task->id);
-            } catch (\Exception $e) {
-                // Silent error handling for event dispatch
-            }
+                self::handleProjectProgress($task->projectId, Auth::id(), $task->id, false);
+            } catch (\Exception $e) { }
         });
 
-        // When task is deleted
         static::deleted(function ($task) {
             try {
-                // Dispatch events for project progress tracking
-                self::handleProjectProgress($task->projectId, Auth::id(), $task->id);
-            } catch (\Exception $e) {
-                // Silent error handling for event dispatch
-            }
+                self::handleProjectProgress($task->projectId, Auth::id(), $task->id, false);
+            } catch (\Exception $e) { }
         });
     }
 
@@ -139,22 +126,23 @@ class Task extends Model
      * @param int|null $taskId
      * @return void
      */
-    public static function handleProjectProgress(int $projectId, ?int $userId = null, ?int $taskId = null): void
+    public static function handleProjectProgress(int $projectId, ?int $userId = null, ?int $taskId = null, bool $shouldBroadcast = true): array
     {
         try {
             // Get project and its tasks
             $project = Project::find($projectId);
-            if (!$project) return;
+            if (!$project) return [];
 
             $totalTasks = self::countProjectTask($projectId);
             if ($totalTasks === 0) {
                 // No tasks, set progress to 0
                 self::updateProjectProgress($projectId, 0, $userId);
-                return;
+                return ['progress' => 0, 'counts' => [0, 0]];
             }
 
             // Count completed tasks
             $completedTasks = self::countCompletedTask($projectId);
+            $pendingTasks = $totalTasks - $completedTasks;
 
             // Calculate progress percentage
             $progress = self::calculateProgress($completedTasks, $totalTasks);
@@ -162,10 +150,18 @@ class Task extends Model
             // Update project progress
             self::updateProjectProgress($projectId, $progress, $userId);
 
-            // Dispatch events for real-time updates
-            self::dispatchProgressEvents($projectId, $completedTasks, $totalTasks, $progress, $userId, $taskId);
+            // Dispatch events for real-time updates (only if requested)
+            if ($shouldBroadcast) {
+                self::dispatchProgressEvents($projectId, $completedTasks, $totalTasks, $progress, $userId, $taskId);
+            }
+
+            return [
+                'progress' => $progress,
+                'counts' => [$completedTasks, $pendingTasks]
+            ];
         } catch (\Exception $e) {
             // Silent error handling for progress updates
+            return [];
         }
     }
 

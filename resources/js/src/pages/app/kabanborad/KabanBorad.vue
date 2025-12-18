@@ -260,7 +260,7 @@ onMounted(async () => {
         }
     }
 
-    // Listen for force cache clear events
+    // Realtime events
     eventBus.on('force-cache-clear', async (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
@@ -273,55 +273,31 @@ onMounted(async () => {
                     });
                 }
             }
-        } catch (error) {
-            // Silent error handling
-        }
+        } catch (error) { }
     });
 
-    // Listen for task comment events
     eventBus.on('task-comment-created', async (eventData: any) => {
-        try {
-            // Only refresh if the comment is from another user and task exists in current project
-            if (ProjectData.value?.data?.tasks && Array.isArray(ProjectData.value.data.tasks)) {
-                const taskExists = ProjectData.value.data.tasks.some((task: any) => task.id === eventData.taskId);
-                if (taskExists && !isCurrentUser(eventData.userId)) {
-                    // For comments, we don't need to refresh the entire project data
-                    // The TaskDetailModal will handle real-time updates for comments
-                    // Only refresh if there are other changes that might affect the task list
-                }
-            }
-        } catch (error) {
-            // Silent error handling
-        }
+        try { } catch (error) { }
     });
 
-    // Listen for project progress updated events
     eventBus.on('project-progress-updated', async (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
                 if (!isCurrentUser(eventData.userId)) {
-                    // Refresh project data to get updated progress
                     await getProjectDetail(slug, false);
                 }
             }
-        } catch (error) {
-            // Silent error handling
-        }
+        } catch (error) { }
     });
 
-    // Listen for column added events - Optimized: Update directly from event data (no API call)
     eventBus.on('column-added', async (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
                 if (!isCurrentUser(eventData.userId) && eventData.column) {
-                    // Optimistic update: Add column directly from event data (instant UI update)
                     const newColumn = transformColumnData(eventData.column, columns.value.length);
-                    
-                    // Add to columns array and sort
                     columns.value.push(newColumn);
                     columns.value.sort((a: any, b: any) => a.position - b.position);
                     
-                    // Update ProjectData to keep sync
                     if (ProjectData.value?.data) {
                         const boardColumns = (ProjectData.value.data as any).board_columns || [];
                         if (Array.isArray(boardColumns)) {
@@ -333,29 +309,23 @@ onMounted(async () => {
                         }
                     }
                     
-                    // Setup drop listeners for new column (immediate, no delay)
                     await nextTick();
                     setupAllDropListeners();
                     forceScrollbar();
                 }
             }
-        } catch (error) {
-            // Silent error handling
-        }
+        } catch (error) { }
     });
 
-    // Listen for column deleted events - Optimized: Remove directly from array (no API call)
     eventBus.on('column-deleted', async (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
                 if (!isCurrentUser(eventData.userId) && eventData.columnId) {
-                    // Optimistic update: Remove column directly from array (instant UI update)
                     const columnIndex = columns.value.findIndex((col: any) => col.id === eventData.columnId);
                     if (columnIndex !== -1) {
                         columns.value.splice(columnIndex, 1);
                     }
                     
-                    // Update ProjectData to keep sync
                     if ((ProjectData.value?.data as any)?.board_columns) {
                         const boardColumns = (ProjectData.value.data as any).board_columns;
                         if (Array.isArray(boardColumns)) {
@@ -366,33 +336,25 @@ onMounted(async () => {
                         }
                     }
                     
-                    // Setup drop listeners after column deletion (immediate, no delay)
                     await nextTick();
                     setupAllDropListeners();
                     forceScrollbar();
                 }
             }
-        } catch (error) {
-            // Silent error handling
-        }
+        } catch (error) { }
     });
 
-    // Listen for task drag started events - Lock task for other users
     eventBus.on('task-drag-started', (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
                 if (!isCurrentUser(eventData.userId) && eventData.taskId) {
-                    // Lock task: Mark as being dragged by another user (Vue reactive)
                     lockedTasks.value.set(Number(eventData.taskId), {
                         userId: eventData.userId,
                         userName: eventData.userName || 'Someone',
                         userAvatar: eventData.userAvatar || null
                     });
-                    // Force reactivity update
                     lockedTasks.value = new Map(lockedTasks.value);
 
-                    // Auto-clear lock after 30s nếu không có drag-ended
-                    // Tăng timeout để phù hợp với trường hợp user nắm giữ lâu chưa drop vào cột
                     setTimeout(() => {
                         const taskIdNum = Number(eventData.taskId);
                         if (lockedTasks.value.has(taskIdNum)) {
@@ -403,46 +365,33 @@ onMounted(async () => {
                             draggingTasks.value.delete(taskIdNum);
                             draggingTasks.value = new Map(draggingTasks.value);
                         }
-                    }, 30000); // 30 giây
+                    }, 30000);
                 }
             }
-        } catch (error) {
-            // Silent error handling
-        }
+        } catch (error) { }
     });
 
-    // Listen for task drag ended events - Không tắt overlay ngay
-    // Overlay sẽ được tắt khi nhận TaskStatusChanged (task đã được update thành công)
     eventBus.on('task-drag-ended', (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
-                // Không tắt overlay ngay ở đây
-                // Chờ TaskStatusChanged để đảm bảo task đã được update trước khi tắt overlay
-                // Chỉ xóa draggingTasks để cleanup
                 if (eventData.taskId) {
                     draggingTasks.value.delete(Number(eventData.taskId));
                     draggingTasks.value = new Map(draggingTasks.value);
                 }
             }
-        } catch (error) {
-            // Silent error handling
-        }
+        } catch (error) { }
     });
 
-    // Listen for task drag over column events - Show visual indicator
     eventBus.on('task-drag-over-column', async (eventData: any) => {
         try {
-            // TỐI ƯU: Nếu là chính mình kéo thì bỏ qua luôn để tránh xử lý thừa gây giật
             if (isCurrentUser(eventData.userId)) return;
 
             if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
                 const taskIdNum = Number(eventData.taskId);
                 if (taskIdNum) {
-                    // Find task info
                     const task = ProjectData.value?.data?.tasks?.find((t: any) => Number(t.id) === taskIdNum);
                     const taskName = task?.name || 'Task';
                     
-                    // Update dragging task info
                     draggingTasks.value.set(taskIdNum, {
                         userId: eventData.userId,
                         userName: eventData.userName || 'Someone',
@@ -452,37 +401,16 @@ onMounted(async () => {
                         taskName: taskName
                     });
                     
-                    // Force reactivity update
                     draggingTasks.value = new Map(draggingTasks.value);
-                    
-                    // Highlight target column
-                    await nextTick();
-                    const targetColumn = document.querySelector(`[data-column-id="${eventData.columnId}"]`) as HTMLElement;
-                    if (targetColumn) {
-                            // (removed dashed highlight per request)
-                        
-                        // Remove highlight after a short delay if no new event
-                        setTimeout(() => {
-                            const currentDragging = draggingTasks.value.get(taskIdNum);
-                            if (!currentDragging || currentDragging.columnId !== eventData.columnId) {
-                                    // no-op
-                            }
-                        }, 500);
-                    }
                 }
             }
-        } catch (error) {
-            // Silent error handling
-        }
+        } catch (error) { }
     });
 
-    // Listen for task status changed events - Realtime update tasks
     eventBus.on('task-status-changed-realtime', async (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
-                // TỐI ƯU: Nếu là chính mình kéo thì không cần update lại danh sách để tránh bị giật (vì đã update optimistic)
                 if (isCurrentUser(eventData.userId)) {
-                    // Tuy nhiên vẫn cần xóa trạng thái lock/dragging nếu còn sót
                     if (eventData.taskId) {
                         const taskIdNum = Number(eventData.taskId);
                         lockedTasks.value.delete(taskIdNum);
@@ -491,45 +419,51 @@ onMounted(async () => {
                     return;
                 }
 
-                const updatedTask = eventData.task;
-                const tasks = ProjectData.value?.data?.tasks || [];
-                const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
-                if (idx !== -1) {
-                    tasks[idx] = {
-                        ...tasks[idx],
-                        ...updatedTask,
-                        status: updatedTask?.status ?? eventData.status
-                    };
+                if (eventData.progress !== undefined && eventData.counts) {
+                    eventBus.emit("dashboard-optimistic-update", {
+                        projectId: eventData.projectId,
+                        tasks: eventData.counts,
+                        progress: eventData.progress,
+                    });
                 }
-                // Force reactivity update (không cần await nextTick - Vue tự động update)
+
+                const updatedTask = eventData.task;
+                if (updatedTask) {
+                    const tasks = ProjectData.value?.data?.tasks || [];
+                    const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
+                    if (idx !== -1) {
+                        tasks[idx] = {
+                            ...tasks[idx],
+                            ...updatedTask,
+                            status: updatedTask?.status ?? eventData.status
+                        };
+                    }
+                } else if (eventData.taskId) {
+                    const tasks = ProjectData.value?.data?.tasks || [];
+                    const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
+                    if (idx !== -1) {
+                        tasks.splice(idx, 1);
+                    }
+                }
                 ProjectData.value = { ...ProjectData.value };
                 
-                // Tắt overlay "Someone is moving this task" sau khi task đã được update thành công
-                // Đảm bảo UX: overlay chỉ tắt khi task đã nhảy qua cột mới
-                // Tắt ngay lập tức để giảm độ trễ
                 if (eventData.taskId) {
                     const taskIdNum = Number(eventData.taskId);
                     lockedTasks.value.delete(taskIdNum);
                     draggingTasks.value.delete(taskIdNum);
-                    // Force reactivity update
                     lockedTasks.value = new Map(lockedTasks.value);
                     draggingTasks.value = new Map(draggingTasks.value);
                 }
             }
-        } catch (error) {
-            // Silent
-        }
+        } catch (error) { }
     });
 
-    // Listen for task status optimistic (whisper)
-    // Chỉ dùng cho *user khác*, không áp dụng cho chính người kéo task.
-    // Người kéo sẽ chờ backend broadcast (task-status-changed-realtime) rồi mới nhảy cột.
     eventBus.on('task-status-optimistic', async (eventData: any) => {
         try {
             if (
                 ProjectData.value?.data?.id &&
                 Number(eventData?.projectId) === Number(ProjectData.value.data.id) &&
-                !isCurrentUser(eventData.userId) // Bỏ qua nếu là chính user hiện tại
+                !isCurrentUser(eventData.userId)
             ) {
                 const tasks = ProjectData.value?.data?.tasks || [];
                 const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
@@ -540,20 +474,16 @@ onMounted(async () => {
                     };
                     ProjectData.value = { ...ProjectData.value };
                     
-                    // Tắt overlay cho user khác khi nhận optimistic update
                     if (eventData.taskId) {
                         const taskIdNum = Number(eventData.taskId);
                         lockedTasks.value.delete(taskIdNum);
                         draggingTasks.value.delete(taskIdNum);
-                        // Force reactivity update
                         lockedTasks.value = new Map(lockedTasks.value);
                         draggingTasks.value = new Map(draggingTasks.value);
                     }
                 }
             }
-        } catch (_) {
-            // Silent
-        }
+        } catch (_) { }
     });
 });
 

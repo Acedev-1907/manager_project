@@ -18,8 +18,10 @@ class TaskStatusChanged implements ShouldBroadcastNow
     public $status;
     public $userId;
     public $updatedAt;
+    public $progress; // Thêm thông tin progress
+    public $counts;   // Thêm thông tin số lượng task [completed, pending]
 
-    public function __construct($task, $projectId, $status, $userId = null)
+    public function __construct($task, $projectId, $status, $userId = null, $progress = null, $counts = null)
     {
         $this->task = $task;
         $this->projectId = $projectId;
@@ -27,6 +29,8 @@ class TaskStatusChanged implements ShouldBroadcastNow
         $this->status = $status;
         $this->userId = $userId;
         $this->updatedAt = now()->toISOString();
+        $this->progress = $progress;
+        $this->counts = $counts;
     }
 
     public function broadcastOn(): array
@@ -49,6 +53,8 @@ class TaskStatusChanged implements ShouldBroadcastNow
             'status' => $this->status,
             'userId' => $this->userId,
             'updatedAt' => $this->updatedAt,
+            'progress' => $this->progress,
+            'counts' => $this->counts,
             'eventType' => 'task_status_changed',
             'eventName' => 'TaskStatusChanged'
         ];

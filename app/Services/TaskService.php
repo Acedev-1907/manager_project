@@ -105,38 +105,27 @@ class TaskService
                 return false;
             }
 
-            // Cập nhật status (không cập nhật column_id vì có thể không tồn tại trong DB)
+            // Cập nhật status
             $updateData = ['status' => $status];
             
-            // Chỉ thêm column_id nếu cột này tồn tại trong bảng
-            // (kiểm tra schema hoặc bỏ qua nếu không có)
-            
-            // updateById đã return task object với fresh() - không cần query lại
             $task = $this->taskRepository->updateById($taskId, $updateData);
 
             if ($task) {
-                // Broadcast realtime task status changed NGAY LẬP TỨC
-                // Trước khi xử lý project progress để giảm độ trễ cho user khác
-                // Sử dụng task object đã có từ updateById() - tránh query DB thêm 1 lần
-                try {
-                    // Broadcast ngay để user khác nhận update nhanh nhất
-                    // Sử dụng toOthers() để tránh bắn ngược lại cho chính người vừa update
-                    broadcast(new TaskStatusChanged($task, $projectId, $status, $userId))->toOthers();
-                    
-                    // Broadcast drag ended để tắt overlay "Someone is moving this task"
-                    // Khi task được drop vào cột và status đã được update
-                    broadcast(new TaskDragEnded($taskId, $projectId, $userId))->toOthers();
-                } catch (\Exception $e) {
-                    Log::warning('Failed to broadcast task status changed: ' . $e->getMessage());
-                    // Không fail toàn bộ request nếu broadcast fail
-                }
+                $progressData = Task::handleProjectProgress($projectId, $userId, $taskId, false);
+                $progress = $progressData['progress'] ?? 0;
+                $counts = $progressData['counts'] ?? [0, 0];
 
-                // Xử lý project progress sau khi broadcast (không block realtime update)
-                // Chạy async để không block response
                 try {
-                    Task::handleProjectProgress($projectId, $userId);
+                    broadcast(new TaskStatusChanged(
+                        $task, 
+                        $projectId, 
+                        $status, 
+                        $userId, 
+                        $progress, 
+                        $counts
+                    ))->toOthers();
                 } catch (\Exception $e) {
-                    Log::warning('Failed to handle project progress: ' . $e->getMessage());
+                    Log::warning('Failed to broadcast unified task update: ' . $e->getMessage());
                 }
             }
 

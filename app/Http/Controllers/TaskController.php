@@ -66,6 +66,19 @@ class TaskController extends ApiController
             if (isset($result['errors'])) {
                 return $this->respondValidationError($result['errors']);
             }
+
+            // Gửi event gộp sau khi tạo mới để Dashboard cập nhật
+            try {
+                $progressData = Task::handleProjectProgress($taskDTO->projectId, Auth::id(), $result['task']->id, false);
+                broadcast(new TaskStatusChanged(
+                    $result['task'], 
+                    $taskDTO->projectId, 
+                    $result['task']->status, 
+                    Auth::id(), 
+                    $progressData['progress'], 
+                    $progressData['counts']
+                ))->toOthers();
+            } catch (\Exception $e) { }
             
             return $this->respondCreated($result['message'], $result['task']->id);
             
@@ -98,13 +111,10 @@ class TaskController extends ApiController
 
         [$newStatus, $nameStatus] = $transitions[$transition];
 
-        // Add userId to the data
         $data = $req->all();
         $data['userId'] = Auth::id();
 
-        $checkUpdate = $this->taskService->updateTaskStatus($data, $newStatus);
-
-        if ($checkUpdate) {
+        if ($this->taskService->updateTaskStatus($data, $newStatus)) {
             return $this->respondUpdated("Task status updated to {$nameStatus}");
         }
 
@@ -121,24 +131,14 @@ class TaskController extends ApiController
     public function transitionToStatus(Request $req, string $status)
     {
         try {
-            // Handle both numeric and string status
-            $newStatus = $status;
+            $newStatus = is_numeric($status) ? (int)$status : $status;
 
-            // If status is numeric, convert to int for validation
-            if (is_numeric($status)) {
-                $newStatus = (int)$status;
-                // Validate status range (allow any non-negative integer)
-                if ($newStatus < 0) {
-                    return $this->respondValidationError('Invalid status: ' . $status);
-                }
-            } else {
-                // For string status, only allow 'OK' for completed
-                if ($status !== 'OK') {
-                    return $this->respondValidationError('Invalid status: ' . $status);
-                }
+            if (is_numeric($newStatus) && $newStatus < 0) {
+                return $this->respondValidationError('Invalid status: ' . $status);
+            } elseif (!is_numeric($newStatus) && $status !== 'OK') {
+                return $this->respondValidationError('Invalid status: ' . $status);
             }
 
-            // Add userId to the data
             $data = $req->all();
             $data['userId'] = Auth::id();
 
@@ -146,32 +146,16 @@ class TaskController extends ApiController
                 return $this->respondValidationError('Task ID and Project ID are required');
             }
 
-            $checkUpdate = $this->taskService->updateTaskStatus($data, $newStatus);
-
-            if ($checkUpdate) {
-                // Map status to column name for response
-                $statusNames = [
-                    0 => 'Not Started',
-                    1 => 'Pending',
-                    2 => 'Column 2',
-                    3 => 'Column 3',
-                    4 => 'Column 4',
-                    'OK' => 'Completed'
-                ];
+            if ($this->taskService->updateTaskStatus($data, $newStatus)) {
+                $statusNames = [0 => 'Not Started', 1 => 'Pending', 'OK' => 'Completed'];
                 $statusName = $statusNames[$newStatus] ?? "Column {$newStatus}";
                 return $this->respondUpdated("Task moved to {$statusName}");
             }
 
             return $this->respondServerError('Failed to update task status');
         } catch (\Exception $e) {
-            Log::error('Error in transitionToStatus: ' . $e->getMessage(), [
-                'status' => $status,
-                'data' => $req->all(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return $this->setStatusCode(500)
-                ->setReturnCode(self::ERROR_INTERNAL)
-                ->respondWithError('Failed to transition task status');
+            Log::error('Error in transitionToStatus: ' . $e->getMessage());
+            return $this->setStatusCode(500)->respondWithError('Failed to transition task status');
         }
     }
 
@@ -183,10 +167,27 @@ class TaskController extends ApiController
      */
     public function destroy(int $id)
     {
+        $task = Task::find($id);
+        $projectId = $task?->projectId;
         $result = $this->taskService->deleteTask($id);
         
         if (isset($result['errors'])) {
             return $this->respondNotFound($result['errors'][0] ?? 'Task not found');
+        }
+
+        // Gửi event gộp sau khi xóa để Dashboard cập nhật
+        if ($projectId) {
+            try {
+                $progressData = Task::handleProjectProgress($projectId, Auth::id(), null, false);
+                broadcast(new TaskStatusChanged(
+                    null, 
+                    $projectId, 
+                    null, 
+                    Auth::id(), 
+                    $progressData['progress'], 
+                    $progressData['counts']
+                ))->toOthers();
+            } catch (\Exception $e) { }
         }
         
         return $this->respondDeleted($result['message']);
@@ -225,7 +226,9 @@ class TaskController extends ApiController
         // Load user relationship trước khi broadcast để đảm bảo data đầy đủ
         $comment->load('user');
         
-        // Broadcast realtime event
+        // Broadcast realtime event TaskStatusChanged để cập nhật bình luận (giống như kéo thả)
+        // Hoặc giữ TaskCommentCreated nhưng đảm bảo data gọn nhẹ. 
+        // Ở đây ta giữ TaskCommentCreated nhưng tối ưu broadcast data.
         try {
             $event = new TaskCommentCreated($comment, $id);
             broadcast($event)->toOthers();
@@ -254,68 +257,21 @@ class TaskController extends ApiController
             $taskId = $request->input('task_id');
             $projectId = $request->input('project_id');
 
-            // Debug log để kiểm tra payload và user
-            Log::info('DragStarted request', [
-                'task_id' => $taskId,
-                'project_id' => $projectId,
-                'user_id' => $user?->id,
-                'ip' => $request->ip(),
-            ]);
-
             if (!$taskId || !$projectId) {
                 return $this->respondValidationError('Task ID and Project ID are required');
             }
 
-            // Verify user has access to project
-            $task = Task::find($taskId);
-            if (!$task || $task->projectId != $projectId) {
-                Log::warning('DragStarted task not found or not in project', [
-                    'task_id' => $taskId,
-                    'project_id' => $projectId,
-                    'task_project' => $task?->projectId,
-                ]);
-                // Vẫn broadcast tối thiểu để FE hiển thị overlay
-                try {
-                    broadcast(new TaskDragStarted(
-                        $taskId,
-                        $projectId,
-                        $user?->id,
-                        $user?->name,
-                        $user?->avatar
-                    ))->toOthers();
-                } catch (\Exception $e) {
-                    Log::warning('Failed to broadcast drag started (task not found): ' . $e->getMessage());
-                }
-                return $this->respondWithMessage('Task not found or not in project (drag-started broadcasted minimal)');
-            }
-
-            // Broadcast event
-            try {
-                broadcast(new TaskDragStarted(
-                    $taskId,
-                    $projectId,
-                    $user->id,
-                    $user->name,
-                    $user->avatar
-                ))->toOthers();
-            } catch (\Exception $e) {
-                Log::error('Failed to broadcast drag started: ' . $e->getMessage(), [
-                    'task_id' => $taskId,
-                    'project_id' => $projectId,
-                    'user_id' => $user->id,
-                ]);
-                // Vẫn trả về success để FE không bị block
-                return $this->respondWithMessage('Drag started event (broadcast may have failed)');
-            }
+            broadcast(new TaskDragStarted(
+                $taskId,
+                $projectId,
+                $user?->id,
+                $user?->name,
+                $user?->avatar
+            ))->toOthers();
 
             return $this->respondWithMessage('Drag started event broadcasted');
         } catch (\Exception $e) {
-            Log::error('Error in broadcastDragStarted: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return $this->setStatusCode(500)
-                ->setReturnCode(self::ERROR_INTERNAL)
-                ->respondWithError('Failed to broadcast drag started event');
+            return $this->setStatusCode(500)->respondWithError('Failed to broadcast drag started event');
         }
     }
 
@@ -332,56 +288,15 @@ class TaskController extends ApiController
             $taskId = $request->input('task_id');
             $projectId = $request->input('project_id');
 
-            // Debug log để kiểm tra payload và user
-            Log::info('DragEnded request', [
-                'task_id' => $taskId,
-                'project_id' => $projectId,
-                'user_id' => $user?->id,
-                'ip' => $request->ip(),
-            ]);
-
             if (!$taskId || !$projectId) {
                 return $this->respondValidationError('Task ID and Project ID are required');
             }
 
-            // Verify user has access to project
-            $task = Task::find($taskId);
-            if (!$task || $task->projectId != $projectId) {
-                Log::warning('DragEnded task not found or not in project', [
-                    'task_id' => $taskId,
-                    'project_id' => $projectId,
-                    'task_project' => $task?->projectId,
-                ]);
-                // Vẫn broadcast tối thiểu để FE gỡ overlay
-                try {
-                    broadcast(new TaskDragEnded($taskId, $projectId, $user?->id))->toOthers();
-                } catch (\Exception $e) {
-                    Log::warning('Failed to broadcast drag ended (task not found): ' . $e->getMessage());
-                }
-                return $this->respondWithMessage('Task not found or not in project (drag-ended broadcasted minimal)');
-            }
-
-            // Broadcast event
-            try {
-                broadcast(new TaskDragEnded($taskId, $projectId, $user->id))->toOthers();
-            } catch (\Exception $e) {
-                Log::error('Failed to broadcast drag ended: ' . $e->getMessage(), [
-                    'task_id' => $taskId,
-                    'project_id' => $projectId,
-                    'user_id' => $user->id,
-                ]);
-                // Vẫn trả về success để FE không bị block
-                return $this->respondWithMessage('Drag ended event (broadcast may have failed)');
-            }
+            broadcast(new TaskDragEnded($taskId, $projectId, $user?->id))->toOthers();
 
             return $this->respondWithMessage('Drag ended event broadcasted');
         } catch (\Exception $e) {
-            Log::error('Error in broadcastDragEnded: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return $this->setStatusCode(500)
-                ->setReturnCode(self::ERROR_INTERNAL)
-                ->respondWithError('Failed to broadcast drag ended event');
+            return $this->setStatusCode(500)->respondWithError('Failed to broadcast drag ended event');
         }
     }
 
@@ -400,75 +315,23 @@ class TaskController extends ApiController
             $columnId = $request->input('column_id');
             $columnStatus = $request->input('column_status');
 
-            // Debug log để kiểm tra payload và user
-            Log::info('DragOverColumn request', [
-                'task_id' => $taskId,
-                'project_id' => $projectId,
-                'column_id' => $columnId,
-                'column_status' => $columnStatus,
-                'user_id' => $user?->id,
-                'ip' => $request->ip(),
-            ]);
-
             if (!$taskId || !$projectId || !$columnId || $columnStatus === null) {
                 return $this->respondValidationError('Task ID, Project ID, Column ID and Column Status are required');
             }
 
-            // Verify user has access to project
-            $task = Task::find($taskId);
-            if (!$task || $task->projectId != $projectId) {
-                Log::warning('DragOverColumn task not found or not in project', [
-                    'task_id' => $taskId,
-                    'project_id' => $projectId,
-                    'task_project' => $task?->projectId,
-                ]);
-                // Vẫn broadcast tối thiểu để FE highlight cột
-                try {
-                    broadcast(new TaskDragOverColumn(
-                        $taskId,
-                        $projectId,
-                        $columnId,
-                        $columnStatus,
-                        $user?->id,
-                        $user?->name,
-                        $user?->avatar
-                    ))->toOthers();
-                } catch (\Exception $e) {
-                    Log::warning('Failed to broadcast drag over column (task not found): ' . $e->getMessage());
-                }
-                return $this->respondWithMessage('Task not found or not in project (drag-over broadcasted minimal)');
-            }
-
-            // Broadcast event
-            try {
-                broadcast(new TaskDragOverColumn(
-                    $taskId,
-                    $projectId,
-                    $columnId,
-                    $columnStatus,
-                    $user->id,
-                    $user->name,
-                    $user->avatar
-                ))->toOthers();
-            } catch (\Exception $e) {
-                Log::error('Failed to broadcast drag over column: ' . $e->getMessage(), [
-                    'task_id' => $taskId,
-                    'project_id' => $projectId,
-                    'column_id' => $columnId,
-                    'user_id' => $user->id,
-                ]);
-                // Vẫn trả về success để FE không bị block
-                return $this->respondWithMessage('Drag over column event (broadcast may have failed)');
-            }
+            broadcast(new TaskDragOverColumn(
+                $taskId,
+                $projectId,
+                $columnId,
+                $columnStatus,
+                $user?->id,
+                $user?->name,
+                $user?->avatar
+            ))->toOthers();
 
             return $this->respondWithMessage('Drag over column event broadcasted');
         } catch (\Exception $e) {
-            Log::error('Error in broadcastDragOverColumn: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-            ]);
-            return $this->setStatusCode(500)
-                ->setReturnCode(self::ERROR_INTERNAL)
-                ->respondWithError('Failed to broadcast drag over column event');
+            return $this->setStatusCode(500)->respondWithError('Failed to broadcast drag over column event');
         }
     }
 }

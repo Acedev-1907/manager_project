@@ -18,7 +18,7 @@ const DRAG_CONFIG = {
   horizontalScrollInterval: 16, // ~60fps
 } as const;
 
-// --- SINGLETON GHOST MANAGEMENT (Quản lý phi hành gia duy nhất toàn ứng dụng) ---
+// --- SINGLETON GHOST MANAGEMENT ---
 let globalGhostElement: HTMLElement | null = null;
 
 function getGhostElement(): HTMLElement | null {
@@ -33,32 +33,18 @@ function getGhostElement(): HTMLElement | null {
   const ghost = document.createElement("div");
   ghost.id = "fixed-drag-ghost";
   ghost.className = "mobile-ghost-task";
-  // Style mặc định: Luôn ẩn và có kích thước cố định 120px
   ghost.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: ${GHOST_SIZE}px !important;
-    height: ${GHOST_SIZE}px !important;
-    z-index: 999999;
-    pointer-events: none;
-    display: none !important;
-    opacity: 0;
-    background: transparent !important;
-    will-change: transform;
-    perspective: 1000px;
-    backface-visibility: hidden;
-    transform-style: preserve-3d;
+    position: fixed; top: 0; left: 0;
+    width: ${GHOST_SIZE}px !important; height: ${GHOST_SIZE}px !important;
+    z-index: 999999; pointer-events: none;
+    display: none !important; opacity: 0;
+    background: transparent !important; will-change: transform;
+    perspective: 1000px; backface-visibility: hidden; transform-style: preserve-3d;
   `;
 
   const img = document.createElement("img");
   img.src = "/images/img_task.png"; 
-  img.style.cssText = `
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    image-rendering: -webkit-optimize-contrast;
-  `;
+  img.style.cssText = `width: 100%; height: 100%; object-fit: contain; image-rendering: -webkit-optimize-contrast;`;
 
   ghost.appendChild(img);
   document.body.appendChild(ghost);
@@ -73,15 +59,13 @@ function showGhost(x: number, y: number, offsetX: number, offsetY: number, flip:
   ghost.style.opacity = "1";
   ghost.style.visibility = "visible";
   
-  // Lật hình ảnh 3D mượt mà hơn bằng rotateY
   const img = ghost.querySelector("img");
   if (img) {
-    // rotateY(180deg) tạo cảm giác xoay trong không gian 3D mượt hơn scaleX(-1)
     const rotateY = flip ? 180 : 0;
-    const rotateZ = flip ? -12 : 12; // Nghiêng nhẹ để tạo cảm giác bay bổng
+    const rotateZ = flip ? -12 : 12;
     
     img.style.transform = `rotateY(${rotateY}deg) rotateZ(${rotateZ}deg)`;
-    img.style.transition = "transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)"; // Hiệu ứng xoay có độ đàn hồi cao
+    img.style.transition = "transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
     img.style.transformOrigin = "center center";
   }
   
@@ -131,10 +115,10 @@ export function updateTaskOptimistically(
       projectData.value = { ...projectData.value };
     }
 
-    // Emit optimistic update for dashboard immediately
+    // Emit optimistic update for dashboard
     try {
       const allTasks = projectData.value.data.tasks || [];
-      const pending = allTasks.filter((t: any) => (t.status ?? 0) !== 3).length; // adjust if 3 is done else tune below
+      const pending = allTasks.filter((t: any) => (t.status ?? 0) !== 3).length;
       const completed = allTasks.filter((t: any) => (t.status ?? 0) === 3).length;
       const total = pending + completed;
       const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -144,13 +128,11 @@ export function updateTaskOptimistically(
         tasks: [pending, completed],
         progress,
       });
-    } catch (e) {
-      // Silent error handling
-    }
+    } catch (e) { }
   }
 }
 
-// Debounced API call + optimistic UI cho chính user đang kéo
+// Debounced API call + optimistic UI
 let apiCallTimeout: any = null;
 export function debouncedChangeTaskStatus(
   taskId: number,
@@ -159,37 +141,39 @@ export function debouncedChangeTaskStatus(
   newStatus: string,
   projectData: any
 ) {
-  if (apiCallTimeout) {
-    clearTimeout(apiCallTimeout);
-  }
+  if (apiCallTimeout) clearTimeout(apiCallTimeout);
 
-  // Cập nhật UI ngay khi drop (optimistic) để task "ở luôn" cột mới
   updateTaskOptimistically(taskId, newStatus, projectData);
 
   apiCallTimeout = setTimeout(async () => {
     try {
       await changeTaskStatus(taskId, projectId, endPoint);
-    } catch (error) {
-      // Nếu lỗi, tạm thời giữ nguyên UI; backend realtime sau đó sẽ đồng bộ lại
-    }
+    } catch (error) { }
   }, DRAG_CONFIG.apiDebounceTime);
 }
 
 // Hệ thống thông báo Realtime dùng chung (Unified Whisper System)
 const whisperTimeouts = new Map<string, any>();
+const lastWhisperPayloads = new Map<string, string>(); // Cache để tránh gửi trùng nội dung
+
 function whisperDrag(eventName: string, payload: any, throttleMs = 0) {
   if (!window.Echo || !payload?.project_id) return;
   
   const key = `${eventName}-${payload.project_id}`;
+  
+  const currentPayloadStr = JSON.stringify(payload);
+  if (lastWhisperPayloads.get(key) === currentPayloadStr) {
+    return;
+  }
+  
   const prev = whisperTimeouts.get(key);
   if (prev) clearTimeout(prev);
   
-  // Đẩy vào hàng đợi async (setTimeout 0) để đảm bảo không block luồng UI
-  // và giúp mobile gửi tin ổn định hơn trên thiết bị thật
   const action = () => {
     try {
       window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
-    } catch (_) { /* ignore */ }
+      lastWhisperPayloads.set(key, currentPayloadStr);
+    } catch (_) { }
   };
 
   if (throttleMs === 0) {
@@ -569,13 +553,6 @@ export function useDragTask(ProjectData?: any) {
     isDragging = false;
     hasProcessedDrop = false;
 
-    // Rung nhẹ ngay khi chạm vào task để "kích hoạt" và báo hiệu có thể kéo (UX)
-    try {
-      if (window.navigator && window.navigator.vibrate) {
-        window.navigator.vibrate(10); 
-      }
-    } catch (_) { /* Silent */ }
-
     // Cache columns when starting drag
     updateCachedColumns();
 
@@ -604,18 +581,15 @@ export function useDragTask(ProjectData?: any) {
         isDragging = true;
         hasProcessedDrop = false;
 
-        // Ẩn card gốc để không bị mờ đè lên hình ảnh
-        try {
-          draggedElement?.classList.add("task-card-dragging");
-          if (draggedElement) {
-            draggedElement.style.opacity = "0"; // Ép ẩn card gốc
-          }
-          // Chặn các gesture mặc định của trình duyệt mobile
-          document.body.style.overflow = "hidden";
-          document.body.style.touchAction = "none";
-        } catch (_) {
-          // ignore
-        }
+    // Ẩn card gốc
+    try {
+      draggedElement?.classList.add("task-card-dragging");
+      if (draggedElement) {
+        draggedElement.style.opacity = "0";
+      }
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } catch (_) { }
 
         // Hiện ghost element khi thực sự bắt đầu kéo (Sử dụng !important để đảm bảo hiện)
         showGhost(currentX, currentY, touchOffsetX, touchOffsetY);
@@ -643,22 +617,19 @@ export function useDragTask(ProjectData?: any) {
         cancelAnimationFrame(ghostAnimationFrame);
       }
 
-      ghostAnimationFrame = requestAnimationFrame(() => {
-        // Duy trì hướng quay cho đến khi có sự thay đổi rõ rệt (> 10px)
-        // Ngưỡng 10px giúp chuyển động xoay trông "đầm" và có ý đồ hơn
-        if (currentX > lastX + 10) {
-          isFlipped = true; // Đang di chuyển qua phải -> lật hình
-          lastX = currentX;
-        } else if (currentX < lastX - 10) {
-          isFlipped = false; // Đang di chuyển qua trái -> về mặc định
-          lastX = currentX;
-        }
+    ghostAnimationFrame = requestAnimationFrame(() => {
+      if (currentX > lastX + 10) {
+        isFlipped = true;
+        lastX = currentX;
+      } else if (currentX < lastX - 10) {
+        isFlipped = false;
+        lastX = currentX;
+      }
 
-        // Cập nhật vị trí và hiện ghost nếu đang kéo
-        showGhost(currentX, currentY, touchOffsetX, touchOffsetY, isFlipped);
-        updateHorizontalScroll(currentX);
-        checkColumnHover(currentX, currentY);
-      });
+      showGhost(currentX, currentY, touchOffsetX, touchOffsetY, isFlipped);
+      updateHorizontalScroll(currentX);
+      checkColumnHover(currentX, currentY);
+    });
     }
   }
 
@@ -779,17 +750,13 @@ export function useDragTask(ProjectData?: any) {
     // Apply drag styles
     target.style.transform = "rotate(5deg) scale(1.05)";
     target.style.zIndex = "9999";
-    // Để card rõ nét, không bị mờ khi đang kéo
     target.style.opacity = "1";
 
-    // Thêm class để CSS làm nổi bật card đang được kéo
     try {
       target.classList.add("task-card-dragging");
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) { }
 
     // Reset grab mode
     isGrabbing = false;
@@ -846,14 +813,11 @@ export function useDragTask(ProjectData?: any) {
     target.style.zIndex = originalZIndex;
     target.style.opacity = originalOpacity;
 
-    // Bỏ class highlight khi thả xong
     try {
       target.classList.remove("task-card-dragging");
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) { }
 
     // Reset all column highlights
     const columnsForReset = cachedColumnsElements.length > 0 ? cachedColumnsElements : Array.from(document.querySelectorAll(".kanban-column"));
@@ -915,17 +879,15 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function cleanupDragVisuals() {
-    // Trả lại trạng thái touch mặc định cho element
     if (draggedElement) {
       try {
         draggedElement.style.touchAction = "";
         draggedElement.style.userSelect = "";
         draggedElement.style.webkitUserSelect = "";
         draggedElement.oncontextmenu = null;
-      } catch (_) { /* ignore */ }
+      } catch (_) { }
     }
 
-    // Whisper drag-ended để người khác xóa overlay bằng helper dùng chung
     if (draggedElement) {
       const taskId = parseInt(draggedElement.dataset.taskId || "0");
       const projectId = parseInt(draggedElement.dataset.projectId || "0");
@@ -934,25 +896,18 @@ export function useDragTask(ProjectData?: any) {
       }
     }
 
-    // Trả lại trạng thái scroll cho body
     try {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) { }
 
-    // Bỏ highlight nếu còn và trả lại trạng thái hiển thị ban đầu
     if (draggedElement) {
       try {
         draggedElement.classList.remove("task-card-dragging");
-        // HOÀN TÁC: Trả lại độ hiển thị để task không bị mất sau khi kéo
         draggedElement.style.transform = originalTransform;
         draggedElement.style.zIndex = originalZIndex;
         draggedElement.style.opacity = originalOpacity;
-      } catch (_) {
-        // ignore
-      }
+      } catch (_) { }
     }
 
     isDragging = false;
@@ -978,6 +933,9 @@ export function useDragTask(ProjectData?: any) {
 
     // Stop horizontal scroll
     stopHorizontalScroll();
+
+    // Xóa cache whisper để lần kéo sau có thể bắn lại event
+    lastWhisperPayloads.clear();
 
     // Reset touch state
     startX = 0;
