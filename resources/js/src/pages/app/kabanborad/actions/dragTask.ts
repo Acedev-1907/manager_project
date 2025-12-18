@@ -274,34 +274,47 @@ export function useDragTask(ProjectData?: any) {
     }
   };
 
-  // Touch / mouse drag state
+  // --- STATE VARIABLES (Quản lý tập trung để tối ưu bộ nhớ) ---
   let isDragging = false;
   let draggedElement: HTMLElement | null = null;
+  let hasProcessedDrop = false;
+
+  // Tọa độ và Offset dùng chung
   let startX = 0;
   let startY = 0;
   let currentX = 0;
   let currentY = 0;
-  let originalTransform = "";
-  let originalZIndex = "";
-  let originalOpacity = "";
-  let ghostAnimationFrame: number | null = null;
-
-  let touchStartTime = 0;
   let touchOffsetX = 0;
   let touchOffsetY = 0;
 
-  // Flag to prevent duplicate API calls
-  let hasProcessedDrop = false;
+  // Cấu hình ban đầu để hoàn tác
+  let originalTransform = "";
+  let originalZIndex = "";
+  let originalOpacity = "";
+  
+  let ghostAnimationFrame: number | null = null;
+  let touchStartTime = 0;
 
   // Auto-scroll state for horizontal scrolling
   let horizontalScrollInterval: number | null = null;
   let horizontalScrollSpeed = 0;
 
-  // Cache container and columns for performance
+  // Cache container và columns để tăng tốc xử lý DOM
   let cachedKanbanContainer: HTMLElement | null = null;
   let cachedContainerRect: DOMRect | null = null;
   let cachedColumns: HTMLElement[] = [];
   let cachedColumnRects: { element: HTMLElement; rect: DOMRect }[] = [];
+
+  // PC Grabbing state
+  let isGrabbing = false;
+  let grabStartX = 0;
+  let grabScrollLeft = 0;
+  let isMouseDown = false;
+  let mouseDownX = 0;
+  let mouseDownY = 0;
+
+  // Set quản lý drop listeners
+  const attachedColumns = new Set<ExtendedHTMLElement>();
 
   function updateCachedColumns() {
     cachedKanbanContainer = document.querySelector(".kanban-grid-container");
@@ -318,37 +331,15 @@ export function useDragTask(ProjectData?: any) {
     }));
   }
 
-  // Mouse drag state for auto-scroll without task
-  let isGrabbing = false;
-  let grabStartX = 0;
-  let grabScrollLeft = 0;
-  let isMouseDown = false;
-  let mouseDownX = 0;
-  let mouseDownY = 0;
-
-  // Drop listeners
-  const attachedColumns = new Set<ExtendedHTMLElement>();
-
   // Auto-scroll functions for horizontal scrolling
   function startHorizontalScroll() {
     if (horizontalScrollInterval) return;
 
     horizontalScrollInterval = setInterval(() => {
       if (horizontalScrollSpeed !== 0) {
-        let kanbanContainer = document.querySelector(".kanban-grid-container");
-        if (!kanbanContainer) {
-          kanbanContainer = document.querySelector(
-            '[class*="kanban-grid-container"]'
-          );
-        }
-        if (!kanbanContainer) {
-          kanbanContainer = document.querySelector('[class*="kanban"]');
-        }
-
+        const kanbanContainer = cachedKanbanContainer || document.querySelector(".kanban-grid-container") as HTMLElement;
         if (kanbanContainer) {
-          const currentScrollLeft = kanbanContainer.scrollLeft;
-          const newScrollLeft = currentScrollLeft + horizontalScrollSpeed;
-          kanbanContainer.scrollLeft = newScrollLeft;
+          kanbanContainer.scrollLeft += horizontalScrollSpeed;
         }
       }
     }, DRAG_CONFIG.horizontalScrollInterval);
@@ -363,47 +354,33 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function updateHorizontalScroll(x: number) {
-    const kanbanContainer =
-      cachedKanbanContainer ||
-      (document.querySelector(".kanban-grid-container") as HTMLElement);
-    const containerRect =
-      cachedContainerRect || kanbanContainer.getBoundingClientRect();
-
-    if (!kanbanContainer || !containerRect) {
+    if (!cachedKanbanContainer || !cachedContainerRect) {
+      updateCachedColumns();
+    }
+    
+    if (!cachedKanbanContainer || !cachedContainerRect) {
       horizontalScrollSpeed = 0;
       return;
     }
 
-    const containerLeft = containerRect.left;
-    const containerRight = containerRect.right;
+    const { left, right } = cachedContainerRect;
+    const threshold = DRAG_CONFIG.horizontalScrollThreshold;
 
-    // Check if we need to scroll left
-    if (x < containerLeft + DRAG_CONFIG.horizontalScrollThreshold) {
-      const distanceFromLeft =
-        containerLeft + DRAG_CONFIG.horizontalScrollThreshold - x;
-      horizontalScrollSpeed = -Math.min(
-        DRAG_CONFIG.horizontalScrollSpeed,
-        distanceFromLeft * 0.5
-      );
-    }
-    // Check if we need to scroll right
-    else if (x > containerRight - DRAG_CONFIG.horizontalScrollThreshold) {
-      const distanceFromRight =
-        x - (containerRight - DRAG_CONFIG.horizontalScrollThreshold);
-      horizontalScrollSpeed = Math.min(
-        DRAG_CONFIG.horizontalScrollSpeed,
-        distanceFromRight * 0.5
-      );
-    }
-    // No scroll needed
-    else {
+    // Tính toán tốc độ cuộn dựa trên khoảng cách tới biên
+    if (x < left + threshold) {
+      const distance = left + threshold - x;
+      horizontalScrollSpeed = -Math.min(DRAG_CONFIG.horizontalScrollSpeed, distance * 0.5);
+    } else if (x > right - threshold) {
+      const distance = x - (right - threshold);
+      horizontalScrollSpeed = Math.min(DRAG_CONFIG.horizontalScrollSpeed, distance * 0.5);
+    } else {
       horizontalScrollSpeed = 0;
     }
 
-    // Start or stop scroll interval based on speed
-    if (horizontalScrollSpeed !== 0 && !horizontalScrollInterval) {
-      startHorizontalScroll();
-    } else if (horizontalScrollSpeed === 0 && horizontalScrollInterval) {
+    // Kích hoạt hoặc dừng interval cuộn
+    if (horizontalScrollSpeed !== 0) {
+      if (!horizontalScrollInterval) startHorizontalScroll();
+    } else {
       stopHorizontalScroll();
     }
   }
@@ -540,35 +517,19 @@ export function useDragTask(ProjectData?: any) {
     taskCards.forEach((card) => {
       const cardElement = card as HTMLElement;
 
-      // Remove existing listeners first to prevent conflicts
+      // Reset listeners để tránh trùng lặp
       cardElement.removeEventListener("dragstart", handleDragStart);
       cardElement.removeEventListener("dragend", handleDragEnd);
-      cardElement.removeEventListener("touchstart", handleTouchStart);
-      cardElement.removeEventListener("touchmove", handleTouchMove);
-      cardElement.removeEventListener("touchend", handleTouchEnd);
 
-      // Add drag events for desktop
+      // Add drag events cho Desktop
       cardElement.addEventListener("dragstart", handleDragStart);
       cardElement.addEventListener("dragend", handleDragEnd);
-
-      // Note: Touch events are handled by delegation in setupTouchDelegation
-      // to avoid conflicts and improve performance
     });
   }
 
   function setupTouchListeners() {
-    // Use delegation instead of individual listeners to avoid conflicts
-    // Individual listeners are removed to prevent double handling
-    const taskCards = document.querySelectorAll(".task-card");
-
-    taskCards.forEach((card) => {
-      const cardElement = card as HTMLElement;
-
-      // Remove existing listeners to prevent conflicts
-      cardElement.removeEventListener("touchstart", handleTouchStart);
-      cardElement.removeEventListener("touchmove", handleTouchMove);
-      cardElement.removeEventListener("touchend", handleTouchEnd);
-    });
+    // Touch events hiện đã được xử lý tập trung qua Delegation
+    // Hàm này được giữ lại để tương thích với các component cũ nếu cần
   }
 
   function setupTouchDelegation() {
@@ -913,131 +874,12 @@ export function useDragTask(ProjectData?: any) {
     hasProcessedDrop = false;
   }
 
-  function handleTouchStart(event: Event) {
-    const target = event.target as HTMLElement;
-
-    // Find the closest task-card element
-    const taskCard = target.closest(".task-card");
-    if (!taskCard) {
-      return;
-    }
-
-    const touch = (event as TouchEvent).touches[0];
-    startX = touch.clientX;
-    startY = touch.clientY;
-    currentX = startX;
-    currentY = startY;
-    touchStartTime = Date.now();
-
-    const taskId = parseInt((taskCard as HTMLElement).dataset.taskId || "0");
-    const projectId = parseInt(
-      (taskCard as HTMLElement).dataset.projectId || "0"
-    );
-
-    if (!taskId || !projectId) {
-      return;
-    }
-
-    // Ensure ghost is hidden initially
-    hideGhost();
-  }
-
-  function handleTouchMove(event: Event) {
-    if (!getGhostElement()) {
-      return;
-    }
-
-    const touch = (event as TouchEvent).touches[0];
-    currentX = touch.clientX;
-    currentY = touch.clientY;
-
-    const distance = Math.sqrt(
-      Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2)
-    );
-
-    if (distance > DRAG_CONFIG.threshold && !isDragging) {
-      isDragging = true;
-      const target = event.target as HTMLElement;
-      if (target.classList.contains("task-card")) {
-        draggedElement = target;
-        hasProcessedDrop = false;
-      }
-      // Only prevent default when we start dragging
-      if (event.cancelable) {
-        event.preventDefault();
-      }
-    }
-
-    if (isDragging) {
-      showGhost(currentX, currentY, touchOffsetX, touchOffsetY);
-      updateHorizontalScroll(currentX);
-      checkColumnHover(currentX, currentY);
-    }
-  }
-
-  function handleTouchEnd() {
-    if (!isDragging || !draggedElement) {
-      cleanupDragVisuals();
-      return;
-    }
-
-    const taskId = parseInt(draggedElement.dataset.taskId || "0");
-    const projectId = parseInt(draggedElement.dataset.projectId || "0");
-
-    if (taskId && projectId) {
-      // Find which column the task was dropped on
-      const columns = document.querySelectorAll(".kanban-column");
-      let droppedOnColumn = null;
-
-      for (const column of columns) {
-        const columnElement = column as HTMLElement;
-        const rect = columnElement.getBoundingClientRect();
-
-        if (
-          currentX >= rect.left &&
-          currentX <= rect.right &&
-          currentY >= rect.top &&
-          currentY <= rect.bottom
-        ) {
-          droppedOnColumn = columnElement;
-          break;
-        }
-      }
-
-      if (droppedOnColumn && !hasProcessedDrop) {
-        const columnId = droppedOnColumn.dataset.columnId;
-        const columnStatus = droppedOnColumn.dataset.columnStatus;
-
-        if (columnId && columnStatus !== undefined) {
-          const endpoint = `task/transition_to_${columnStatus}`;
-          const newStatus = parseInt(columnStatus);
-          hasProcessedDrop = true;
-          debouncedChangeTaskStatus(
-            taskId,
-            projectId,
-            endpoint,
-            newStatus.toString(),
-            ProjectData
-          );
-          // Gửi thông báo bằng helper dùng chung
-          notifyStatusOptimistic(taskId, projectId, newStatus);
-          notifyDragEnded(taskId, projectId);
-        }
-      }
-    }
-
-    cleanupDragVisuals();
-  }
-
   function checkColumnHover(x: number, y: number) {
-    const columns =
-      cachedColumnRects.length > 0
-        ? cachedColumnRects
-        : (Array.from(document.querySelectorAll(".kanban-column")) as any[]).map(
-            (el) => ({ element: el, rect: el.getBoundingClientRect() })
-          );
+    if (cachedColumnRects.length === 0) {
+      updateCachedColumns();
+    }
 
-    columns.forEach(({ element: columnElement, rect }) => {
+    cachedColumnRects.forEach(({ element: columnElement, rect }) => {
       if (
         x >= rect.left &&
         x <= rect.right &&
@@ -1045,7 +887,6 @@ export function useDragTask(ProjectData?: any) {
         y <= rect.bottom
       ) {
         // Chỉ dùng whisper (realtime) để báo nhanh cho user khác, không gọi HTTP API
-        // API sẽ chỉ được gọi khi drop vào cột
         if (isDragging && draggedElement) {
           const taskId = parseInt(draggedElement.dataset.taskId || "0");
           const projectId = parseInt(draggedElement.dataset.projectId || "0");
@@ -1053,7 +894,6 @@ export function useDragTask(ProjectData?: any) {
           const columnStatus = columnElement.dataset.columnStatus || "";
 
           if (taskId && projectId && columnId && columnStatus) {
-            // Sử dụng helper dùng chung
             notifyDragOver(taskId, projectId, columnId, columnStatus);
           }
         }
@@ -1183,9 +1023,7 @@ export function useDragTask(ProjectData?: any) {
     mouseDownY = event.clientY;
     grabStartX = event.clientX;
 
-    const kanbanContainer = document.querySelector(
-      ".kanban-grid-container"
-    ) as HTMLElement;
+    const kanbanContainer = cachedKanbanContainer || document.querySelector(".kanban-grid-container") as HTMLElement;
     if (kanbanContainer) {
       grabScrollLeft = kanbanContainer.scrollLeft;
     }
@@ -1198,16 +1036,13 @@ export function useDragTask(ProjectData?: any) {
     const deltaY = event.clientY - mouseDownY;
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-    // Only start grabbing if mouse moved enough and not over task cards
     if (distance > 5 && !isGrabbing) {
       const target = event.target as HTMLElement;
 
       if (!target.closest(".task-card")) {
         isGrabbing = true;
 
-        const kanbanContainer = document.querySelector(
-          ".kanban-grid-container"
-        ) as HTMLElement;
+        const kanbanContainer = cachedKanbanContainer || document.querySelector(".kanban-grid-container") as HTMLElement;
         if (kanbanContainer) {
           kanbanContainer.style.cursor = "grabbing";
           kanbanContainer.style.userSelect = "none";
@@ -1216,22 +1051,17 @@ export function useDragTask(ProjectData?: any) {
     }
 
     if (isGrabbing) {
-      const kanbanContainer = document.querySelector(
-        ".kanban-grid-container"
-      ) as HTMLElement;
+      const kanbanContainer = cachedKanbanContainer || document.querySelector(".kanban-grid-container") as HTMLElement;
       if (kanbanContainer) {
         const deltaX = grabStartX - event.clientX;
-        const newScrollLeft = grabScrollLeft + deltaX;
-        kanbanContainer.scrollLeft = newScrollLeft;
+        kanbanContainer.scrollLeft = grabScrollLeft + deltaX;
       }
     }
   }
 
   function handleMouseUp() {
     if (isGrabbing) {
-      const kanbanContainer = document.querySelector(
-        ".kanban-grid-container"
-      ) as HTMLElement;
+      const kanbanContainer = cachedKanbanContainer || document.querySelector(".kanban-grid-container") as HTMLElement;
       if (kanbanContainer) {
         kanbanContainer.style.cursor = "";
         kanbanContainer.style.userSelect = "";
@@ -1292,17 +1122,13 @@ export function useDragTask(ProjectData?: any) {
 
     // If horizontal movement is greater than vertical, allow scroll
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      // Only prevent default if the event is cancelable
       if (event.cancelable) {
         event.preventDefault();
       }
 
-      const kanbanContainer = document.querySelector(
-        ".kanban-grid-container"
-      ) as HTMLElement;
+      const kanbanContainer = cachedKanbanContainer || document.querySelector(".kanban-grid-container") as HTMLElement;
       if (kanbanContainer) {
-        // Đơn giản hóa: Scroll trực tiếp với tốc độ cao
-        const scrollSpeed = 2.0; // Giảm từ 4.0 xuống 2.0 để vừa phải
+        const scrollSpeed = 2.0; 
         kanbanContainer.scrollLeft -= deltaX * scrollSpeed;
 
         startX = touch.clientX;

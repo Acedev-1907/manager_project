@@ -1,118 +1,20 @@
 /* Improved Drag and Drop Styles */
-.ghost-task {
-  position: fixed !important;
-  pointer-events: none !important;
-  z-index: 9999 !important;
-  background: transparent !important;
-  border-radius: 12px !important;
-  padding: 0 !important;
-  border: none !important;
-  box-shadow: none !important;
-  max-width: 300px !important;
-  min-width: 250px !important;
-  opacity: 1 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  transform: none !important;
-  transition: none !important;
-  user-select: none !important;
-}
 
-.ghost-task .task-title {
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: #1e293b !important;
-  margin: 0 0 8px 0 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  max-width: 100% !important;
-  display: block !important;
-}
-
-.ghost-task .task-members {
-  display: flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-  flex-wrap: nowrap !important;
-  max-width: 100% !important;
-}
-
-.ghost-task .member-avatar {
-  width: 20px !important;
-  height: 20px !important;
-  border-radius: 50% !important;
-  background: #3b82f6 !important;
-  color: white !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 8px !important;
-  font-weight: 600 !important;
-  flex-shrink: 0 !important;
-}
-
-.task-card.dragging {
-  opacity: 0.5 !important;
-  transform: rotate(5deg) !important;
-  z-index: 1000 !important;
-  transition: all 0.2s ease !important;
-}
-
-.kanban-column.hovered {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%) !important;
-  border: 2px dashed #3b82f6 !important;
-  transform: scale(1.02) !important;
-  transition: all 0.3s ease !important;
-}
-
-/* Prevent text selection during drag */
+/* Prevent text selection during drag and tap highlighting */
 .task-card {
   user-select: none !important;
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
-  touch-action: pan-y !important; /* Allow vertical scrolling but prevent horizontal */
+  touch-action: pan-y !important; /* Allow vertical scrolling but prevent horizontal gestures */
   -webkit-touch-callout: none !important;
   -webkit-tap-highlight-color: transparent !important;
 }
 
-/* When dragging, disable all touch actions */
-.task-card.dragging {
-  touch-action: none !important;
-  -webkit-touch-callout: none !important;
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-/* Prevent scrolling on kanban columns during drag */
-.kanban-column {
-  touch-action: pan-y !important;
-}
-
-.kanban-column.hovered {
-  touch-action: none !important;
-}
-
-/* Better approach to prevent scroll during drag - ALLOW HORIZONTAL SCROLL */
-body.dragging {
-  overflow-y: hidden !important; /* Only prevent vertical scroll */
-  overflow-x: auto !important; /* Allow horizontal scroll */
-  position: relative !important;
-}
-
-/* Prevent vertical scroll on kanban container during drag but allow horizontal */
-body.dragging .kanban-container,
-body.dragging .kanban-content {
-  overflow-y: hidden !important; /* Only prevent vertical scroll */
-  overflow-x: auto !important; /* Allow horizontal scroll */
-  -webkit-overflow-scrolling: auto !important;
-}
-
-/* Prevent text selection in kanban area */
+/* Prevent text selection in kanban area to make dragging smoother */
 .kanban-content,
 .kanban-grid-container,
-.kanban-column,
-.task-card {
+.kanban-column {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -121,26 +23,15 @@ body.dragging .kanban-content {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Grab cursor for kanban area */
-.kanban-content:hover,
-.kanban-grid-container:hover {
-  cursor: grab;
-}
-
-.kanban-content:active,
-.kanban-grid-container:active {
-  cursor: grabbing;
-}
-
-/* Mobile ghost element optimization */
+/* Mobile ghost element optimization - Used for both Desktop and Mobile custom ghost */
 .mobile-ghost-task {
   pointer-events: none !important;
   touch-action: none !important;
   background: transparent !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  z-index: 99999 !important;
-  /* Tối ưu performance cho mobile */
+  z-index: 999999 !important;
+  /* GPU acceleration for smooth movement */
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   will-change: transform;
@@ -151,3 +42,8 @@ body.dragging .kanban-content {
 
 /* Mobile-specific improvements */
 @media (max-width: 768px) {
+  .task-card {
+    /* Ensure cards are easily grabbable on mobile */
+    touch-action: pan-y !important;
+  }
+}
