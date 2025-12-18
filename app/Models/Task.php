@@ -41,7 +41,7 @@ class Task extends Model
             if ($task->wasChanged('status')) {
                 try {
                     // Dispatch events for project progress tracking
-                    self::handleProjectProgress($task->projectId, Auth::id());
+                    self::handleProjectProgress($task->projectId, Auth::id(), $task->id);
                 } catch (\Exception $e) {
                     // Silent error handling for event dispatch
                 }
@@ -52,7 +52,7 @@ class Task extends Model
         static::created(function ($task) {
             try {
                 // Dispatch events for project progress tracking
-                self::handleProjectProgress($task->projectId, Auth::id());
+                self::handleProjectProgress($task->projectId, Auth::id(), $task->id);
             } catch (\Exception $e) {
                 // Silent error handling for event dispatch
             }
@@ -62,7 +62,7 @@ class Task extends Model
         static::deleted(function ($task) {
             try {
                 // Dispatch events for project progress tracking
-                self::handleProjectProgress($task->projectId, Auth::id());
+                self::handleProjectProgress($task->projectId, Auth::id(), $task->id);
             } catch (\Exception $e) {
                 // Silent error handling for event dispatch
             }
@@ -136,9 +136,10 @@ class Task extends Model
      * 
      * @param int $projectId
      * @param int|null $userId
+     * @param int|null $taskId
      * @return void
      */
-    public static function handleProjectProgress(int $projectId, ?int $userId = null): void
+    public static function handleProjectProgress(int $projectId, ?int $userId = null, ?int $taskId = null): void
     {
         try {
             // Get project and its tasks
@@ -162,7 +163,7 @@ class Task extends Model
             self::updateProjectProgress($projectId, $progress, $userId);
 
             // Dispatch events for real-time updates
-            self::dispatchProgressEvents($projectId, $completedTasks, $totalTasks, $progress);
+            self::dispatchProgressEvents($projectId, $completedTasks, $totalTasks, $progress, $userId, $taskId);
         } catch (\Exception $e) {
             // Silent error handling for progress updates
         }
@@ -217,15 +218,18 @@ class Task extends Model
      * @param int $completed
      * @param int $total
      * @param int $progress
+     * @param int|null $userId
+     * @param int|null $taskId
      * @return void
      */
-    private static function dispatchProgressEvents(int $projectId, int $completed, int $total, int $progress): void
+    private static function dispatchProgressEvents(int $projectId, int $completed, int $total, int $progress, ?int $userId = null, ?int $taskId = null): void
     {
         // Broadcast project progress update
-        broadcast(new TrackProjectProgress($projectId, $progress));
+        broadcast(new TrackProjectProgress($progress, $projectId, $userId));
 
         // Broadcast completed and pending task counts
-        broadcast(new TrackCompletedAndPending($projectId, $completed, $total - $completed));
+        $tasks = [$completed, $total - $completed];
+        broadcast(new TrackCompletedAndPending($tasks, $projectId, $taskId, $userId));
     }
 
     /**
