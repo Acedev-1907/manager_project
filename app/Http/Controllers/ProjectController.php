@@ -188,7 +188,7 @@ class ProjectController extends ApiController
             );
 
             // Broadcast event để các user khác nhận được cột mới
-            broadcast(new \App\Events\ColumnAdded($column, $projectId, $user->id));
+            broadcast(new \App\Events\ColumnAdded($column, $projectId, $user->id))->toOthers();
 
             return $this->respondWithData($column, 'Column added successfully');
         } catch (\Exception $e) {
@@ -290,7 +290,7 @@ class ProjectController extends ApiController
             $deleted = $project->deleteColumn($columnId);
             if ($deleted) {
                 // Broadcast event để các user khác nhận được cột đã bị xóa
-                broadcast(new \App\Events\ColumnDeleted($columnId, $projectId, $user->id));
+                broadcast(new \App\Events\ColumnDeleted($columnId, $projectId, $user->id))->toOthers();
 
                 return $this->respondWithMessage('Column deleted successfully');
             } else {

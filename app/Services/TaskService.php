@@ -120,11 +120,12 @@ class TaskService
                 // Sử dụng task object đã có từ updateById() - tránh query DB thêm 1 lần
                 try {
                     // Broadcast ngay để user khác nhận update nhanh nhất
-                    broadcast(new TaskStatusChanged($task, $projectId, $status, $userId));
+                    // Sử dụng toOthers() để tránh bắn ngược lại cho chính người vừa update
+                    broadcast(new TaskStatusChanged($task, $projectId, $status, $userId))->toOthers();
                     
                     // Broadcast drag ended để tắt overlay "Someone is moving this task"
                     // Khi task được drop vào cột và status đã được update
-                    broadcast(new TaskDragEnded($taskId, $projectId, $userId));
+                    broadcast(new TaskDragEnded($taskId, $projectId, $userId))->toOthers();
                 } catch (\Exception $e) {
                     Log::warning('Failed to broadcast task status changed: ' . $e->getMessage());
                     // Không fail toàn bộ request nếu broadcast fail

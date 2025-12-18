@@ -131,9 +131,9 @@ export function initEcho() {
 
             window.Echo = echo
 
-            if (import.meta.env.DEV) {
-                console.log('Echo initialized:', { wsHost: config.wsHost, wsPort: config.wsPort })
-            }
+            // if (import.meta.env.DEV) {
+            //     console.log('Echo initialized:', { wsHost: config.wsHost, wsPort: config.wsPort })
+            // }
 
             return true
         } catch (error) {

@@ -432,9 +432,12 @@ onMounted(async () => {
     // Listen for task drag over column events - Show visual indicator
     eventBus.on('task-drag-over-column', async (eventData: any) => {
         try {
+            // TỐI ƯU: Nếu là chính mình kéo thì bỏ qua luôn để tránh xử lý thừa gây giật
+            if (isCurrentUser(eventData.userId)) return;
+
             if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
                 const taskIdNum = Number(eventData.taskId);
-                if (!isCurrentUser(eventData.userId) && taskIdNum) {
+                if (taskIdNum) {
                     // Find task info
                     const task = ProjectData.value?.data?.tasks?.find((t: any) => Number(t.id) === taskIdNum);
                     const taskName = task?.name || 'Task';
@@ -477,6 +480,17 @@ onMounted(async () => {
     eventBus.on('task-status-changed-realtime', async (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
+                // TỐI ƯU: Nếu là chính mình kéo thì không cần update lại danh sách để tránh bị giật (vì đã update optimistic)
+                if (isCurrentUser(eventData.userId)) {
+                    // Tuy nhiên vẫn cần xóa trạng thái lock/dragging nếu còn sót
+                    if (eventData.taskId) {
+                        const taskIdNum = Number(eventData.taskId);
+                        lockedTasks.value.delete(taskIdNum);
+                        draggingTasks.value.delete(taskIdNum);
+                    }
+                    return;
+                }
+
                 const updatedTask = eventData.task;
                 const tasks = ProjectData.value?.data?.tasks || [];
                 const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));

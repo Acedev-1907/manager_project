@@ -225,11 +225,12 @@ class Task extends Model
     private static function dispatchProgressEvents(int $projectId, int $completed, int $total, int $progress, ?int $userId = null, ?int $taskId = null): void
     {
         // Broadcast project progress update
-        broadcast(new TrackProjectProgress($progress, $projectId, $userId));
+        // Sử dụng toOthers() để tránh bắn ngược lại cho chính người vừa gây ra sự thay đổi
+        broadcast(new TrackProjectProgress($progress, $projectId, $userId))->toOthers();
 
         // Broadcast completed and pending task counts
         $tasks = [$completed, $total - $completed];
-        broadcast(new TrackCompletedAndPending($tasks, $projectId, $taskId, $userId));
+        broadcast(new TrackCompletedAndPending($tasks, $projectId, $taskId, $userId))->toOthers();
     }
 
     /**

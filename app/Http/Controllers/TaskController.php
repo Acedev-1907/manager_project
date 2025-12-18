@@ -228,15 +228,7 @@ class TaskController extends ApiController
         // Broadcast realtime event
         try {
             $event = new TaskCommentCreated($comment, $id);
-           broadcast($event);
-            // Log::info('TaskCommentCreated broadcasted', [
-            //     'taskId' => $id,
-            //     'commentId' => $comment->id,
-            //     'userId' => $userId,
-            //     'channel' => 'task.' . $id,
-            //     'eventName' => 'TaskCommentCreated',
-            //     'broadcastResult' => $broadcastResult ? 'success' : 'failed'
-            // ]);
+            broadcast($event)->toOthers();
         } catch (\Exception $e) {
             Log::error('Failed to broadcast TaskCommentCreated', [
                 'error' => $e->getMessage(),
@@ -290,7 +282,7 @@ class TaskController extends ApiController
                         $user?->id,
                         $user?->name,
                         $user?->avatar
-                    ));
+                    ))->toOthers();
                 } catch (\Exception $e) {
                     Log::warning('Failed to broadcast drag started (task not found): ' . $e->getMessage());
                 }
@@ -305,7 +297,7 @@ class TaskController extends ApiController
                     $user->id,
                     $user->name,
                     $user->avatar
-                ));
+                ))->toOthers();
             } catch (\Exception $e) {
                 Log::error('Failed to broadcast drag started: ' . $e->getMessage(), [
                     'task_id' => $taskId,
@@ -362,7 +354,7 @@ class TaskController extends ApiController
                 ]);
                 // Vẫn broadcast tối thiểu để FE gỡ overlay
                 try {
-                    broadcast(new TaskDragEnded($taskId, $projectId, $user?->id));
+                    broadcast(new TaskDragEnded($taskId, $projectId, $user?->id))->toOthers();
                 } catch (\Exception $e) {
                     Log::warning('Failed to broadcast drag ended (task not found): ' . $e->getMessage());
                 }
@@ -371,7 +363,7 @@ class TaskController extends ApiController
 
             // Broadcast event
             try {
-                broadcast(new TaskDragEnded($taskId, $projectId, $user->id));
+                broadcast(new TaskDragEnded($taskId, $projectId, $user->id))->toOthers();
             } catch (\Exception $e) {
                 Log::error('Failed to broadcast drag ended: ' . $e->getMessage(), [
                     'task_id' => $taskId,
@@ -440,7 +432,7 @@ class TaskController extends ApiController
                         $user?->id,
                         $user?->name,
                         $user?->avatar
-                    ));
+                    ))->toOthers();
                 } catch (\Exception $e) {
                     Log::warning('Failed to broadcast drag over column (task not found): ' . $e->getMessage());
                 }
@@ -457,7 +449,7 @@ class TaskController extends ApiController
                     $user->id,
                     $user->name,
                     $user->avatar
-                ));
+                ))->toOthers();
             } catch (\Exception $e) {
                 Log::error('Failed to broadcast drag over column: ' . $e->getMessage(), [
                     'task_id' => $taskId,
