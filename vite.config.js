@@ -13,7 +13,7 @@ export default defineConfig({
     build: {
         // outDir: '../public/build',
         outDir: 'public/build',
-        chunkSizeWarningLimit: 1600,
+        chunkSizeWarningLimit: 8000,
     },
     // server: {
     //     host: '0.0.0.0',        // để máy khác truy cập
