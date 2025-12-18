@@ -102,26 +102,27 @@ export function useAppGlobalRealtime() {
         // Whisper listener để hiển thị gần như tức thời khi drag
         .listenForWhisper("drag-started", (e: any) => {
           eventBus.emit("task-drag-started", {
-            projectId,
-            taskId: e.task_id,
+            projectId: Number(projectId),
+            taskId: Number(e.task_id),
             userId: e.user_id,
             userName: e.user_name,
             userAvatar: e.user_avatar,
+            taskName: e.task_name,
             timestamp: Date.now(),
           });
         })
         .listenForWhisper("drag-ended", (e: any) => {
           eventBus.emit("task-drag-ended", {
-            projectId,
-            taskId: e.task_id,
+            projectId: Number(projectId),
+            taskId: Number(e.task_id),
             userId: e.user_id,
             timestamp: Date.now(),
           });
         })
         .listenForWhisper("drag-over-column", (e: any) => {
           eventBus.emit("task-drag-over-column", {
-            projectId,
-            taskId: e.task_id,
+            projectId: Number(projectId),
+            taskId: Number(e.task_id),
             columnId: e.column_id,
             columnStatus: e.column_status,
             userId: e.user_id,

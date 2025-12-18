@@ -1,12 +1,14 @@
+import { useUserStore } from "../../../../state/userStore";
 import { emitForceCacheClear } from "../../../../helper/eventBus";
 import eventBus from "../../../../helper/eventBus";
-import { getCurrentUserId, getUserData } from "../../../../helper/getUserData";
+import { getCurrentUserId } from "../../../../helper/getUserData";
 import {
   changeTaskStatusApi,
   notifyTaskDragEnded,
 } from "../../../../services/taskService";
 
 // Constants
+const GHOST_SIZE = 120; // Kích thước cố định cho phi hành gia (Fix lỗi hình quá to)
 const DRAG_CONFIG = {
   threshold: 5,
   apiDebounceTime: 0, // Gọi API ngay lập tức khi drop để giảm độ trễ
@@ -15,6 +17,71 @@ const DRAG_CONFIG = {
   horizontalScrollSpeed: 15,
   horizontalScrollInterval: 16, // ~60fps
 } as const;
+
+// --- SINGLETON GHOST MANAGEMENT (Quản lý phi hành gia duy nhất toàn ứng dụng) ---
+let globalGhostElement: HTMLElement | null = null;
+
+function getGhostElement(): HTMLElement | null {
+  if (globalGhostElement) return globalGhostElement;
+  
+  const existing = document.getElementById("fixed-drag-ghost");
+  if (existing) {
+    globalGhostElement = existing;
+    return globalGhostElement;
+  }
+
+  const ghost = document.createElement("div");
+  ghost.id = "fixed-drag-ghost";
+  ghost.className = "mobile-ghost-task";
+  // Style mặc định: Luôn ẩn và có kích thước cố định 120px
+  ghost.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: ${GHOST_SIZE}px !important;
+    height: ${GHOST_SIZE}px !important;
+    z-index: 999999;
+    pointer-events: none;
+    display: none !important;
+    opacity: 0;
+    background: transparent !important;
+    will-change: transform;
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
+  `;
+
+  const img = document.createElement("img");
+  img.src = "/images/img_task.png"; 
+  img.style.cssText = `
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+  `;
+
+  ghost.appendChild(img);
+  document.body.appendChild(ghost);
+  globalGhostElement = ghost;
+  return globalGhostElement;
+}
+
+function showGhost(x: number, y: number, offsetX: number, offsetY: number) {
+  const ghost = getGhostElement();
+  if (!ghost) return;
+  ghost.style.setProperty("display", "flex", "important");
+  ghost.style.opacity = "1";
+  ghost.style.visibility = "visible";
+  ghost.style.transform = `translate3d(${x - offsetX}px, ${y - offsetY}px, 0)`;
+}
+
+function hideGhost() {
+  const ghost = getGhostElement();
+  if (!ghost) return;
+  ghost.style.setProperty("display", "none", "important");
+  ghost.style.opacity = "0";
+  ghost.style.visibility = "hidden";
+}
+// --- KẾT THÚC QUẢN LÝ SINGLETON ---
 
 // Extend HTMLElement interface for cleanup function
 interface ExtendedHTMLElement extends HTMLElement {
@@ -94,32 +161,29 @@ export function debouncedChangeTaskStatus(
   }, DRAG_CONFIG.apiDebounceTime);
 }
 
-// Throttle whisper realtime (không qua HTTP) để báo nhanh cho user khác
+// Hệ thống thông báo Realtime dùng chung (Unified Whisper System)
 const whisperTimeouts = new Map<string, any>();
 function whisperDrag(eventName: string, payload: any, throttleMs = 0) {
   if (!window.Echo || !payload?.project_id) return;
+  
   const key = `${eventName}-${payload.project_id}`;
   const prev = whisperTimeouts.get(key);
   if (prev) clearTimeout(prev);
   
-  // Nếu throttleMs = 0, gửi ngay lập tức để tối ưu hiệu năng
+  // Đẩy vào hàng đợi async (setTimeout 0) để đảm bảo không block luồng UI
+  // và giúp mobile gửi tin ổn định hơn trên thiết bị thật
+  const action = () => {
+    try {
+      window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
+    } catch (_) { /* ignore */ }
+  };
+
   if (throttleMs === 0) {
-    try {
-      window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
-    } catch (_) {
-      // ignore whisper errors
-    }
-    return;
+    setTimeout(action, 0);
+  } else {
+    const t = setTimeout(action, throttleMs);
+    whisperTimeouts.set(key, t);
   }
-  
-  const t = setTimeout(() => {
-    try {
-      window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
-    } catch (_) {
-      // ignore whisper errors
-    }
-  }, throttleMs);
-  whisperTimeouts.set(key, t);
 }
 
 export async function changeTaskStatus(
@@ -151,6 +215,65 @@ export function cleanupDrag() {
 }
 
 export function useDragTask(ProjectData?: any) {
+  const userStore = useUserStore();
+
+  // Khởi tạo ghost cache ngay khi hook được gọi
+  getGhostElement();
+
+  // Unified Notification Helpers
+  const notifyDragStarted = (taskId: number, projectId: number, element: HTMLElement) => {
+    const user = (userStore as any).user;
+    const taskName = element.querySelector(".task-title")?.textContent?.trim() || "Task";
+    if (taskId && projectId && user) {
+      whisperDrag("drag-started", {
+        task_id: taskId,
+        project_id: projectId,
+        task_name: taskName,
+        user_id: user.id,
+        user_name: user.name || "Someone",
+        user_avatar: user.avatar || null,
+      }, 0);
+    }
+  };
+
+  const notifyDragOver = (taskId: number, projectId: number, columnId: string, columnStatus: string) => {
+    const user = (userStore as any).user;
+    if (taskId && projectId && user) {
+      whisperDrag("drag-over-column", {
+        task_id: taskId,
+        project_id: projectId,
+        column_id: columnId,
+        column_status: columnStatus,
+        user_id: user.id,
+        user_name: user.name || "Someone",
+        user_avatar: user.avatar || null,
+      }, 50);
+    }
+  };
+
+  const notifyDragEnded = (taskId: number, projectId: number) => {
+    const user = (userStore as any).user;
+    if (taskId && projectId && user) {
+      whisperDrag("drag-ended", {
+        task_id: taskId,
+        project_id: projectId,
+        user_id: user.id,
+      }, 0);
+    }
+  };
+
+  const notifyStatusOptimistic = (taskId: number, projectId: number, newStatus: number) => {
+    const user = (userStore as any).user;
+    if (taskId && projectId && user) {
+      whisperDrag("task-status-optimistic", {
+        task_id: taskId,
+        project_id: projectId,
+        status: newStatus,
+        user_id: user.id,
+      }, 0);
+    }
+  };
+
   // Touch / mouse drag state
   let isDragging = false;
   let draggedElement: HTMLElement | null = null;
@@ -161,8 +284,8 @@ export function useDragTask(ProjectData?: any) {
   let originalTransform = "";
   let originalZIndex = "";
   let originalOpacity = "";
-  let ghostElement: HTMLElement | null = null;
   let ghostAnimationFrame: number | null = null;
+
   let touchStartTime = 0;
   let touchOffsetX = 0;
   let touchOffsetY = 0;
@@ -304,11 +427,7 @@ export function useDragTask(ProjectData?: any) {
 
       // Cập nhật vị trí ghost rõ nét cho desktop khi đang drag
       if (isDragging) {
-        if (!ghostElement) {
-          createMobileGhost(x, y);
-        } else {
-          updateMobileGhost(x, y);
-        }
+        showGhost(x, y, touchOffsetX, touchOffsetY);
       }
 
       // Check if mouse is within column bounds
@@ -318,26 +437,13 @@ export function useDragTask(ProjectData?: any) {
         y >= rect.top &&
         y <= rect.bottom
       ) {
-        // Chỉ dùng whisper (realtime) để báo nhanh cho user khác, không gọi HTTP API
-        // API sẽ chỉ được gọi khi drop vào cột (trong handleDrop)
         const taskId = parseInt(draggedElement.dataset.taskId || "0");
         const projectId = parseInt(draggedElement.dataset.projectId || "0");
         const columnId = targetColumn.dataset.columnId || "";
         const columnStatus = targetColumn.dataset.columnStatus || "";
-        
+
         if (taskId && projectId && columnId && columnStatus) {
-          // Chỉ dùng whisper để realtime update cho user khác (không qua HTTP)
-          // Throttle nhẹ 50ms để giảm spam nhưng vẫn đảm bảo realtime nhanh
-          const user = getUserData();
-          whisperDrag("drag-over-column", {
-            task_id: taskId,
-            project_id: projectId,
-            column_id: columnId,
-            column_status: columnStatus,
-            user_id: user?.user?.id,
-            user_name: user?.user?.name,
-            user_avatar: user?.user?.avatar,
-          }, 50); // Giảm từ 100ms xuống 50ms để tối ưu hiệu năng
+          notifyDragOver(taskId, projectId, columnId, columnStatus);
         }
       }
     }
@@ -511,11 +617,14 @@ export function useDragTask(ProjectData?: any) {
     // Store the task card for later use
     draggedElement = taskCard as HTMLElement;
 
-    // Tính toán offset để ghost nằm đúng vị trí ngón tay chạm
-    const rect = draggedElement.getBoundingClientRect();
-    const touchData = (event as TouchEvent).touches[0];
-    touchOffsetX = touchData.clientX - rect.left;
-    touchOffsetY = touchData.clientY - rect.top;
+    // LƯU LẠI trạng thái hiển thị gốc để khôi phục khi thả (tránh mất task)
+    originalTransform = draggedElement.style.transform;
+    originalZIndex = draggedElement.style.zIndex;
+    originalOpacity = draggedElement.style.opacity;
+
+    // Ép trung tâm của ghost nằm ngay ngón tay chạm
+    touchOffsetX = GHOST_SIZE / 2;
+    touchOffsetY = GHOST_SIZE / 2;
 
     // Reset drag state
     isDragging = false;
@@ -523,6 +632,9 @@ export function useDragTask(ProjectData?: any) {
 
     // Cache columns when starting drag
     updateCachedColumns();
+
+    // TỐI ƯU: Đảm bảo ghost luôn ẩn khi vừa chạm
+    hideGhost();
   }
 
   function handleTouchMoveDelegation(event: Event) {
@@ -546,9 +658,17 @@ export function useDragTask(ProjectData?: any) {
         isDragging = true;
         hasProcessedDrop = false;
 
-        // Làm nổi bật task đang được kéo trên mobile
+        // Rung nhẹ trên điện thoại thật khi bắt đầu kéo (UX giống máy tính)
+        if (window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate(20);
+        }
+
+        // Ẩn card gốc để không bị mờ đè lên hình ảnh
         try {
           draggedElement?.classList.add("task-card-dragging");
+          if (draggedElement) {
+            draggedElement.style.opacity = "0"; // Ép ẩn card gốc
+          }
           // Chặn các gesture mặc định của trình duyệt mobile
           document.body.style.overflow = "hidden";
           document.body.style.touchAction = "none";
@@ -556,29 +676,13 @@ export function useDragTask(ProjectData?: any) {
           // ignore
         }
 
-        // Create ghost element when starting drag
-        if (!ghostElement) {
-          createMobileGhost(currentX, currentY);
-        }
+        // Hiện ghost element khi thực sự bắt đầu kéo (Sử dụng !important để đảm bảo hiện)
+        showGhost(currentX, currentY, touchOffsetX, touchOffsetY);
 
-        // Broadcast drag started event (realtime only, không gọi HTTP API)
-        // Gửi ngay lập tức để tối ưu hiệu năng
-        const taskId = parseInt(draggedElement.dataset.taskId || "0");
-        const projectId = parseInt(draggedElement.dataset.projectId || "0");
-        if (taskId && projectId) {
-          const user = getUserData();
-          whisperDrag(
-            "drag-started",
-            {
-              task_id: taskId,
-              project_id: projectId,
-              user_id: user?.user?.id,
-              user_name: user?.user?.name,
-              user_avatar: user?.user?.avatar,
-            },
-            0 // 0ms = gửi ngay lập tức để tối ưu hiệu năng
-          );
-        }
+        // Gửi thông báo bằng helper dùng chung
+        const taskId = Number(draggedElement.dataset.taskId || "0");
+        const projectId = Number(draggedElement.dataset.projectId || "0");
+        notifyDragStarted(taskId, projectId, draggedElement);
 
         // Only prevent default when we start dragging
         if (event.cancelable) {
@@ -599,12 +703,8 @@ export function useDragTask(ProjectData?: any) {
       }
 
       ghostAnimationFrame = requestAnimationFrame(() => {
-        // Ensure ghost element exists and is visible
-        if (!ghostElement) {
-          createMobileGhost(currentX, currentY);
-        } else {
-          updateMobileGhost(currentX, currentY);
-        }
+        // Cập nhật vị trí và hiện ghost nếu đang kéo
+        showGhost(currentX, currentY, touchOffsetX, touchOffsetY);
         updateHorizontalScroll(currentX);
         checkColumnHover(currentX, currentY);
       });
@@ -655,27 +755,13 @@ export function useDragTask(ProjectData?: any) {
             newStatus.toString(),
             ProjectData
           );
-          // Whisper optimistic status to other users for instant UI (gửi ngay lập tức)
-          const user = getUserData();
-          whisperDrag("task-status-optimistic", {
-            task_id: taskId,
-            project_id: projectId,
-            status: newStatus,
-            user_id: user?.user?.id,
-          }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
-          
-          // Chỉ broadcast drag ended khi đã drop vào cột
-          // Backend sẽ broadcast TaskDragEnded sau khi update status thành công
-          // Nhưng cũng gọi ở đây để đảm bảo realtime nhanh
-          whisperDrag("drag-ended", {
-            task_id: taskId,
-            project_id: projectId,
-            user_id: user?.user?.id,
-          }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
+          // Gửi thông báo bằng helper dùng chung
+          notifyStatusOptimistic(taskId, projectId, newStatus);
+          notifyDragEnded(taskId, projectId);
           
           // Gọi API ngay lập tức (không debounce) để đảm bảo event được broadcast qua Laravel realtime
           notifyTaskDragEnded(taskId, projectId).catch(() => {
-            // Silent error handling - whisper đã gửi rồi nên không cần lo
+            // Silent error handling
           });
         }
       }
@@ -686,18 +772,32 @@ export function useDragTask(ProjectData?: any) {
     cleanupDragVisuals();
   }
 
+  function handleGlobalDragOver(e: DragEvent) {
+    if (!isDragging) return;
+    e.preventDefault(); 
+    
+    // Cập nhật vị trí ghost cho Desktop toàn cục (không bị giới hạn bởi cột)
+    showGhost(e.clientX, e.clientY, touchOffsetX, touchOffsetY);
+    
+    // Kiểm tra cuộn trang tự động
+    updateHorizontalScroll(e.clientX);
+  }
+
   function handleDragStart(event: Event) {
     const target = event.target as HTMLElement;
     if (!target.classList.contains("task-card")) return;
 
-    const taskId = parseInt(target.dataset.taskId || "0");
-    const projectId = parseInt(target.dataset.projectId || "0");
+    const taskId = Number(target.dataset.taskId || "0");
+    const projectId = Number(target.dataset.projectId || "0");
 
     if (!taskId || !projectId) return;
 
     isDragging = true;
     draggedElement = target;
     hasProcessedDrop = false;
+
+    // Lắng nghe sự kiện di chuyển chuột toàn cầu để ghost bay khắp màn hình
+    document.addEventListener("dragover", handleGlobalDragOver);
 
     // Cache columns when starting drag
     updateCachedColumns();
@@ -743,28 +843,27 @@ export function useDragTask(ProjectData?: any) {
         dragEvent.dataTransfer.setDragImage(target, offsetX, offsetY);
       }
 
+      // Gán offset là trung tâm của ghost 120px để nằm ngay tâm chuột
+      touchOffsetX = GHOST_SIZE / 2;
+      touchOffsetY = GHOST_SIZE / 2;
+
       // Tạo ghost rõ nét cho desktop (dùng chung với mobile ghost)
-      createMobileGhost(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      const targetRect = target.getBoundingClientRect();
+      showGhost(targetRect.left + targetRect.width / 2, targetRect.top + targetRect.height / 2, touchOffsetX, touchOffsetY);
       // Ẩn card gốc trong lúc kéo để chỉ còn ghost
       target.style.opacity = "0";
     }
 
-    // KHÔNG gọi drag-started ngay ở đây
-    // Sẽ gọi khi thực sự bắt đầu drag (trong dragover handler sau khi di chuyển)
-    // Chỉ whisper để realtime update nhanh (gửi ngay lập tức)
-    const user = getUserData();
-    whisperDrag("drag-started", {
-      task_id: taskId,
-      project_id: projectId,
-      user_id: user?.user?.id,
-      user_name: user?.user?.name,
-      user_avatar: user?.user?.avatar,
-    }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
+    // Gửi thông báo bằng helper dùng chung
+    notifyDragStarted(taskId, projectId, target);
   }
 
   function handleDragEnd(event: Event) {
     const target = event.target as HTMLElement;
     if (!target.classList.contains("task-card")) return;
+
+    // Gỡ bỏ sự kiện di chuyển toàn cục
+    document.removeEventListener("dragover", handleGlobalDragOver);
 
     const taskId = parseInt(target.dataset.taskId || "0");
     const projectId = parseInt(target.dataset.projectId || "0");
@@ -801,21 +900,12 @@ export function useDragTask(ProjectData?: any) {
     cleanupDragVisuals();
 
     // Chỉ broadcast drag ended khi đã drop vào cột (hasProcessedDrop === true)
-    // Nếu chưa drop vào cột, không broadcast để overlay vẫn hiện cho đến khi:
-    // 1. Backend xử lý xong và broadcast TaskDragEnded
-    // 2. Hoặc timeout 5s tự động clear
     if (taskId && projectId && hasProcessedDrop) {
-      const user = getUserData();
-      // Whisper để realtime nhanh
-      whisperDrag("drag-ended", {
-        task_id: taskId,
-        project_id: projectId,
-        user_id: user?.user?.id,
-      }, 5);
+      notifyDragEnded(taskId, projectId);
       
       // Gọi API để đảm bảo event được broadcast qua Laravel realtime
       notifyTaskDragEnded(taskId, projectId).catch(() => {
-        // Silent error handling - whisper đã gửi rồi nên không cần lo
+        // Silent error handling
       });
     }
 
@@ -848,12 +938,12 @@ export function useDragTask(ProjectData?: any) {
       return;
     }
 
-    // Create ghost element for mobile
-    createMobileGhost(startX, startY);
+    // Ensure ghost is hidden initially
+    hideGhost();
   }
 
   function handleTouchMove(event: Event) {
-    if (!ghostElement) {
+    if (!getGhostElement()) {
       return;
     }
 
@@ -879,7 +969,7 @@ export function useDragTask(ProjectData?: any) {
     }
 
     if (isDragging) {
-      updateMobileGhost(currentX, currentY);
+      showGhost(currentX, currentY, touchOffsetX, touchOffsetY);
       updateHorizontalScroll(currentX);
       checkColumnHover(currentX, currentY);
     }
@@ -929,14 +1019,9 @@ export function useDragTask(ProjectData?: any) {
             newStatus.toString(),
             ProjectData
           );
-          // Whisper optimistic status to other users for instant UI (gửi ngay lập tức)
-          const user = getUserData();
-          whisperDrag("task-status-optimistic", {
-            task_id: taskId,
-            project_id: projectId,
-            status: newStatus,
-            user_id: user?.user?.id,
-          }, 0); // 0ms = gửi ngay lập tức để tối ưu hiệu năng
+          // Gửi thông báo bằng helper dùng chung
+          notifyStatusOptimistic(taskId, projectId, newStatus);
+          notifyDragEnded(taskId, projectId);
         }
       }
     }
@@ -968,18 +1053,8 @@ export function useDragTask(ProjectData?: any) {
           const columnStatus = columnElement.dataset.columnStatus || "";
 
           if (taskId && projectId && columnId && columnStatus) {
-            // Chỉ dùng whisper để realtime update cho user khác (không qua HTTP)
-            // Throttle nhẹ 50ms để giảm spam nhưng vẫn đảm bảo realtime nhanh
-            const user = getUserData();
-            whisperDrag("drag-over-column", {
-              task_id: taskId,
-              project_id: projectId,
-              column_id: columnId,
-              column_status: columnStatus,
-              user_id: user?.user?.id,
-              user_name: user?.user?.name,
-              user_avatar: user?.user?.avatar,
-            }, 50); // Giảm từ 100ms xuống 50ms để tối ưu hiệu năng
+            // Sử dụng helper dùng chung
+            notifyDragOver(taskId, projectId, columnId, columnStatus);
           }
         }
       }
@@ -987,6 +1062,25 @@ export function useDragTask(ProjectData?: any) {
   }
 
   function cleanupDragVisuals() {
+    // Trả lại trạng thái touch mặc định cho element
+    if (draggedElement) {
+      try {
+        draggedElement.style.touchAction = "";
+        draggedElement.style.userSelect = "";
+        draggedElement.style.webkitUserSelect = "";
+        draggedElement.oncontextmenu = null;
+      } catch (_) { /* ignore */ }
+    }
+
+    // Whisper drag-ended để người khác xóa overlay bằng helper dùng chung
+    if (draggedElement) {
+      const taskId = parseInt(draggedElement.dataset.taskId || "0");
+      const projectId = parseInt(draggedElement.dataset.projectId || "0");
+      if (taskId && projectId) {
+        notifyDragEnded(taskId, projectId);
+      }
+    }
+
     // Trả lại trạng thái scroll cho body
     try {
       document.body.style.overflow = "";
@@ -995,10 +1089,14 @@ export function useDragTask(ProjectData?: any) {
       // ignore
     }
 
-    // Bỏ highlight nếu còn
+    // Bỏ highlight nếu còn và trả lại trạng thái hiển thị ban đầu
     if (draggedElement) {
       try {
         draggedElement.classList.remove("task-card-dragging");
+        // HOÀN TÁC: Trả lại độ hiển thị để task không bị mất sau khi kéo
+        draggedElement.style.transform = originalTransform;
+        draggedElement.style.zIndex = originalZIndex;
+        draggedElement.style.opacity = originalOpacity;
       } catch (_) {
         // ignore
       }
@@ -1016,11 +1114,8 @@ export function useDragTask(ProjectData?: any) {
       columnElement.style.borderColor = "";
     });
 
-    // Remove ghost element
-    if (ghostElement) {
-      ghostElement.remove();
-      ghostElement = null;
-    }
+    // ẨN TUYỆT ĐỐI GHOST TOÀN CỤC
+    hideGhost();
 
     // Cancel animation frame
     if (ghostAnimationFrame) {
@@ -1042,248 +1137,6 @@ export function useDragTask(ProjectData?: any) {
     cachedColumnRects = [];
     cachedKanbanContainer = null;
     cachedContainerRect = null;
-  }
-
-  function createMobileGhost(x: number, y: number) {
-    if (!draggedElement) {
-      return;
-    }
-
-    // Lấy kích thước thật của task để ghost giống hệt
-    const originalRect = draggedElement.getBoundingClientRect();
-
-    // Remove existing ghost
-    if (ghostElement) {
-      ghostElement.remove();
-    }
-
-    // Create ghost element
-    ghostElement = document.createElement("div");
-    ghostElement.className = "mobile-ghost-task";
-    ghostElement.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: ${originalRect.width}px;
-      height: ${originalRect.height}px;
-      background: #ffffff;
-      border: 2px solid #3b82f6;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(59, 130, 246, 0.25);
-      z-index: 99999;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      padding: 12px;
-      transform: translate(${x - touchOffsetX}px, ${
-      y - touchOffsetY
-    }px) rotate(3deg) scale(0.95);
-      transition: none;
-      opacity: 1;
-      visibility: visible;
-      will-change: transform;
-    `;
-
-    // Get task info
-    const taskName =
-      draggedElement.querySelector(".task-title")?.textContent || "Task";
-    const taskMembers = draggedElement.querySelectorAll(".member-avatar");
-
-    // Create ghost content
-    const ghostContent = document.createElement("div");
-    ghostContent.style.cssText = `
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      justify-content: space-between;
-    `;
-
-    // Task title
-    const taskTitleElement = document.createElement("div");
-    taskTitleElement.textContent = taskName;
-    taskTitleElement.style.cssText = `
-      font-size: 14px;
-      font-weight: 600;
-      color: #1f2937;
-      line-height: 1.3;
-      margin-bottom: 8px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    `;
-
-    // Task footer with date and members
-    const taskFooter = document.createElement("div");
-    taskFooter.style.cssText = `
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: #6b7280;
-    `;
-
-    // Date
-    const dateElement = document.createElement("div");
-    dateElement.style.cssText = `
-        display: flex;
-      align-items: center;
-      gap: 4px;
-    `;
-    dateElement.innerHTML = `
-      <i class="fas fa-calendar" style="font-size: 10px;"></i>
-      <span>${new Date().toLocaleDateString()}</span>
-    `;
-
-    // Members
-    const membersElement = document.createElement("div");
-    membersElement.style.cssText = `
-      display: flex;
-      align-items: center;
-        gap: 2px;
-      `;
-
-    if (taskMembers.length > 0) {
-      const maxMembers = Math.min(taskMembers.length, 3);
-      for (let i = 0; i < maxMembers; i++) {
-        const memberDot = document.createElement("div");
-        memberDot.style.cssText = `
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #3b82f6;
-        `;
-        membersElement.appendChild(memberDot);
-      }
-
-      if (taskMembers.length > 3) {
-        const moreDot = document.createElement("div");
-        moreDot.style.cssText = `
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #e5e7eb;
-          font-size: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #6b7280;
-        `;
-        moreDot.textContent = "+";
-        membersElement.appendChild(moreDot);
-      }
-    } else {
-      const noMembers = document.createElement("div");
-      noMembers.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        color: #9ca3af;
-      `;
-      noMembers.innerHTML = `
-        <i class="fas fa-user-plus" style="font-size: 10px;"></i>
-        <span>Unassigned</span>
-      `;
-      membersElement.appendChild(noMembers);
-    }
-
-    taskFooter.appendChild(dateElement);
-    taskFooter.appendChild(membersElement);
-
-    ghostContent.appendChild(taskTitleElement);
-    ghostContent.appendChild(taskFooter);
-
-    ghostElement.appendChild(ghostContent);
-    document.body.appendChild(ghostElement);
-
-    // Force ghost element to be visible immediately
-    if (ghostElement) {
-      ghostElement.style.opacity = "1";
-      ghostElement.style.visibility = "visible";
-      ghostElement.style.display = "flex";
-      ghostElement.style.zIndex = "99999";
-    }
-  }
-
-  function updateGhostTaskColor(x: number, y: number) {
-    if (!ghostElement) return;
-
-    const columns =
-      cachedColumnRects.length > 0
-        ? cachedColumnRects
-        : (Array.from(document.querySelectorAll(".kanban-column")) as any[]).map(
-            (el) => ({ element: el, rect: el.getBoundingClientRect() })
-          );
-
-    let isOverColumn = false;
-
-    columns.forEach(({ element: columnElement, rect }) => {
-      if (
-        x >= rect.left &&
-        x <= rect.right &&
-        y >= rect.top &&
-        y <= rect.bottom
-      ) {
-        isOverColumn = true;
-
-        // Get column color from data attribute or CSS custom property
-        const columnColor =
-          columnElement.dataset.columnColor ||
-          getComputedStyle(columnElement).getPropertyValue("--column-color") ||
-          columnElement.style.getPropertyValue("--column-color");
-
-        // Use the actual column color if available
-        if (columnColor && columnColor !== "") {
-          ghostElement!.style.borderColor = columnColor;
-          ghostElement!.style.boxShadow = `0 8px 32px ${columnColor}40`;
-        } else {
-          // Fallback to default colors based on column key
-          const columnKey =
-            columnElement.dataset.columnKey || columnElement.className;
-
-          if (columnKey.includes("not-started") || columnKey.includes("0")) {
-            ghostElement!.style.borderColor = "#3b82f6";
-            ghostElement!.style.boxShadow =
-              "0 8px 32px rgba(59, 130, 246, 0.25)";
-          } else if (columnKey.includes("pending") || columnKey.includes("1")) {
-            ghostElement!.style.borderColor = "#f59e0b";
-            ghostElement!.style.boxShadow =
-              "0 8px 32px rgba(245, 158, 11, 0.25)";
-          } else if (
-            columnKey.includes("completed") ||
-            columnKey.includes("OK")
-          ) {
-            ghostElement!.style.borderColor = "#10b981";
-            ghostElement!.style.boxShadow =
-              "0 8px 32px rgba(16, 185, 129, 0.25)";
-          } else {
-            // Use a neutral color for custom columns
-            ghostElement!.style.borderColor = "#6b7280";
-            ghostElement!.style.boxShadow =
-              "0 8px 32px rgba(107, 114, 128, 0.25)";
-          }
-        }
-      }
-    });
-
-    if (!isOverColumn && ghostElement) {
-      ghostElement.style.borderColor = "#3b82f6";
-      ghostElement.style.boxShadow = "0 8px 32px rgba(59, 130, 246, 0.25)";
-    }
-  }
-
-  function updateMobileGhost(x: number, y: number) {
-    if (!ghostElement) {
-      createMobileGhost(x, y);
-      return;
-    }
-
-    // Sử dụng offset đã tính để ghost bám sát ngón tay
-    ghostElement.style.transform = `translate(${x - touchOffsetX}px, ${
-      y - touchOffsetY
-    }px) rotate(3deg) scale(0.95)`;
-    ghostElement.style.opacity = "1";
-    ghostElement.style.visibility = "visible";
-    updateGhostTaskColor(x, y);
   }
 
   function setupMouseDragListeners() {

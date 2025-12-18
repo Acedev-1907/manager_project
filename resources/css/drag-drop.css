@@ -3,21 +3,19 @@
   position: fixed !important;
   pointer-events: none !important;
   z-index: 9999 !important;
-  background: white !important;
+  background: transparent !important;
   border-radius: 12px !important;
-  padding: 16px !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 12px 40px 8px rgba(59, 130, 246, 0.25),
-    0 2px 8px rgba(0, 0, 0, 0.18) !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
   max-width: 300px !important;
   min-width: 250px !important;
-  opacity: 0.9 !important;
-  backdrop-filter: blur(10px) !important;
-  transform: rotate(-2deg) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform: none !important;
   transition: none !important;
   user-select: none !important;
-  font-family: inherit !important;
-  line-height: 1.4 !important;
 }
 
 .ghost-task .task-title {
@@ -134,47 +132,22 @@ body.dragging .kanban-content {
   cursor: grabbing;
 }
 
+/* Mobile ghost element optimization */
+.mobile-ghost-task {
+  pointer-events: none !important;
+  touch-action: none !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  z-index: 99999 !important;
+  /* Tối ưu performance cho mobile */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: layout style paint;
+}
+
 /* Mobile-specific improvements */
 @media (max-width: 768px) {
-  .task-card {
-    touch-action: pan-y !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-
-  .task-card.dragging {
-    touch-action: none !important;
-    position: relative !important;
-    z-index: 1000 !important;
-  }
-
-  /* Prevent body scroll during drag - ALLOW HORIZONTAL SCROLL */
-  body.dragging {
-    overflow-y: hidden !important; /* Only prevent vertical scroll */
-    overflow-x: auto !important; /* Allow horizontal scroll */
-  }
-
-  /* Optimize scrolling performance */
-  body {
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: auto;
-  }
-
-  /* Mobile ghost element optimization */
-  .mobile-ghost-task {
-    pointer-events: none !important;
-    touch-action: none !important;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: flex !important;
-    z-index: 99999 !important;
-    /* Tối ưu performance cho mobile */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    will-change: transform;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    contain: layout style paint;
-  }
-}

@@ -380,10 +380,10 @@ onMounted(async () => {
     // Listen for task drag started events - Lock task for other users
     eventBus.on('task-drag-started', (eventData: any) => {
         try {
-            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+            if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
                 if (!isCurrentUser(eventData.userId) && eventData.taskId) {
                     // Lock task: Mark as being dragged by another user (Vue reactive)
-                    lockedTasks.value.set(eventData.taskId, {
+                    lockedTasks.value.set(Number(eventData.taskId), {
                         userId: eventData.userId,
                         userName: eventData.userName || 'Someone',
                         userAvatar: eventData.userAvatar || null
@@ -394,12 +394,13 @@ onMounted(async () => {
                     // Auto-clear lock after 30s nếu không có drag-ended
                     // Tăng timeout để phù hợp với trường hợp user nắm giữ lâu chưa drop vào cột
                     setTimeout(() => {
-                        if (lockedTasks.value.has(eventData.taskId)) {
-                            lockedTasks.value.delete(eventData.taskId);
+                        const taskIdNum = Number(eventData.taskId);
+                        if (lockedTasks.value.has(taskIdNum)) {
+                            lockedTasks.value.delete(taskIdNum);
                             lockedTasks.value = new Map(lockedTasks.value);
                         }
-                        if (draggingTasks.value.has(eventData.taskId)) {
-                            draggingTasks.value.delete(eventData.taskId);
+                        if (draggingTasks.value.has(taskIdNum)) {
+                            draggingTasks.value.delete(taskIdNum);
                             draggingTasks.value = new Map(draggingTasks.value);
                         }
                     }, 30000); // 30 giây
@@ -414,12 +415,12 @@ onMounted(async () => {
     // Overlay sẽ được tắt khi nhận TaskStatusChanged (task đã được update thành công)
     eventBus.on('task-drag-ended', (eventData: any) => {
         try {
-            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+            if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
                 // Không tắt overlay ngay ở đây
                 // Chờ TaskStatusChanged để đảm bảo task đã được update trước khi tắt overlay
                 // Chỉ xóa draggingTasks để cleanup
                 if (eventData.taskId) {
-                    draggingTasks.value.delete(eventData.taskId);
+                    draggingTasks.value.delete(Number(eventData.taskId));
                     draggingTasks.value = new Map(draggingTasks.value);
                 }
             }
@@ -431,14 +432,15 @@ onMounted(async () => {
     // Listen for task drag over column events - Show visual indicator
     eventBus.on('task-drag-over-column', async (eventData: any) => {
         try {
-            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
-                if (!isCurrentUser(eventData.userId) && eventData.taskId) {
+            if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
+                const taskIdNum = Number(eventData.taskId);
+                if (!isCurrentUser(eventData.userId) && taskIdNum) {
                     // Find task info
-                    const task = ProjectData.value?.data?.tasks?.find((t: any) => t.id === eventData.taskId);
+                    const task = ProjectData.value?.data?.tasks?.find((t: any) => Number(t.id) === taskIdNum);
                     const taskName = task?.name || 'Task';
                     
                     // Update dragging task info
-                    draggingTasks.value.set(eventData.taskId, {
+                    draggingTasks.value.set(taskIdNum, {
                         userId: eventData.userId,
                         userName: eventData.userName || 'Someone',
                         userAvatar: eventData.userAvatar || null,
@@ -458,7 +460,7 @@ onMounted(async () => {
                         
                         // Remove highlight after a short delay if no new event
                         setTimeout(() => {
-                            const currentDragging = draggingTasks.value.get(eventData.taskId);
+                            const currentDragging = draggingTasks.value.get(taskIdNum);
                             if (!currentDragging || currentDragging.columnId !== eventData.columnId) {
                                     // no-op
                             }
@@ -474,10 +476,10 @@ onMounted(async () => {
     // Listen for task status changed events - Realtime update tasks
     eventBus.on('task-status-changed-realtime', async (eventData: any) => {
         try {
-            if (ProjectData.value?.data?.id && eventData?.projectId === ProjectData.value.data.id) {
+            if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
                 const updatedTask = eventData.task;
                 const tasks = ProjectData.value?.data?.tasks || [];
-                const idx = tasks.findIndex((t: any) => String(t.id) === String(eventData.taskId));
+                const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
                 if (idx !== -1) {
                     tasks[idx] = {
                         ...tasks[idx],
@@ -492,8 +494,9 @@ onMounted(async () => {
                 // Đảm bảo UX: overlay chỉ tắt khi task đã nhảy qua cột mới
                 // Tắt ngay lập tức để giảm độ trễ
                 if (eventData.taskId) {
-                    lockedTasks.value.delete(eventData.taskId);
-                    draggingTasks.value.delete(eventData.taskId);
+                    const taskIdNum = Number(eventData.taskId);
+                    lockedTasks.value.delete(taskIdNum);
+                    draggingTasks.value.delete(taskIdNum);
                     // Force reactivity update
                     lockedTasks.value = new Map(lockedTasks.value);
                     draggingTasks.value = new Map(draggingTasks.value);
@@ -511,11 +514,11 @@ onMounted(async () => {
         try {
             if (
                 ProjectData.value?.data?.id &&
-                eventData?.projectId === ProjectData.value.data.id &&
+                Number(eventData?.projectId) === Number(ProjectData.value.data.id) &&
                 !isCurrentUser(eventData.userId) // Bỏ qua nếu là chính user hiện tại
             ) {
                 const tasks = ProjectData.value?.data?.tasks || [];
-                const idx = tasks.findIndex((t: any) => String(t.id) === String(eventData.taskId));
+                const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
                 if (idx !== -1) {
                     tasks[idx] = {
                         ...tasks[idx],
@@ -525,8 +528,9 @@ onMounted(async () => {
                     
                     // Tắt overlay cho user khác khi nhận optimistic update
                     if (eventData.taskId) {
-                        lockedTasks.value.delete(eventData.taskId);
-                        draggingTasks.value.delete(eventData.taskId);
+                        const taskIdNum = Number(eventData.taskId);
+                        lockedTasks.value.delete(taskIdNum);
+                        draggingTasks.value.delete(taskIdNum);
                         // Force reactivity update
                         lockedTasks.value = new Map(lockedTasks.value);
                         draggingTasks.value = new Map(draggingTasks.value);
