@@ -51,6 +51,8 @@ const emit = defineEmits<{
 const showDetailModal = ref(false);
 const startImageIndex = ref(0);
 const showShareModal = ref(false);
+const hasCopiedShareLink = ref(false);
+const shareLinkInputRef = ref<HTMLInputElement | null>(null);
 
 const userStore = useUserStore();
 // @ts-expect-error - Pinia store type inference issue
@@ -156,6 +158,7 @@ const openShareModal = async () => {
     } catch {
         // ignore
     }
+    hasCopiedShareLink.value = false;
     showShareModal.value = true;
 };
 
@@ -164,12 +167,24 @@ const copyShareLink = async () => {
     try {
         if (navigator.clipboard) {
             await navigator.clipboard.writeText(url);
-            showError('Đã copy link bài viết, bạn có thể dán để chia sẻ.'); // dùng alert hiện tại
+            // Copy thành công: đổi text nút thành "Đã copy"
+            hasCopiedShareLink.value = true;
         } else {
-            window.prompt('Copy link bài viết để chia sẻ:', url);
+            // Trình duyệt không hỗ trợ clipboard API (HTTP,...)
+            // -> chọn sẵn text trong input để user tự Ctrl+C
+            if (shareLinkInputRef.value) {
+                shareLinkInputRef.value.focus();
+                shareLinkInputRef.value.select();
+            }
+            hasCopiedShareLink.value = true;
         }
     } catch {
-        window.prompt('Copy link bài viết để chia sẻ:', url);
+        // Nếu lỗi, vẫn chỉ chọn text để user tự copy, không bật prompt
+        if (shareLinkInputRef.value) {
+            shareLinkInputRef.value.focus();
+            shareLinkInputRef.value.select();
+        }
+        hasCopiedShareLink.value = true;
     }
 };
 
@@ -350,10 +365,10 @@ const handleSelectReaction = async (reactionType: string) => {
                 <div class="share-modal-body">
                     <p class="share-modal-text">Link bài viết:</p>
                     <div class="share-link-wrapper">
-                        <input class="share-link-input" :value="shareLink" readonly />
+                        <input ref="shareLinkInputRef" class="share-link-input" :value="shareLink" readonly />
                         <button class="share-copy-btn" @click="copyShareLink">
-                            <i class="bi bi-clipboard"></i>
-                            Copy
+                            <i :class="hasCopiedShareLink ? 'bi bi-clipboard-check' : 'bi bi-clipboard'"></i>
+                            <span>{{ hasCopiedShareLink ? 'Đã copy' : 'Copy' }}</span>
                         </button>
                     </div>
                     <p class="share-tip">Bạn có thể dán link này vào Facebook, Zalo,... để chia sẻ.</p>
