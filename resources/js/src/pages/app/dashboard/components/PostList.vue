@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
 import PostItem from './PostItem.vue';
 import CreatePost from './CreatePost.vue';
@@ -74,6 +74,13 @@ onMounted(() => {
 
     if (loadMoreTrigger.value) {
         observer.observe(loadMoreTrigger.value);
+    }
+});
+
+// Khi ref của sentinel thay đổi (sau khi render danh sách), gắn lại observer
+watch(loadMoreTrigger, (el) => {
+    if (observer && el) {
+        observer.observe(el);
     }
 });
 
