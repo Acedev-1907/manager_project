@@ -13,22 +13,38 @@ export function useGlobalEchoListener(userId: Ref<string | number | null>) {
   function setupEchoListener(userIdVal: string | number | null) {
     if (!userIdVal) return;
     if (joinedUserChannel === userIdVal) return;
-    joinedUserChannel = userIdVal;
+    
     if (!window.Echo) {
       setTimeout(() => setupEchoListener(userIdVal), 200);
       return;
     }
+    
     try {
-      window.Echo.private(`user.${userIdVal}`)
+      const channel = window.Echo.private(`user.${userIdVal}`);
+      
+      channel
         .listen("NewProjectForMembers", (e: any) => {
           eventBus.emit("new-project-for-members", e);
         })
         .listen("UserRemovedFromProject", (e: any) => {
           eventBus.emit("user-removed-from-project", e);
+        })
+        .listen(".PrivateMessageCreated", (e: any) => {
+          // Realtime message 1-1 (dùng prefix . vì event có broadcastAs())
+          eventBus.emit("chat-new-message", e);
+        })
+        .error((error: any) => {
+          if (import.meta.env.DEV) {
+            console.error('[Chat Realtime] Channel error:', error);
+          }
         });
+      
+      joinedUserChannel = userIdVal;
       echoReady.value = true;
     } catch (error) {
-      // Silent error handling
+      if (import.meta.env.DEV) {
+        console.error('[Chat Realtime] Setup error:', error);
+      }
     }
   }
 

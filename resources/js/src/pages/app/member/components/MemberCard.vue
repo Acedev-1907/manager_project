@@ -14,11 +14,13 @@
 
 <script setup lang="ts">
 import { ref, defineProps, defineEmits, onMounted, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import BaseCard from '../../../../components/BaseCard.vue';
 
 const props = defineProps<{ member: { id: number; name: string; email: string; avatar?: string } }>();
 const emit = defineEmits(['remove']);
 
+const router = useRouter();
 const showMenu = ref(false);
 const menuWrapperRef = ref<HTMLElement | null>(null);
 
@@ -31,8 +33,8 @@ function handleRemove() {
 }
 function handleChat() {
     showMenu.value = false;
-    // TODO: emit chat event or handle chat logic
-    alert('Chat feature coming soon!');
+    // Điều hướng đến trang chat với user_id của member được chọn
+    router.push({ name: 'chat', query: { user_id: props.member.id } });
 }
 
 function handleClickOutside(event: MouseEvent) {

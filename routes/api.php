@@ -7,7 +7,8 @@ use App\Http\Controllers\{
     MemberController,
     ProjectController,
     TaskController,
-    PostController
+    PostController,
+    ChatController
 };
 
 Route::controller(AuthController::class)->group(function () {
@@ -85,6 +86,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/tasks/drag-started', 'broadcastDragStarted');
         Route::post('/tasks/drag-ended', 'broadcastDragEnded');
         Route::post('/tasks/drag-over-column', 'broadcastDragOverColumn');
+    });
+
+    // API Chat 1-1
+    Route::controller(ChatController::class)->group(function () {
+        Route::get('/chat/conversations', 'conversations');
+        Route::get('/chat/messages', 'messages');
+        Route::post('/chat/messages', 'send');
     });
 
     // API notification cho user

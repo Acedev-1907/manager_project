@@ -100,6 +100,11 @@ const router = createRouter({
           name: "profile",
           component: () => import("../pages/app/UserProfile.vue"),
         },
+        {
+          path: "/chat",
+          name: "chat",
+          component: () => import("../pages/app/chat/ChatPage.vue"),
+        },
       ],
     },
     // Catch all route - redirect to login
