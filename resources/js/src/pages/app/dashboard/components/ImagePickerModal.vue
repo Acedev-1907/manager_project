@@ -29,6 +29,53 @@ const fetchUserImages = async () => {
     }
 };
 
+// Nén ảnh phía client để giảm dung lượng upload
+const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, quality = 0.8): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+
+            // Giữ tỉ lệ, giới hạn kích thước
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                resolve(file); // fallback: không nén
+                return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) {
+                        resolve(file);
+                        return;
+                    }
+                    const compressed = new File([blob], file.name, { type: 'image/jpeg' });
+                    resolve(compressed);
+                },
+                'image/jpeg',
+                quality,
+            );
+        };
+        img.onerror = () => reject(new Error('Không thể đọc hình để nén'));
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            img.src = e.target?.result as string;
+        };
+        reader.onerror = () => reject(new Error('Không thể đọc file hình'));
+        reader.readAsDataURL(file);
+    });
+};
+
 const handleFileSelect = async (event: Event) => {
     const target = event.target as HTMLInputElement;
     const files = target.files;
@@ -36,18 +83,33 @@ const handleFileSelect = async (event: Event) => {
 
     const validFiles: File[] = [];
     
-    // Validate all files
+    // Validate + nén file
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!file.type.startsWith('image/')) {
             showError(`File "${file.name}" không phải là hình ảnh`);
             continue;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            showError(`File "${file.name}" quá lớn. Vui lòng chọn file nhỏ hơn 10MB`);
+
+        let fileToUpload: File = file;
+
+        // Nếu file lớn hơn ~2MB thì nén lại trước khi gửi
+        if (file.size > 2 * 1024 * 1024) {
+            try {
+                fileToUpload = await compressImage(file, 1600, 1600, 0.8);
+            } catch {
+                // Nếu nén lỗi thì dùng file gốc
+                fileToUpload = file;
+            }
+        }
+
+        // Chặn các file vẫn quá lớn sau khi nén (ví dụ > 10MB)
+        if (fileToUpload.size > 10 * 1024 * 1024) {
+            showError(`File "${file.name}" quá lớn sau khi nén. Vui lòng chọn file nhỏ hơn 10MB`);
             continue;
         }
-        validFiles.push(file);
+
+        validFiles.push(fileToUpload);
     }
 
     if (validFiles.length === 0) return;
