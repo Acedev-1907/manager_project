@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
 import PostItem from './PostItem.vue';
 import CreatePost from './CreatePost.vue';
@@ -9,6 +9,8 @@ const posts = ref<any[]>([]);
 const isLoading = ref(true);
 const page = ref(1);
 const hasMore = ref(true);
+const loadMoreTrigger = ref<HTMLElement | null>(null);
+let observer: IntersectionObserver | null = null;
 
 const fetchPosts = async (isRefresh = false) => {
     if (isRefresh) {
@@ -54,6 +56,32 @@ const handlePostUpdated = (payload: { postId: number; likes_count: number; likes
 
 onMounted(() => {
     fetchPosts(true);
+
+    // Infinite scroll: dùng IntersectionObserver quan sát phần tử cuối danh sách
+    observer = new IntersectionObserver(
+        (entries) => {
+            const first = entries[0];
+            if (first.isIntersecting && hasMore.value && !isLoading.value) {
+                fetchPosts();
+            }
+        },
+        {
+            root: null,
+            rootMargin: '0px 0px 200px 0px',
+            threshold: 0.1,
+        },
+    );
+
+    if (loadMoreTrigger.value) {
+        observer.observe(loadMoreTrigger.value);
+    }
+});
+
+onUnmounted(() => {
+    if (observer) {
+        observer.disconnect();
+        observer = null;
+    }
 });
 </script>
 
@@ -82,12 +110,14 @@ onMounted(() => {
                 :post="post" 
                 @postUpdated="handlePostUpdated" 
             />
-            
-            <div v-if="hasMore" class="load-more">
-                <button @click="fetchPosts()" :disabled="isLoading" class="load-more-btn">
-                    <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
-                    {{ isLoading ? 'Đang tải...' : 'Xem thêm bài viết' }}
-                </button>
+
+            <!-- Sentinel cho infinite scroll -->
+            <div
+                v-if="hasMore"
+                ref="loadMoreTrigger"
+                class="load-more-sentinel"
+            >
+                <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
             </div>
         </div>
     </div>
@@ -155,25 +185,10 @@ onMounted(() => {
     width: 100%;
 }
 
-.load-more {
+.load-more-sentinel {
     display: flex;
     justify-content: center;
-    margin: 10px 0 20px 0;
-}
-
-.load-more-btn {
-    background: #fff;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-weight: 600;
-    color: #1877f2;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    transition: background 0.2s;
-}
-
-.load-more-btn:hover {
-    background: #f2f2f2;
+    padding: 10px 0 20px 0;
 }
 </style>
 
