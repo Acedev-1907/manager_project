@@ -137,6 +137,12 @@ const openImageGallery = (index: number) => {
     showDetailModal.value = true;
 };
 
+const openComments = () => {
+    // Mở modal chi tiết, tập trung vào phần bình luận
+    startImageIndex.value = 0;
+    showDetailModal.value = true;
+};
+
 const handlePostUpdated = (payload: { postId: number; likes_count: number; likes: any[]; liked: boolean; reactionType: string | null }) => {
     emit('postUpdated', payload);
 };
@@ -282,7 +288,7 @@ const handleSelectReaction = async (reactionType: string) => {
                 </transition>
             </div>
 
-            <button class="action-btn">
+            <button class="action-btn" @click.stop="openComments">
                 <i class="bi bi-chat"></i> 
                 <span>Bình luận</span>
             </button>

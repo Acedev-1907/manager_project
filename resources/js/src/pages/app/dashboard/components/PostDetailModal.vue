@@ -43,7 +43,10 @@ const props = defineProps<{
     startImageIndex?: number;
 }>();
 
-const emit = defineEmits(['close', 'postUpdated']);
+const emit = defineEmits<{
+    (e: 'close'): void;
+    (e: 'postUpdated', payload: { postId: number; likes_count: number; likes: any[]; liked: boolean; reactionType: string | null }): void;
+}>();
 
 const userStore = useUserStore();
 // @ts-expect-error - Pinia store type inference issue
@@ -124,7 +127,7 @@ const handleLike = async () => {
     
     isLiking.value = true;
     try {
-        const res = await makeHttpReq<never, { liked: boolean; likes_count: number; likes: any[] }>(
+        const res = await makeHttpReq<never, { liked: boolean; likes_count: number; likes: any[]; type?: string | null }>(
             `/posts/${postData.value.id}/like`,
             'POST'
         );
@@ -134,8 +137,16 @@ const handleLike = async () => {
             postData.value.likes_count = res.likes_count;
             postData.value.likes = res.likes;
         }
-        
-        emit('postUpdated');
+
+        const reactionType = res.liked ? (res.type || 'like') : null;
+
+        emit('postUpdated', {
+            postId: postData.value.id,
+            liked: res.liked,
+            likes_count: res.likes_count,
+            likes: res.likes,
+            reactionType,
+        });
     } catch (error: any) {
         showError(error?.message || 'Không thể thích bài viết');
     } finally {
@@ -163,7 +174,17 @@ const handleComment = async () => {
         }
         
         commentText.value = '';
-        emit('postUpdated');
+
+        // Thông báo cho list để cập nhật lại likes/reaction (nếu cần)
+        if (postData.value) {
+            emit('postUpdated', {
+                postId: postData.value.id,
+                liked: isLiked.value,
+                likes_count: postData.value.likes_count ?? 0,
+                likes: postData.value.likes ?? [],
+                reactionType: null,
+            });
+        }
         
         // Focus lại input sau khi comment
         setTimeout(() => {
