@@ -273,11 +273,13 @@ onMounted(async () => {
                     });
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
-    eventBus.on('task-comment-created', async (eventData: any) => {
-        try { } catch (error) { }
+    eventBus.on('task-comment-created', async () => {
+        // Placeholder for future implementation
     });
 
     eventBus.on('project-progress-updated', async (eventData: any) => {
@@ -287,7 +289,9 @@ onMounted(async () => {
                     await getProjectDetail(slug, false);
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
     eventBus.on('column-added', async (eventData: any) => {
@@ -314,7 +318,9 @@ onMounted(async () => {
                     forceScrollbar();
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
     eventBus.on('column-deleted', async (eventData: any) => {
@@ -341,7 +347,9 @@ onMounted(async () => {
                     forceScrollbar();
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
     eventBus.on('task-drag-started', (eventData: any) => {
@@ -368,7 +376,9 @@ onMounted(async () => {
                     }, 30000);
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
     eventBus.on('task-drag-ended', (eventData: any) => {
@@ -379,7 +389,9 @@ onMounted(async () => {
                     draggingTasks.value = new Map(draggingTasks.value);
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
     eventBus.on('task-drag-over-column', async (eventData: any) => {
@@ -404,7 +416,9 @@ onMounted(async () => {
                     draggingTasks.value = new Map(draggingTasks.value);
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
     eventBus.on('task-status-changed-realtime', async (eventData: any) => {
@@ -455,7 +469,9 @@ onMounted(async () => {
                     draggingTasks.value = new Map(draggingTasks.value);
                 }
             }
-        } catch (error) { }
+        } catch (error) {
+            // Silent error handling
+        }
     });
 
     eventBus.on('task-status-optimistic', async (eventData: any) => {
@@ -483,7 +499,9 @@ onMounted(async () => {
                     }
                 }
             }
-        } catch (_) { }
+        } catch (_) {
+            // Silent error handling
+        }
     });
 });
 

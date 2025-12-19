@@ -6,7 +6,8 @@ use App\Http\Controllers\{
     UserController,
     MemberController,
     ProjectController,
-    TaskController
+    TaskController,
+    PostController
 };
 
 Route::controller(AuthController::class)->group(function () {
@@ -92,6 +93,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']); //not implemented
     Route::delete('/notifications/{id}', [\App\Http\Controllers\NotificationController::class, 'destroy']);
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+
+    // API Post (News Feed)
+    Route::controller(PostController::class)->group(function () {
+        Route::get('/posts', 'index');
+        Route::post('/posts', 'store');
+        Route::get('/posts/user-images', 'getUserImages');
+        Route::post('/posts/upload-image', 'uploadImage');
+        Route::get('/posts/{id}', 'show')->whereNumber('id');
+        Route::post('/posts/{id}/like', 'toggleLike')->whereNumber('id');
+        Route::post('/posts/{id}/comment', 'addComment')->whereNumber('id');
+    });
 });
 
 Route::get('/check_email/{token}', [AuthController::class, 'verifyEmailApi'])->name('validEmail');

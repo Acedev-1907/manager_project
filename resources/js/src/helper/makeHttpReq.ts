@@ -63,8 +63,13 @@ export async function makeHttpReq<TInput, TResponse>(
       const userData = getUserData();
       const authHeader = userData?.token ? `Bearer ${userData.token}` : "";
 
-      // Build request URL
-      let url = `${APP.apiBaseURL}/${endpoint}`;
+      // Build request URL - remove leading slash from endpoint to avoid double slashes
+      const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+      const cleanBaseURL = APP.apiBaseURL.endsWith('/') ? APP.apiBaseURL.slice(0, -1) : APP.apiBaseURL;
+      let url = `${cleanBaseURL}/${cleanEndpoint}`;
+
+      // Check if input is FormData
+      const isFormData = input instanceof FormData;
 
       // Prepare fetch options
     const fetchOptions: RequestInit = {
@@ -72,14 +77,15 @@ export async function makeHttpReq<TInput, TResponse>(
         headers: {
           ...(authHeader && { Authorization: authHeader }),
           ...headers,
-          "Content-Type": "application/json",
+          // Don't set Content-Type for FormData, let browser set it with boundary
+          ...(isFormData ? {} : { "Content-Type": "application/json" }),
         },
         credentials: "include",
       };
 
       // Handle request body for non-GET requests
       if (verb !== "GET" && input !== undefined) {
-        fetchOptions.body = JSON.stringify(input);
+        fetchOptions.body = isFormData ? input : JSON.stringify(input);
       } else if (verb === "GET" && input) {
         // Append query parameters to URL for GET requests
         const params = new URLSearchParams(input as any).toString();

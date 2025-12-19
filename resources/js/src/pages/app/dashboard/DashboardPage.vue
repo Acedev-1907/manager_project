@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { onMounted, onActivated, ref, onUnmounted } from 'vue';
+import PostList from './components/PostList.vue';
 import { useGetPinnedProject } from './actions/GetPinnedProject';
 import { useGetTotalProject } from './actions/countProject';
 import LoadingPage from '../../../components/LoadingPage.vue';
@@ -503,209 +504,29 @@ onUnmounted(() => {
 });
 </script>
 
+<template>
+    <div class="dashboard-container">
+        <LoadingPage :visible="isLoading" />
+        <div class="feed-layout">
+            <PostList />
+        </div>
+    </div>
+</template>
+
 <style scoped>
 .dashboard-container {
     display: flex;
     flex-direction: column;
-    padding: 2rem 1rem;
+    min-height: calc(100vh - 64px);
+    background-color: #f0f2f5;
+    padding: 1.5rem 1rem;
 }
 
-.dashboard-title {
-    font-size: 2.2rem;
-    font-weight: 700;
-    color: #2d3748;
-    margin-bottom: 1rem;
-    text-align: center;
-}
-
-.news-placeholder {
+.feed-layout {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2.5rem 1.5rem;
-    background: #f8fafc;
-    border-radius: 1rem;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-    max-width: 760px;
-    margin: 1rem auto 0 auto;
-    text-align: center;
-    gap: 0.35rem;
-}
-
-.news-icon {
-    font-size: 3rem;
-    color: #2563eb;
-    margin-bottom: 0.25rem;
-}
-
-.news-text {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #1f2937;
-}
-
-.news-subtext {
-    color: #6b7280;
-    margin: 0;
-}
-
-
-.dashboard-card {
-    background: #fff;
-    border-radius: 1.2rem;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-    padding: 2rem 1.5rem;
-    min-width: 260px;
-    flex: 1 1 300px;
-    max-width: 370px;
-    transition: box-shadow 0.2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.dashboard-card:hover {
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.13);
-}
-
-.card-header {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #4a5568;
-    margin-bottom: 1rem;
-    text-align: center;
-}
-
-.card-body {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-
-
-.dashboard-number {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: #3182ce;
-    text-align: center;
-}
-
-.priority-project-container {
-    background: #f8fafc;
-    border-radius: 1.2rem;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-    padding: 2rem 1.5rem;
-    margin-top: 2rem;
-    margin-bottom: 2rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.priority-project-title {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #2563eb;
-    margin-bottom: 1.5rem;
-    text-align: center;
-    letter-spacing: 0.5px;
-}
-
-.priority-project-row {
-    display: flex;
-    gap: 2rem;
     justify-content: center;
     width: 100%;
-}
-
-.dashboard-main-row {
-    display: flex;
-    flex-direction: row;
-    gap: 2rem;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 2rem;
-}
-
-.dashboard-main-col {
-    flex: 1 1 180px;
-    min-width: 180px;
-    max-width: 180px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.total-projects-card {
-    width: 180px;
-    height: 180px;
-    border-radius: 1.2rem;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 1.5rem;
-}
-
-.dashboard-main-col .dashboard-card {
-    width: 220px;
-    height: 220px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-}
-
-@media (max-width: 900px) {
-    .dashboard-card {
-        max-width: 100%;
-        min-width: 0;
-    }
-
-    .priority-project-row {
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-
-    .dashboard-main-row {
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-
-    .priority-project-container {
-        max-width: 100%;
-        min-width: 0;
-    }
-
-    .dashboard-main-col,
-    .total-projects-card {
-        min-width: 0;
-        max-width: 100%;
-        width: 50vw;
-        height: 50vw;
-        max-width: 320px;
-        max-height: 320px;
-        min-width: 140px;
-        min-height: 140px;
-        margin-left: auto;
-        margin-right: auto;
-    }
+    max-width: 680px;
+    margin: 0 auto;
 }
 </style>
-
-<template>
-    <div class="dashboard-container">
-        <LoadingPage :visible="isLoading" />
-        <h2 class="dashboard-title">News & Updates (Coming Soon)</h2>
-        <div class="news-placeholder">
-            <i class="bi bi-newspaper news-icon"></i>
-            <p class="news-text">News feed sẽ hiển thị tại đây khi tính năng đăng bài được triển khai.</p>
-            <p class="news-subtext">Tạm thời, hãy quản lý dự án và xem thống kê trong trang Projects.</p>
-        </div>
-    </div>
-</template>

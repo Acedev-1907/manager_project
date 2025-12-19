@@ -66,4 +66,9 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(\App\Models\Project::class, 'project_user', 'user_id', 'project_id');
     }
+
+    public function posts()
+    {
+        return $this->hasMany(\App\Models\Post::class);
+    }
 }

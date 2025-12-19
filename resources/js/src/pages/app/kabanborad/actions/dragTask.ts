@@ -128,7 +128,9 @@ export function updateTaskOptimistically(
         tasks: [pending, completed],
         progress,
       });
-    } catch (e) { }
+    } catch (e) {
+      // Silent error handling
+    }
   }
 }
 
@@ -148,7 +150,9 @@ export function debouncedChangeTaskStatus(
   apiCallTimeout = setTimeout(async () => {
     try {
       await changeTaskStatus(taskId, projectId, endPoint);
-    } catch (error) { }
+    } catch (error) {
+      // Silent error handling
+    }
   }, DRAG_CONFIG.apiDebounceTime);
 }
 
@@ -173,7 +177,9 @@ function whisperDrag(eventName: string, payload: any, throttleMs = 0) {
     try {
       window.Echo.private(`project.${payload.project_id}`).whisper(eventName, payload);
       lastWhisperPayloads.set(key, currentPayloadStr);
-    } catch (_) { }
+    } catch (_) {
+      // Silent error handling
+    }
   };
 
   if (throttleMs === 0) {
@@ -589,7 +595,9 @@ export function useDragTask(ProjectData?: any) {
       }
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
-    } catch (_) { }
+    } catch (_) {
+      // Silent error handling
+    }
 
         // Hiện ghost element khi thực sự bắt đầu kéo (Sử dụng !important để đảm bảo hiện)
         showGhost(currentX, currentY, touchOffsetX, touchOffsetY);
@@ -756,7 +764,9 @@ export function useDragTask(ProjectData?: any) {
       target.classList.add("task-card-dragging");
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
-    } catch (_) { }
+    } catch (_) {
+      // Silent error handling
+    }
 
     // Reset grab mode
     isGrabbing = false;
@@ -817,7 +827,9 @@ export function useDragTask(ProjectData?: any) {
       target.classList.remove("task-card-dragging");
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
-    } catch (_) { }
+    } catch (_) {
+      // Silent error handling
+    }
 
     // Reset all column highlights
     const columnsForReset = cachedColumnsElements.length > 0 ? cachedColumnsElements : Array.from(document.querySelectorAll(".kanban-column"));
@@ -885,7 +897,9 @@ export function useDragTask(ProjectData?: any) {
         draggedElement.style.userSelect = "";
         draggedElement.style.webkitUserSelect = "";
         draggedElement.oncontextmenu = null;
-      } catch (_) { }
+      } catch (_) {
+        // Silent error handling
+      }
     }
 
     if (draggedElement) {
@@ -899,7 +913,9 @@ export function useDragTask(ProjectData?: any) {
     try {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
-    } catch (_) { }
+    } catch (_) {
+      // Silent error handling
+    }
 
     if (draggedElement) {
       try {
@@ -907,7 +923,9 @@ export function useDragTask(ProjectData?: any) {
         draggedElement.style.transform = originalTransform;
         draggedElement.style.zIndex = originalZIndex;
         draggedElement.style.opacity = originalOpacity;
-      } catch (_) { }
+      } catch (_) {
+        // Silent error handling
+      }
     }
 
     isDragging = false;

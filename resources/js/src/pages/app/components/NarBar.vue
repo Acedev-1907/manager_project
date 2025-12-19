@@ -9,7 +9,7 @@ import { listenRealtime, fetchNotifications } from '../../../state/notificationS
 import eventBus from '../../../helper/eventBus';
 
 const navigation = ref([
-    { name: "Dashboard", link: "/dashboard", icon: "bi bi-speedometer2" },
+    { name: "Feed", link: "/dashboard", icon: "bi bi-newspaper" },
     { name: "Projects", link: "/projects", icon: "bi bi-kanban" },
     { name: "Members", link: "/members", icon: "bi bi-people" },
 ]);
