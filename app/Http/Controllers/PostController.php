@@ -32,27 +32,34 @@ class PostController extends Controller
             'images.*' => 'string|url',
         ]);
 
-        // Handle multiple image uploads if files are provided
-        if ($request->hasFile('images')) {
-            $files = $request->file('images');
-            $user = $request->user();
-            $folder = env('IMAGEKIT_AVATAR_FOLDER', 'app-manager-project') . '/posts/' . $user->id;
-            $uploadedImages = [];
+        try {
+            // Handle multiple image uploads if files are provided
+            if ($request->hasFile('images')) {
+                $files = $request->file('images');
+                $user = $request->user();
+                $folder = env('IMAGEKIT_AVATAR_FOLDER', 'app-manager-project') . '/posts/' . $user->id;
+                $uploadedImages = [];
 
-            foreach ($files as $file) {
-                $result = $this->imageKitService->upload($file, $folder);
-                $uploadedImages[] = $result['url'];
+                foreach ($files as $file) {
+                    $result = $this->imageKitService->upload($file, $folder);
+                    $uploadedImages[] = $result['url'];
+                }
+
+                $validated['images'] = $uploadedImages;
             }
 
-            $validated['images'] = $uploadedImages;
+            $post = $this->postService->createPost($validated);
+
+            return Response::json([
+                'message' => 'Bài viết đã được đăng thành công!',
+                'post' => $post->load('user:id,name,avatar'),
+            ], 201);
+        } catch (\Exception $e) {
+            // Xử lý lỗi spam hoặc các lỗi khác
+            return Response::json([
+                'error' => $e->getMessage(),
+            ], 429); // 429 Too Many Requests
         }
-
-        $post = $this->postService->createPost($validated);
-
-        return Response::json([
-            'message' => 'Bài viết đã được đăng thành công!',
-            'post' => $post->load('user:id,name,avatar'),
-        ], 201);
     }
 
     /**
