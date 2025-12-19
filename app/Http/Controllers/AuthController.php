@@ -19,11 +19,20 @@ class AuthController extends Controller
 {
     public function register(RegisterRequest $request, AuthService $authService)
     {
-        $user = $authService->register($request->validated());
-        return response()->json([
-            'user' => $user,
-            'message' => __('validationMessages.register_success')
-        ], 201);
+        try {
+            // Lấy IP address từ request
+            $ipAddress = $request->ip();
+            $user = $authService->register($request->validated(), $ipAddress);
+            return response()->json([
+                'user' => $user,
+                'message' => __('validationMessages.register_success')
+            ], 201);
+        } catch (\Exception $e) {
+            // Xử lý lỗi spam hoặc các lỗi khác
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 429); // 429 Too Many Requests
+        }
     }
 
     public function verifyEmailApi(Request $request, string $token)
