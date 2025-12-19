@@ -103,6 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/posts/{id}', 'show')->whereNumber('id');
         Route::post('/posts/{id}/like', 'toggleLike')->whereNumber('id');
         Route::post('/posts/{id}/comment', 'addComment')->whereNumber('id');
+        Route::post('/posts/{id}/share', 'share')->whereNumber('id');
     });
 });
 

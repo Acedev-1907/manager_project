@@ -86,6 +86,18 @@ class PostService
             'content' => $content,
         ])->load('user:id,name,avatar');
     }
+
+    /**
+     * Tăng số lần chia sẻ bài viết
+     */
+    public function sharePost($postId)
+    {
+        $post = $this->postRepository->getPostById($postId);
+        $post->share_count = ($post->share_count ?? 0) + 1;
+        $post->save();
+
+        return $post->share_count;
+    }
 }
 
 

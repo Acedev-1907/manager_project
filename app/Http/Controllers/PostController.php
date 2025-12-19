@@ -161,4 +161,16 @@ class PostController extends Controller
             'comments_count' => $post->comments_count
         ], 201);
     }
+
+    /**
+     * Tăng share_count cho bài viết
+     */
+    public function share($id)
+    {
+        $shareCount = $this->postService->sharePost($id);
+
+        return Response::json([
+            'share_count' => $shareCount,
+        ]);
+    }
 }

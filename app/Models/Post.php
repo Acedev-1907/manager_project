@@ -16,10 +16,12 @@ class Post extends Model
         'content',
         'image_url',
         'images',
+        'share_count',
     ];
 
     protected $casts = [
         'images' => 'array',
+        'share_count' => 'integer',
     ];
 
     public function user(): BelongsTo

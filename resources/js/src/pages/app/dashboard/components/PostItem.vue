@@ -21,6 +21,7 @@ const props = defineProps<{
         };
         likes_count?: number;
         comments_count?: number;
+        share_count?: number;
         user_reaction_type?: string | null;
         likes?: Array<{
             id: number;
@@ -49,6 +50,7 @@ const emit = defineEmits<{
 
 const showDetailModal = ref(false);
 const startImageIndex = ref(0);
+const showShareModal = ref(false);
 
 const userStore = useUserStore();
 // @ts-expect-error - Pinia store type inference issue
@@ -141,6 +143,34 @@ const openComments = () => {
     // Mở modal chi tiết, tập trung vào phần bình luận
     startImageIndex.value = 0;
     showDetailModal.value = true;
+};
+
+const shareLink = computed(() => {
+    return `${window.location.origin}/app/dashboard?postId=${props.post.id}`;
+});
+
+const openShareModal = async () => {
+    try {
+        // Tăng share_count nhưng không chặn UI nếu lỗi
+        makeHttpReq<never, { share_count: number }>(`/posts/${props.post.id}/share`, 'POST').catch(() => {});
+    } catch {
+        // ignore
+    }
+    showShareModal.value = true;
+};
+
+const copyShareLink = async () => {
+    const url = shareLink.value;
+    try {
+        if (navigator.clipboard) {
+            await navigator.clipboard.writeText(url);
+            showError('Đã copy link bài viết, bạn có thể dán để chia sẻ.'); // dùng alert hiện tại
+        } else {
+            window.prompt('Copy link bài viết để chia sẻ:', url);
+        }
+    } catch {
+        window.prompt('Copy link bài viết để chia sẻ:', url);
+    }
 };
 
 const handlePostUpdated = (payload: { postId: number; likes_count: number; likes: any[]; liked: boolean; reactionType: string | null }) => {
@@ -292,7 +322,7 @@ const handleSelectReaction = async (reactionType: string) => {
                 <i class="bi bi-chat"></i> 
                 <span>Bình luận</span>
             </button>
-            <button class="action-btn">
+            <button class="action-btn" @click.stop="openShareModal">
                 <i class="bi bi-share"></i> 
                 <span>Chia sẻ</span>
             </button>
@@ -306,6 +336,34 @@ const handleSelectReaction = async (reactionType: string) => {
             @close="showDetailModal = false"
             @postUpdated="handlePostUpdated"
         />
+
+        <!-- Share Modal -->
+        <div v-if="showShareModal" class="share-modal-overlay" @click.self="showShareModal = false">
+            <div class="share-modal" @click.stop>
+                <div class="share-modal-header">
+                    <h4>Chia sẻ bài viết</h4>
+                    <button class="share-modal-close" @click="showShareModal = false">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+
+                <div class="share-modal-body">
+                    <p class="share-modal-text">Link bài viết:</p>
+                    <div class="share-link-wrapper">
+                        <input class="share-link-input" :value="shareLink" readonly />
+                        <button class="share-copy-btn" @click="copyShareLink">
+                            <i class="bi bi-clipboard"></i>
+                            Copy
+                        </button>
+                    </div>
+                    <p class="share-tip">Bạn có thể dán link này vào Facebook, Zalo,... để chia sẻ.</p>
+                </div>
+
+                <div class="share-modal-footer">
+                    <button class="share-close-btn" @click="showShareModal = false">Đóng</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -590,6 +648,107 @@ const handleSelectReaction = async (reactionType: string) => {
 .fade-leave-to {
     opacity: 0;
     transform: translateY(6px);
+}
+
+.share-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.share-modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    padding: 16px 20px 18px;
+}
+
+.share-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.share-modal-header h4 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.share-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #6b7280;
+}
+
+.share-modal-body {
+    margin-bottom: 14px;
+}
+
+.share-modal-text {
+    margin: 0 0 6px;
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+.share-link-wrapper {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.share-link-input {
+    flex: 1;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    color: #111827;
+    background: #f9fafb;
+}
+
+.share-copy-btn {
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.share-tip {
+    margin: 8px 0 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.share-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.share-close-btn {
+    border: none;
+    background: #e5e7eb;
+    color: #111827;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
 }
 </style>
 
