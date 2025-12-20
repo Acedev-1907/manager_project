@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Models\SpamBlock;
+use App\Models\SpamAttempt;
 
 /**
  * Spam Detection Service
@@ -144,18 +145,18 @@ class SpamDetectionService
             return;
         }
 
-        $blockKey = "spam_block_{$factorType}_{$actionType}_{$identifier}";
-        $blockUntilKey = "spam_block_until_{$factorType}_{$actionType}_{$identifier}";
-        $attemptsKey = "spam_attempts_{$factorType}_{$actionType}_{$identifier}";
+        $identifierStr = (string) $identifier;
 
-        // Check if already blocked
-        if (Cache::has($blockKey)) {
-            $blockUntil = Cache::get($blockUntilKey);
-            if ($blockUntil) {
-                $remainingMinutes = max(0, Carbon::parse($blockUntil)->diffInMinutes(Carbon::now()));
-                throw new \Exception($this->getBlockedMessage($factorType, $remainingMinutes));
-            }
-            throw new \Exception($this->getBlockedMessage($factorType));
+        // Check if already blocked (active block only)
+        $block = SpamBlock::where('factor_type', $factorType)
+            ->where('action_type', $actionType)
+            ->where('identifier', $identifierStr)
+            ->active()
+            ->first();
+
+        if ($block) {
+            $remainingMinutes = $block->getRemainingMinutes();
+            throw new \Exception($this->getBlockedMessage($factorType, $remainingMinutes));
         }
 
         // Get configuration with stricter rules for domains
@@ -163,25 +164,30 @@ class SpamDetectionService
         $blockDuration = $isDomain ? $config['block_duration'] * 2 : $config['block_duration'];
         $timeWindow = $config['time_window'];
 
-        // Get and filter attempts
-        $attempts = Cache::get($attemptsKey, []);
-        $now = Carbon::now();
-        $attempts = array_filter($attempts, function($time) use ($now, $timeWindow) {
-            return Carbon::parse($time)->diffInMinutes($now) <= $timeWindow;
-        });
+        // Count recent attempts from database
+        $attemptCount = SpamAttempt::countRecentAttempts(
+            $factorType,
+            $actionType,
+            $identifierStr,
+            $timeWindow
+        );
 
         // Check if exceeded limit
-        if (count($attempts) >= $maxAttempts) {
-            $blockUntilTime = now()->addMinutes($blockDuration);
-            Cache::put($blockKey, true, $blockUntilTime);
-            Cache::put($blockUntilKey, $blockUntilTime->toDateTimeString(), $blockUntilTime);
+        if ($attemptCount >= $maxAttempts) {
+            // Create block in database
+            SpamBlock::findOrCreateBlock(
+                $factorType,
+                $actionType,
+                $identifierStr,
+                $blockDuration,
+                $attemptCount
+            );
 
             throw new \Exception($this->getExceededLimitMessage($factorType, $actionType, $blockDuration));
         }
 
-        // Record this attempt
-        $attempts[] = $now->toDateTimeString();
-        Cache::put($attemptsKey, $attempts, now()->addMinutes($timeWindow + 1));
+        // Record this attempt in database
+        SpamAttempt::recordAttempt($factorType, $actionType, $identifierStr);
     }
 
     /**
@@ -206,10 +212,16 @@ class SpamDetectionService
         }
 
         $combinedKey = md5("{$ipAddress}_{$emailDomain}");
-        $blockKey = "spam_block_combined_{$actionType}_{$combinedKey}";
-        $attemptsKey = "spam_attempts_combined_{$actionType}_{$combinedKey}";
+        $factorType = 'combined';
 
-        if (Cache::has($blockKey)) {
+        // Check if already blocked
+        $block = SpamBlock::where('factor_type', $factorType)
+            ->where('action_type', $actionType)
+            ->where('identifier', $combinedKey)
+            ->active()
+            ->first();
+
+        if ($block) {
             throw new \Exception('This IP and email domain combination has been temporarily blocked due to suspicious activity.');
         }
 
@@ -218,21 +230,29 @@ class SpamDetectionService
         $blockDuration = $config['block_duration'] * 3;
         $timeWindow = $config['time_window'];
 
-        $attempts = Cache::get($attemptsKey, []);
-        $now = Carbon::now();
-        $attempts = array_filter($attempts, function($time) use ($now, $timeWindow) {
-            return Carbon::parse($time)->diffInMinutes($now) <= $timeWindow;
-        });
+        // Count recent attempts
+        $attemptCount = SpamAttempt::countRecentAttempts(
+            $factorType,
+            $actionType,
+            $combinedKey,
+            $timeWindow
+        );
 
-        if (count($attempts) >= $maxAttempts) {
-            $blockUntilTime = now()->addMinutes($blockDuration);
-            Cache::put($blockKey, true, $blockUntilTime);
+        if ($attemptCount >= $maxAttempts) {
+            // Create block in database
+            SpamBlock::findOrCreateBlock(
+                $factorType,
+                $actionType,
+                $combinedKey,
+                $blockDuration,
+                $attemptCount
+            );
 
             throw new \Exception("Suspicious activity detected from this IP and email domain combination. Blocked for {$blockDuration} minutes.");
         }
 
-        $attempts[] = $now->toDateTimeString();
-        Cache::put($attemptsKey, $attempts, now()->addMinutes($timeWindow + 1));
+        // Record this attempt
+        SpamAttempt::recordAttempt($factorType, $actionType, $combinedKey);
     }
 
     /**
@@ -398,5 +418,152 @@ class SpamDetectionService
             'user_id' => $userId,
             'ip' => $request ? $request->ip() : null,
         ]);
+    }
+
+    // ========== Unblock Methods ==========
+
+    /**
+     * Unblock a specific identifier (IP, User ID, Email Domain, Fingerprint)
+     * 
+     * @param string $factorType Type of factor (ip, email_domain, fingerprint, user_id, combined)
+     * @param string|int $identifier The identifier value (IP address, user ID, domain, fingerprint, combined key)
+     * @param string $actionType Action type (registration, post, comment, invitation)
+     * @return bool True if unblocked, false if not found
+     */
+    public function unblock(string $factorType, $identifier, string $actionType): bool
+    {
+        // For combined, identifier is already the hash
+        if ($factorType !== 'combined') {
+            $identifier = (string) $identifier;
+        }
+
+        return SpamBlock::removeBlock($factorType, $actionType, $identifier);
+    }
+
+    /**
+     * Unblock user by User ID for all action types
+     * 
+     * @param int $userId
+     * @return array List of action types that were unblocked
+     */
+    public function unblockUser(int $userId): array
+    {
+        $actionTypes = ['post', 'comment', 'invitation'];
+        $unblocked = [];
+
+        foreach ($actionTypes as $actionType) {
+            if ($this->unblock('user_id', $userId, $actionType)) {
+                $unblocked[] = $actionType;
+            }
+        }
+
+        return $unblocked;
+    }
+
+    /**
+     * Unblock IP address for all action types
+     * 
+     * @param string $ipAddress
+     * @return array List of action types that were unblocked
+     */
+    public function unblockIp(string $ipAddress): array
+    {
+        $actionTypes = ['registration', 'post', 'comment', 'invitation'];
+        $unblocked = [];
+
+        foreach ($actionTypes as $actionType) {
+            if ($this->unblock('ip', $ipAddress, $actionType)) {
+                $unblocked[] = $actionType;
+            }
+        }
+
+        return $unblocked;
+    }
+
+    /**
+     * Unblock email domain for registration
+     * 
+     * @param string $emailDomain
+     * @return bool
+     */
+    public function unblockEmailDomain(string $emailDomain): bool
+    {
+        return $this->unblock('email_domain', $emailDomain, 'registration');
+    }
+
+    /**
+     * Unblock combined pattern (IP + Email Domain)
+     * 
+     * @param string $ipAddress
+     * @param string $emailDomain
+     * @return bool
+     */
+    public function unblockCombined(string $ipAddress, string $emailDomain): bool
+    {
+        $combinedKey = md5("{$ipAddress}_{$emailDomain}");
+        return SpamBlock::removeBlock('combined', 'registration', $combinedKey);
+    }
+
+    /**
+     * Check if an identifier is currently blocked
+     * 
+     * @param string $factorType Type of factor (ip, email_domain, fingerprint, user_id, combined)
+     * @param string|int $identifier The identifier value
+     * @param string $actionType Action type
+     * @return array|null Block information or null if not blocked
+     */
+    public function getBlockStatus(string $factorType, $identifier, string $actionType): ?array
+    {
+        // For combined, identifier is already the hash
+        if ($factorType !== 'combined') {
+            $identifier = (string) $identifier;
+        }
+
+        $block = SpamBlock::where('factor_type', $factorType)
+            ->where('action_type', $actionType)
+            ->where('identifier', $identifier)
+            ->active()
+            ->first();
+
+        if (!$block) {
+            return null;
+        }
+
+        return [
+            'blocked' => true,
+            'block_until' => $block->blocked_until?->toDateTimeString(),
+            'remaining_minutes' => $block->getRemainingMinutes(),
+            'attempt_count' => $block->attempt_count,
+            'factor_type' => $block->factor_type,
+            'identifier' => $block->identifier,
+            'action_type' => $block->action_type,
+            'created_at' => $block->created_at->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Clear all expired spam blocks (cleanup)
+     * 
+     * @return int Number of blocks deleted
+     */
+    public function cleanupExpiredBlocks(): int
+    {
+        return SpamBlock::cleanupExpired();
+    }
+
+    /**
+     * Clear all spam blocks and attempts (use with caution - admin only)
+     * 
+     * @return array Number of records deleted
+     */
+    public function clearAllBlocks(): array
+    {
+        $blocksDeleted = SpamBlock::query()->delete();
+        $attemptsDeleted = SpamAttempt::query()->delete();
+
+        return [
+            'blocks' => $blocksDeleted,
+            'attempts' => $attemptsDeleted,
+        ];
     }
 }
