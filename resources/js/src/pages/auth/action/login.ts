@@ -46,7 +46,8 @@ export function useLoginUser() {
       }
     } catch (error: any) {
       loading.value = false;
-      const message = error?.message || "Login failed!";
+      // Extract message from different error formats
+      const message = error?.error?.message || error?.message || "Login failed!";
       showError(message);
       throw error; // Re-throw for component handling
     } finally {

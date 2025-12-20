@@ -80,6 +80,9 @@ class AuthController extends ApiController
     /**
      * Login user
      * 
+     * Note: Login endpoint returns data directly (not wrapped in ApiController format)
+     * to maintain compatibility with frontend authentication flow
+     * 
      * @param LoginRequest $request
      * @param AuthService $authService
      * @return \Illuminate\Http\JsonResponse
@@ -97,7 +100,10 @@ class AuthController extends ApiController
                 ->setReturnCode(self::ERROR_UNAUTHORIZED)
                 ->respondWithError($result['error']);
         }
-        return $this->respondWithData($result, 'Login successful');
+        
+        // Return login data directly (user + token) for frontend compatibility
+        // Frontend expects: { user: {...}, token: "..." }
+        return response()->json($result, 200);
     }
 
     /**
