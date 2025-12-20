@@ -19,7 +19,11 @@ class PostRepository extends BaseRepository
             'user:id,name,avatar',
             'likes:id,post_id,user_id,type', // Include type field
             'likes.user:id,name,avatar',
-            'comments.user:id,name,avatar'
+            'comments' => function($query) {
+                $query->whereNull('parent_id')
+                    ->with(['user:id,name,avatar', 'replies.user:id,name,avatar'])
+                    ->orderBy('created_at', 'asc');
+            }
         ])
             ->withCount('likes')
             ->withCount('comments')
@@ -33,7 +37,11 @@ class PostRepository extends BaseRepository
             'user:id,name,avatar',
             'likes:id,post_id,user_id,type', // Include type field
             'likes.user:id,name,avatar',
-            'comments.user:id,name,avatar'
+            'comments' => function($query) {
+                $query->whereNull('parent_id')
+                    ->with(['user:id,name,avatar', 'replies.user:id,name,avatar'])
+                    ->orderBy('created_at', 'asc');
+            }
         ])
             ->withCount('likes')
             ->withCount('comments')

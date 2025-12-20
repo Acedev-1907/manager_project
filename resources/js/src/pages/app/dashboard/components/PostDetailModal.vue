@@ -61,6 +61,9 @@ const currentImageIndex = ref(0);
 const commentInputRef = ref<HTMLTextAreaElement | null>(null);
 const imageError = ref(false);
 const imageLoading = ref(true);
+const replyingTo = ref<number | null>(null);
+const replyTexts = ref<Record<number, string>>({});
+const isReplying = ref<Record<number, boolean>>({});
 
 const handleImageError = (e: Event) => {
     imageError.value = true;
@@ -408,12 +411,15 @@ const handleComment = async () => {
             { content: commentText.value.trim() }
         );
         
-        if (postData.value) {
+        const commentData = (res as any)?.data ? (res as any).data : res;
+        const newComment = commentData.comment || commentData;
+        
+        if (postData.value && newComment && newComment.id) {
             if (!postData.value.comments) {
                 postData.value.comments = [];
             }
-            postData.value.comments.push(res.comment);
-            postData.value.comments_count = res.comments_count;
+            postData.value.comments.push(newComment);
+            postData.value.comments_count = commentData.comments_count || postData.value.comments_count;
         }
         
         commentText.value = '';
@@ -440,6 +446,60 @@ const handleComment = async () => {
     } finally {
         isCommenting.value = false;
     }
+};
+
+const handleReply = async (commentId: number) => {
+    const replyText = replyTexts.value[commentId];
+    if (!postData.value || !replyText?.trim() || isReplying.value[commentId]) return;
+    
+    isReplying.value[commentId] = true;
+    try {
+        const res = await makeHttpReq<{ content: string }, { reply: any; comments_count: number }>(
+            `/comments/${commentId}/reply`,
+            'POST',
+            { content: replyText.trim() }
+        );
+        
+        const replyData = (res as any)?.data ? (res as any).data : res;
+        const newReply = replyData.reply || replyData;
+        
+        if (postData.value && postData.value.comments && newReply && newReply.id) {
+            const comment = postData.value.comments.find((c: any) => c && c.id === commentId);
+            if (comment) {
+                if (!comment.replies) {
+                    comment.replies = [];
+                }
+                comment.replies.push(newReply);
+                postData.value.comments_count = replyData.comments_count || postData.value.comments_count;
+            }
+        }
+        
+        replyTexts.value[commentId] = '';
+        replyingTo.value = null;
+    } catch (error: any) {
+        showError(error?.message || 'Không thể thêm phản hồi');
+    } finally {
+        isReplying.value[commentId] = false;
+    }
+};
+
+const startReply = (commentId: number) => {
+    replyingTo.value = commentId;
+    if (!replyTexts.value[commentId]) {
+        replyTexts.value[commentId] = '';
+    }
+    // Focus vào input sau khi DOM update
+    setTimeout(() => {
+        const input = document.querySelector(`[data-reply-input="${commentId}"]`) as HTMLTextAreaElement;
+        if (input) {
+            input.focus();
+        }
+    }, 100);
+};
+
+const cancelReply = (commentId: number) => {
+    replyingTo.value = null;
+    replyTexts.value[commentId] = '';
 };
 
 const nextImage = () => {
@@ -525,7 +585,7 @@ onUnmounted(() => {
                         <div class="comments-section">
                             <div v-if="postData.comments && postData.comments.length > 0" class="comments-list">
                                 <div 
-                                    v-for="comment in postData.comments" 
+                                    v-for="comment in (postData.comments || []).filter((c: any) => c && c.id)" 
                                     :key="comment.id"
                                     class="comment-item"
                                 >
@@ -535,12 +595,77 @@ onUnmounted(() => {
                                         alt="Avatar"
                                     />
                                     <div class="comment-content">
-                                        <div class="comment-bubble">
+                                        <div class="comment-header">
                                             <span class="comment-author">{{ comment.user?.name }}</span>
-                                            <span class="comment-text">{{ comment.content }}</span>
-                                        </div>
-                                        <div class="comment-meta">
                                             <span class="comment-time">{{ timeAgo(comment.created_at) }}</span>
+                                        </div>
+                                        <div class="comment-text">{{ comment.content }}</div>
+                                        <div class="comment-actions">
+                                            <button class="comment-action-btn">
+                                                <i class="bi bi-hand-thumbs-up"></i>
+                                                <span>Thích</span>
+                                            </button>
+                                            <button class="comment-action-btn" @click="startReply(comment.id)">
+                                                <i class="bi bi-reply"></i>
+                                                <span>Phản hồi</span>
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- Replies -->
+                                        <div v-if="comment.replies && comment.replies.length > 0" class="replies-list">
+                                            <div 
+                                                v-for="reply in (comment.replies || []).filter((r: any) => r && r.id)" 
+                                                :key="reply.id"
+                                                class="reply-item"
+                                            >
+                                                <img 
+                                                    :src="getAvatarSrc(reply.user?.avatar, reply.user?.name)" 
+                                                    class="reply-avatar" 
+                                                    alt="Avatar"
+                                                />
+                                                <div class="reply-content">
+                                                    <div class="reply-header">
+                                                        <span class="reply-author">{{ reply.user?.name }}</span>
+                                                        <span class="reply-time">{{ timeAgo(reply.created_at) }}</span>
+                                                    </div>
+                                                    <div class="reply-text">{{ reply.content }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Reply Input -->
+                                        <div v-if="replyingTo === comment.id" class="reply-input-section">
+                                            <img 
+                                                :src="getAvatarSrc(currentUser?.avatar, currentUser?.name)" 
+                                                class="reply-input-avatar" 
+                                                alt="Avatar"
+                                            />
+                                            <div class="reply-input-wrapper">
+                                                <textarea
+                                                    :data-reply-input="comment.id"
+                                                    v-model="replyTexts[comment.id]"
+                                                    class="reply-input"
+                                                    placeholder="Viết phản hồi..."
+                                                    rows="1"
+                                                    @keydown.enter.exact.prevent="handleReply(comment.id)"
+                                                    @keydown.shift.enter.exact.prevent
+                                                ></textarea>
+                                                <div class="reply-input-actions">
+                                                    <button 
+                                                        class="reply-cancel-btn"
+                                                        @click="cancelReply(comment.id)"
+                                                    >
+                                                        Hủy
+                                                    </button>
+                                                    <button 
+                                                        class="reply-submit-btn"
+                                                        @click="handleReply(comment.id)"
+                                                        :disabled="!replyTexts[comment.id]?.trim() || isReplying[comment.id]"
+                                                    >
+                                                        <i class="bi bi-send-fill"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -635,18 +760,19 @@ onUnmounted(() => {
                                 ref="commentInputRef"
                                 v-model="commentText"
                                 class="comment-input"
-                                placeholder="Viết bình luận..."
+                                placeholder="Thêm bình luận..."
                                 rows="1"
                                 @keydown.enter.exact.prevent="handleComment"
                                 @keydown.shift.enter.exact.prevent
                             ></textarea>
-                            <button 
-                                class="comment-submit-btn"
-                                @click="handleComment"
-                                :disabled="!commentText.trim() || isCommenting"
-                            >
-                                <i class="bi bi-send-fill"></i>
-                            </button>
+                            <div class="comment-input-actions">
+                                <button class="comment-input-icon-btn" title="Emoji">
+                                    <i class="bi bi-emoji-smile"></i>
+                                </button>
+                                <button class="comment-input-icon-btn" title="Hình ảnh">
+                                    <i class="bi bi-image"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1062,12 +1188,13 @@ onUnmounted(() => {
 
 .comment-item {
     display: flex;
-    gap: 8px;
+    gap: 12px;
+    padding: 8px 0;
 }
 
 .comment-avatar {
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -1075,37 +1202,213 @@ onUnmounted(() => {
 
 .comment-content {
     flex: 1;
+    min-width: 0;
 }
 
-.comment-bubble {
-    background: #3a3b3c;
-    border-radius: 18px;
-    padding: 8px 12px;
-    display: inline-block;
-    max-width: 100%;
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
 }
 
 .comment-author {
     font-weight: 600;
     color: #e4e6eb;
-    margin-right: 6px;
     font-size: 0.9rem;
-}
-
-.comment-text {
-    color: #e4e6eb;
-    font-size: 0.9rem;
-    word-wrap: break-word;
-}
-
-.comment-meta {
-    margin-top: 4px;
-    padding-left: 12px;
 }
 
 .comment-time {
     font-size: 0.75rem;
     color: #b0b3b8;
+}
+
+.comment-text {
+    color: #e4e6eb;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    margin-bottom: 8px;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.comment-action-btn {
+    background: none;
+    border: none;
+    color: #b0b3b8;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.comment-action-btn:hover {
+    background: #3a3b3c;
+    color: #e4e6eb;
+}
+
+.comment-action-btn i {
+    font-size: 0.9rem;
+}
+
+/* Replies Styles */
+.replies-list {
+    margin-top: 12px;
+    padding-left: 12px;
+    border-left: 2px solid #3a3b3c;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.reply-item {
+    display: flex;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.reply-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.reply-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.reply-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.reply-author {
+    font-weight: 600;
+    color: #e4e6eb;
+    font-size: 0.85rem;
+}
+
+.reply-time {
+    font-size: 0.75rem;
+    color: #b0b3b8;
+}
+
+.reply-text {
+    color: #e4e6eb;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+/* Reply Input Styles */
+.reply-input-section {
+    margin-top: 12px;
+    display: flex;
+    gap: 12px;
+    padding-left: 12px;
+}
+
+.reply-input-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.reply-input-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.reply-input {
+    width: 100%;
+    border: 1px solid #3a3b3c;
+    background: #3a3b3c;
+    border-radius: 18px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    color: #e4e6eb;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 36px;
+    max-height: 100px;
+}
+
+.reply-input:focus {
+    border-color: #4e4f50;
+    background: #4e4f50;
+}
+
+.reply-input::placeholder {
+    color: #b0b3b8;
+}
+
+.reply-input-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 0 4px;
+}
+
+.reply-cancel-btn {
+    background: none;
+    border: none;
+    color: #b0b3b8;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.reply-cancel-btn:hover {
+    background: #3a3b3c;
+    color: #e4e6eb;
+}
+
+.reply-submit-btn {
+    background: #2d88ff;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    font-size: 0.9rem;
+}
+
+.reply-submit-btn:hover:not(:disabled) {
+    background: #1a6ed8;
+}
+
+.reply-submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.reply-submit-btn i {
+    font-size: 0.9rem;
 }
 
 .no-comments {
@@ -1272,7 +1575,7 @@ onUnmounted(() => {
     align-items: center;
     background: #3a3b3c;
     border-radius: 24px;
-    padding: 8px 16px;
+    padding: 8px 12px;
     transition: background 0.2s;
     min-height: 40px;
 }
@@ -1301,31 +1604,33 @@ onUnmounted(() => {
     color: #b0b3b8;
 }
 
-.comment-submit-btn {
+.comment-input-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.comment-input-icon-btn {
     background: none;
     border: none;
-    color: #2d88ff;
+    color: #b0b3b8;
     cursor: pointer;
-    padding: 4px;
+    padding: 4px 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: opacity 0.2s;
-    flex-shrink: 0;
-    align-self: flex-end;
-    margin-bottom: 2px;
+    transition: all 0.2s;
+    border-radius: 4px;
+    font-size: 1.1rem;
 }
 
-.comment-submit-btn:hover:not(:disabled) {
-    opacity: 0.7;
+.comment-input-icon-btn:hover {
+    background: #4e4f50;
+    color: #e4e6eb;
 }
 
-.comment-submit-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-.comment-submit-btn i {
+.comment-input-icon-btn i {
     font-size: 1.1rem;
 }
 

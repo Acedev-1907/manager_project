@@ -112,6 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/posts/{id}/like', 'toggleLike')->whereNumber('id');
         Route::post('/posts/{id}/comment', 'addComment')->whereNumber('id');
         Route::post('/posts/{id}/share', 'share')->whereNumber('id');
+        Route::post('/comments/{commentId}/reply', 'replyComment')->whereNumber('commentId');
     });
 });
 

@@ -154,6 +154,36 @@ class PostService
     }
 
     /**
+     * Reply to a comment
+     * 
+     * @param int $commentId
+     * @param string $content Reply content
+     * @param Request|null $request HTTP request object
+     * @return PostComment
+     * @throws \Exception
+     */
+    public function replyComment(int $commentId, string $content, ?Request $request = null): PostComment
+    {
+        $userId = Auth::id();
+        
+        // Get parent comment to get post_id
+        $parentComment = PostComment::findOrFail($commentId);
+        
+        // Check spam for comment creation
+        $this->spamDetection->checkCommentSpam($userId, $request);
+        
+        $reply = PostComment::create([
+            'post_id' => $parentComment->post_id,
+            'user_id' => $userId,
+            'content' => $content,
+            'parent_id' => $commentId,
+        ]);
+        
+        // Load user relationship for response
+        return $reply->load('user:id,name,avatar');
+    }
+
+    /**
      * Increment share count for a post
      * 
      * @param int $postId

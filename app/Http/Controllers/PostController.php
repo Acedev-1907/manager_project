@@ -211,6 +211,30 @@ class PostController extends ApiController
     }
 
     /**
+     * Reply to a comment
+     * 
+     * @param Request $request
+     * @param int $commentId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function replyComment(Request $request, $commentId)
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:1000',
+        ]);
+
+        $reply = $this->postService->replyComment($commentId, $validated['content'], $request);
+        $post = $this->postService->getPostById($reply->post_id);
+        
+        return $this->setStatusCode(201)
+            ->setReturnCode(self::RESPONSE_CREATED)
+            ->respondWithData([
+                'reply' => $reply,
+                'comments_count' => $post->comments_count
+            ], 'Reply added successfully');
+    }
+
+    /**
      * Share a post (increment share count)
      * 
      * @param int $id

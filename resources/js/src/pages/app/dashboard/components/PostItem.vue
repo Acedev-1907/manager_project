@@ -40,6 +40,16 @@ const props = defineProps<{
                 name: string;
                 avatar?: string;
             };
+            replies?: Array<{
+                id: number;
+                content: string;
+                created_at: string;
+                user: {
+                    id: number;
+                    name: string;
+                    avatar?: string;
+                };
+            }>;
         }>;
     }
 }>();
@@ -458,6 +468,72 @@ const handleSelectReaction = async (reactionType: string) => {
                 <i class="bi bi-share"></i> 
                 <span>Chia sẻ</span>
             </button>
+        </div>
+
+        <!-- Featured Comments Section (Always visible if has comments) -->
+        <div v-if="post.comments && post.comments.length > 0" class="featured-comments">
+            <div class="comments-list">
+                <div 
+                    v-for="comment in post.comments.slice(0, 2)" 
+                    :key="comment.id"
+                    class="comment-item"
+                >
+                    <img 
+                        :src="getAvatarSrc(comment.user?.avatar, comment.user?.name)" 
+                        class="comment-avatar" 
+                        alt="Avatar"
+                    />
+                    <div class="comment-content">
+                        <div class="comment-header">
+                            <span class="comment-author">{{ comment.user?.name }}</span>
+                            <span class="comment-time">{{ timeAgo(comment.created_at) }}</span>
+                        </div>
+                        <div class="comment-text">{{ comment.content }}</div>
+                        <div class="comment-actions">
+                            <button class="comment-action-btn">
+                                <i class="bi bi-hand-thumbs-up"></i>
+                                <span>Thích</span>
+                            </button>
+                            <button class="comment-action-btn" @click="startImageIndex = 0; showDetailModal = true;">
+                                <i class="bi bi-reply"></i>
+                                <span>Phản hồi</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Replies -->
+                        <div v-if="comment.replies && comment.replies.length > 0" class="replies-list">
+                            <div 
+                                v-for="reply in (comment.replies || []).filter((r: any) => r && r.id).slice(0, 2)" 
+                                :key="reply.id"
+                                class="reply-item"
+                            >
+                                <img 
+                                    :src="getAvatarSrc(reply.user?.avatar, reply.user?.name)" 
+                                    class="reply-avatar" 
+                                    alt="Avatar"
+                                />
+                                <div class="reply-content">
+                                    <div class="reply-header">
+                                        <span class="reply-author">{{ reply.user?.name }}</span>
+                                        <span class="reply-time">{{ timeAgo(reply.created_at) }}</span>
+                                    </div>
+                                    <div class="reply-text">{{ reply.content }}</div>
+                                </div>
+                            </div>
+                            <div v-if="comment.replies.length > 2" class="view-more-replies">
+                                <button @click="startImageIndex = 0; showDetailModal = true;">
+                                    Xem thêm {{ comment.replies.length - 2 }} phản hồi
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-if="post.comments.length > 2" class="view-all-comments">
+                <button @click="startImageIndex = 0; showDetailModal = true;">
+                    Xem tất cả {{ post.comments.length }} bình luận
+                </button>
+            </div>
         </div>
 
         <!-- Inline Comments Section -->
@@ -925,6 +1001,188 @@ const handleSelectReaction = async (reactionType: string) => {
     padding: 6px 14px;
     font-size: 0.85rem;
     cursor: pointer;
+}
+
+/* Featured Comments Styles */
+.featured-comments {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #e4e6e9;
+}
+
+.featured-comments .comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.featured-comments .comment-item {
+    display: flex;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.featured-comments .comment-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.featured-comments .comment-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.featured-comments .comment-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.featured-comments .comment-author {
+    font-weight: 600;
+    color: #050505;
+    font-size: 0.9rem;
+}
+
+.featured-comments .comment-time {
+    font-size: 0.75rem;
+    color: #65676b;
+}
+
+.featured-comments .comment-text {
+    color: #050505;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    margin-bottom: 8px;
+}
+
+.featured-comments .comment-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.featured-comments .comment-action-btn {
+    background: none;
+    border: none;
+    color: #65676b;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.featured-comments .comment-action-btn:hover {
+    background: #f2f2f2;
+    color: #050505;
+}
+
+.featured-comments .comment-action-btn i {
+    font-size: 0.9rem;
+}
+
+.view-all-comments {
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+.view-all-comments button {
+    background: none;
+    border: none;
+    color: #65676b;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 4px 0;
+    font-weight: 500;
+}
+
+.view-all-comments button:hover {
+    color: #1877f2;
+    text-decoration: underline;
+}
+
+/* Replies Styles */
+.featured-comments .replies-list {
+    margin-top: 12px;
+    padding-left: 12px;
+    border-left: 2px solid #e4e6e9;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.featured-comments .reply-item {
+    display: flex;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.featured-comments .reply-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.featured-comments .reply-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.featured-comments .reply-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.featured-comments .reply-author {
+    font-weight: 600;
+    color: #050505;
+    font-size: 0.85rem;
+}
+
+.featured-comments .reply-time {
+    font-size: 0.75rem;
+    color: #65676b;
+}
+
+.featured-comments .reply-text {
+    color: #050505;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.view-more-replies {
+    margin-top: 8px;
+    padding-left: 44px;
+}
+
+.view-more-replies button {
+    background: none;
+    border: none;
+    color: #65676b;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px 0;
+    font-weight: 500;
+}
+
+.view-more-replies button:hover {
+    color: #1877f2;
+    text-decoration: underline;
 }
 
 /* Inline Comments Styles */
