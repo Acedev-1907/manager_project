@@ -22,10 +22,10 @@ return new class extends Migration
                 $table->text('metadata')->nullable(); // Additional info (JSON)
                 $table->timestamps();
 
-                // Indexes for fast lookup
-                $table->index(['factor_type', 'action_type', 'identifier']);
-                $table->index('blocked_until'); // For cleanup of expired blocks
-                $table->index(['factor_type', 'identifier']); // For unblock operations
+            // Indexes for fast lookup
+            $table->index(['factor_type', 'action_type', 'identifier'], 'spam_blocks_lookup_idx');
+            $table->index('blocked_until', 'spam_blocks_expires_idx'); // For cleanup of expired blocks
+            $table->index(['factor_type', 'identifier'], 'spam_blocks_factor_idx'); // For unblock operations
             });
         }
 
@@ -40,9 +40,9 @@ return new class extends Migration
                 $table->text('metadata')->nullable(); // Additional info (IP, user agent, etc.)
                 $table->timestamps();
 
-                // Indexes
-                $table->index(['factor_type', 'action_type', 'identifier', 'attempted_at']);
-                $table->index('attempted_at'); // For cleanup of old attempts
+            // Indexes
+            $table->index(['factor_type', 'action_type', 'identifier', 'attempted_at'], 'spam_attempts_lookup_idx');
+            $table->index('attempted_at', 'spam_attempts_time_idx'); // For cleanup of old attempts
             });
         }
     }
