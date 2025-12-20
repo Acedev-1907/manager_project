@@ -24,6 +24,8 @@ class Post extends Model
         'share_count' => 'integer',
     ];
 
+    protected $appends = ['user_reaction_type'];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -37,5 +39,29 @@ class Post extends Model
     public function comments(): HasMany
     {
         return $this->hasMany(PostComment::class)->orderBy('created_at', 'asc');
+    }
+
+    /**
+     * Get the reaction type of the current authenticated user for this post
+     * 
+     * @return string|null
+     */
+    public function getUserReactionTypeAttribute(): ?string
+    {
+        $userId = \Illuminate\Support\Facades\Auth::id();
+        
+        if (!$userId) {
+            return null;
+        }
+
+        // Check if likes relationship is loaded
+        if ($this->relationLoaded('likes')) {
+            $userLike = $this->likes->firstWhere('user_id', $userId);
+            return $userLike ? $userLike->type : null;
+        }
+
+        // If not loaded, query directly
+        $like = $this->likes()->where('user_id', $userId)->first();
+        return $like ? $like->type : null;
     }
 }

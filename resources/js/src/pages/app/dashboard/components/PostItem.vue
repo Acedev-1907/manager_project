@@ -53,6 +53,7 @@ const startImageIndex = ref(0);
 const showShareModal = ref(false);
 const hasCopiedShareLink = ref(false);
 const shareLinkInputRef = ref<HTMLInputElement | null>(null);
+const showComments = ref(false); // Toggle inline comments display
 
 const userStore = useUserStore();
 // @ts-expect-error - Pinia store type inference issue
@@ -64,18 +65,43 @@ const postTimeAgo = computed(() => {
 
 const postImages = computed(() => {
     // Support both old image_url and new images array
-    if (props.post.images && Array.isArray(props.post.images) && props.post.images.length > 0) {
-        return props.post.images;
+    let images: string[] = [];
+    
+    // Check for images array first
+    if (props.post.images) {
+        if (Array.isArray(props.post.images)) {
+            images = props.post.images.filter(img => img && typeof img === 'string' && img.trim() !== '');
+        } else if (typeof props.post.images === 'string') {
+            // Handle case where images might be a JSON string
+            try {
+                const parsed = JSON.parse(props.post.images);
+                if (Array.isArray(parsed)) {
+                    images = parsed.filter(img => img && typeof img === 'string' && img.trim() !== '');
+                }
+            } catch (e) {
+                // If parsing fails, treat as single image URL
+                const imageStr = String(props.post.images);
+                if (imageStr.trim() !== '') {
+                    images = [imageStr];
+                }
+            }
+        }
     }
-    if (props.post.image_url) {
-        return [props.post.image_url];
+    
+    // Fallback to image_url if no images found
+    if (images.length === 0 && props.post.image_url) {
+        images = [props.post.image_url];
     }
-    return [];
+    
+    return images;
 });
 
 const likesLabel = computed(() => {
-    const count = props.post.likes_count || 0;
-    if (count === 1 && currentUser.value && props.post.likes && props.post.likes.some((like) => like.user?.id === currentUser.value.id)) {
+    // Use local state for optimistic updates first
+    const count = localLikesCount.value !== null ? localLikesCount.value : (props.post.likes_count || 0);
+    const likes = localLikes.value !== null ? localLikes.value : props.post.likes;
+    
+    if (count === 1 && currentUser.value && likes && likes.some((like: any) => like.user?.id === currentUser.value.id)) {
         return 'Bạn';
     }
     return `${count} người`;
@@ -92,14 +118,25 @@ const isSingleLikeByCurrentUser = computed(() => {
 });
 
 const currentUserReaction = computed<string | null>(() => {
-    // Ưu tiên dùng trường user_reaction_type được frontend cập nhật
-    if (typeof props.post.user_reaction_type !== 'undefined') {
-        return props.post.user_reaction_type || null;
+    // Use local state for optimistic updates first
+    if (localReactionType.value !== null) {
+        return localReactionType.value;
     }
-
-    if (!currentUser.value || !props.post.likes) return null;
-    const like = props.post.likes.find((like) => like.user?.id === currentUser.value.id);
+    
+    // Then check props
+    if (props.post.user_reaction_type !== undefined && props.post.user_reaction_type !== null) {
+        return props.post.user_reaction_type;
+    }
+    
+    // Fallback: check likes array for current user's reaction
+    if (!currentUser.value || !props.post.likes || !Array.isArray(props.post.likes)) {
+        return null;
+    }
+    
+    const like = props.post.likes.find((like: any) => like?.user?.id === currentUser.value?.id);
     if (!like) return null;
+    
+    // Return the reaction type, default to 'like' if type is not specified
     return (like as any).type || 'like';
 });
 
@@ -124,8 +161,19 @@ const reactionTextClass = computed(() => {
     return map[currentUserReaction.value] || 'text-primary';
 });
 
+const reactionButtonText = computed(() => {
+    if (!currentUserReaction.value) return 'Thích';
+    const meta = reactions.find((r) => r.type === currentUserReaction.value);
+    return meta?.label || 'Thích';
+});
+
 const showReactions = ref(false);
 let hideReactionsTimeout: number | null = null;
+
+// Local state for optimistic updates
+const localReactionType = ref<string | null>(null);
+const localLikesCount = ref<number | null>(null);
+const localLikes = ref<any[] | null>(null);
 
 const reactions = [
     { type: 'like', label: 'Thích', emoji: '👍' },
@@ -136,15 +184,24 @@ const reactions = [
     { type: 'angry', label: 'Phẫn nộ', emoji: '😡' },
 ];
 
+// Don't watch props to reset local state
+// Local state will be cleared after server response is received and props are updated
+
 const openImageGallery = (index: number) => {
     startImageIndex.value = index;
     showDetailModal.value = true;
 };
 
 const openComments = () => {
-    // Mở modal chi tiết, tập trung vào phần bình luận
-    startImageIndex.value = 0;
-    showDetailModal.value = true;
+    // Toggle inline comments OR open modal
+    // If post has no comments, open modal to allow adding first comment
+    if (props.post.comments && props.post.comments.length > 0) {
+        showComments.value = !showComments.value;
+    } else {
+        // No comments yet, open modal to add first comment
+        startImageIndex.value = 0;
+        showDetailModal.value = true;
+    }
 };
 
 const shareLink = computed(() => {
@@ -210,21 +267,75 @@ const scheduleHideReactions = () => {
 };
 
 const sendReaction = async (reactionType: string) => {
+    // Optimistic update: update UI immediately
+    const currentReaction = currentUserReaction.value;
+    const currentCount = props.post.likes_count || 0;
+    const currentLikes = props.post.likes || [];
+    
+    // Determine if this is a toggle (same reaction) or change
+    const isToggling = currentReaction === reactionType;
+    
+    if (isToggling) {
+        // Toggling off
+        localReactionType.value = null;
+        localLikesCount.value = Math.max(0, currentCount - 1);
+        // Remove current user's like from local likes
+        localLikes.value = currentLikes.filter((like: any) => like?.user?.id !== currentUser.value?.id);
+    } else {
+        // Changing reaction or adding new
+        localReactionType.value = reactionType;
+        if (currentReaction) {
+            // Changing reaction, count stays same
+            localLikesCount.value = currentCount;
+        } else {
+            // Adding new reaction
+            localLikesCount.value = currentCount + 1;
+        }
+        // Update local likes array
+        const otherLikes = currentLikes.filter((like: any) => like?.user?.id !== currentUser.value?.id);
+        localLikes.value = [...otherLikes, {
+            id: Date.now(), // Temporary ID
+            user: currentUser.value,
+            type: reactionType
+        }];
+    }
+    
     try {
         const res = await makeHttpReq<{ type: string }, { liked: boolean; type?: string | null; likes_count: number; likes: any[] }>(
             `/posts/${props.post.id}/like`,
             'POST',
             { type: reactionType }
         );
-        const finalType = res.liked ? (res.type || reactionType) : null;
+        const resp = (res as any)?.data ? (res as any).data : res;
+        const finalType = resp.liked ? (resp.type || reactionType) : null;
+        
+        // Update local state with server response IMMEDIATELY
+        localReactionType.value = finalType;
+        localLikesCount.value = resp.likes_count;
+        localLikes.value = resp.likes;
+        
+        // Emit update to parent
         emit('postUpdated', {
             postId: props.post.id,
-            liked: res.liked,
-            likes_count: res.likes_count,
-            likes: res.likes,
+            liked: resp.liked,
+            likes_count: resp.likes_count,
+            likes: resp.likes,
             reactionType: finalType,
         });
+        
+        // Clear local state after a delay to allow props to update
+        // This ensures smooth transition from local state to props
+        // Use longer delay (500ms) to prevent UI "jumping" when changing reactions
+        setTimeout(() => {
+            localReactionType.value = null;
+            localLikesCount.value = null;
+            localLikes.value = null;
+        }, 500);
     } catch (error: any) {
+        // Revert optimistic update on error
+        localReactionType.value = null;
+        localLikesCount.value = null;
+        localLikes.value = null;
         showError(error?.message || 'Không thể gửi tương tác');
     }
 };
@@ -234,7 +345,13 @@ const handleLikeClick = async () => {
 };
 
 const handleSelectReaction = async (reactionType: string) => {
+    // Close reaction bar immediately for better UX
     showReactions.value = false;
+    if (hideReactionsTimeout) {
+        clearTimeout(hideReactionsTimeout);
+        hideReactionsTimeout = null;
+    }
+    // Send reaction
     await sendReaction(reactionType);
 };
 </script>
@@ -310,7 +427,7 @@ const handleSelectReaction = async (reactionType: string) => {
                         {{ reactionButtonEmoji }}
                     </span>
                     <i v-else class="bi bi-hand-thumbs-up"></i> 
-                    <span>Thích</span>
+                    <span>{{ reactionButtonText }}</span>
                 </button>
 
                 <transition name="fade">
@@ -343,10 +460,47 @@ const handleSelectReaction = async (reactionType: string) => {
             </button>
         </div>
 
+        <!-- Inline Comments Section -->
+        <div v-if="showComments && post.comments && post.comments.length > 0" class="inline-comments">
+            <div class="comments-header">
+                <h5>Bình luận ({{ post.comments.length }})</h5>
+                <button class="view-all-btn" @click="startImageIndex = 0; showDetailModal = true;">
+                    Xem tất cả
+                </button>
+            </div>
+            <div class="comments-list">
+                <div 
+                    v-for="comment in post.comments.slice(0, 3)" 
+                    :key="comment.id"
+                    class="comment-item"
+                >
+                    <img 
+                        :src="getAvatarSrc(comment.user?.avatar, comment.user?.name)" 
+                        class="comment-avatar" 
+                        alt="Avatar"
+                    />
+                    <div class="comment-content">
+                        <div class="comment-bubble">
+                            <span class="comment-author">{{ comment.user?.name }}</span>
+                            <span class="comment-text">{{ comment.content }}</span>
+                        </div>
+                        <div class="comment-meta">
+                            <span class="comment-time">{{ timeAgo(comment.created_at) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-if="post.comments.length > 3" class="show-more-comments">
+                <button @click="startImageIndex = 0; showDetailModal = true;">
+                    Xem thêm {{ post.comments.length - 3 }} bình luận
+                </button>
+            </div>
+        </div>
+
         <!-- Post Detail Modal -->
         <PostDetailModal 
             :visible="showDetailModal"
-            :post="post"
+            :post="{ ...post, user_reaction_type: currentUserReaction, likes_count: localLikesCount !== null ? localLikesCount : post.likes_count, likes: localLikes !== null ? localLikes : post.likes } as any"
             :startImageIndex="startImageIndex"
             @close="showDetailModal = false"
             @postUpdated="handlePostUpdated"
@@ -515,6 +669,8 @@ const handleSelectReaction = async (reactionType: string) => {
     overflow: hidden;
     cursor: pointer;
     background: #f0f2f5;
+    min-height: 200px;
+    aspect-ratio: 1;
 }
 
 .post-image-item img {
@@ -523,6 +679,11 @@ const handleSelectReaction = async (reactionType: string) => {
     object-fit: cover;
     display: block;
     transition: transform 0.2s;
+}
+
+.post-images-container.images-count-1 .post-image-item {
+    min-height: 400px;
+    aspect-ratio: auto;
 }
 
 .post-image-item:hover img {
@@ -764,6 +925,106 @@ const handleSelectReaction = async (reactionType: string) => {
     padding: 6px 14px;
     font-size: 0.85rem;
     cursor: pointer;
+}
+
+/* Inline Comments Styles */
+.inline-comments {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e4e6e9;
+}
+
+.comments-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.comments-header h5 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #050505;
+}
+
+.view-all-btn,
+.show-more-comments button {
+    background: none;
+    border: none;
+    color: #1877f2;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.view-all-btn:hover,
+.show-more-comments button:hover {
+    text-decoration: underline;
+}
+
+.inline-comments .comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.inline-comments .comment-item {
+    display: flex;
+    gap: 8px;
+}
+
+.inline-comments .comment-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.inline-comments .comment-content {
+    flex: 1;
+}
+
+.inline-comments .comment-bubble {
+    background: #f0f2f5;
+    border-radius: 18px;
+    padding: 8px 12px;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.inline-comments .comment-author {
+    font-weight: 600;
+    color: #050505;
+    margin-right: 6px;
+    font-size: 0.85rem;
+}
+
+.inline-comments .comment-text {
+    color: #050505;
+    font-size: 0.85rem;
+    word-wrap: break-word;
+}
+
+.inline-comments .comment-meta {
+    margin-top: 4px;
+    padding-left: 12px;
+}
+
+.inline-comments .comment-time {
+    font-size: 0.75rem;
+    color: #65676b;
+}
+
+.show-more-comments {
+    margin-top: 8px;
+    text-align: center;
+}
+
+.show-more-comments button {
+    padding: 8px 16px;
 }
 </style>
 

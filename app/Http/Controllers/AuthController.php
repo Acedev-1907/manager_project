@@ -14,27 +14,41 @@ use App\Services\AuthService;
 use App\Mail\ResetPasswordMail;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use App\Http\Controllers\Api\ApiController;
     
-class AuthController extends Controller
+class AuthController extends ApiController
 {
+    /**
+     * Register a new user
+     * 
+     * @param RegisterRequest $request
+     * @param AuthService $authService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function register(RegisterRequest $request, AuthService $authService)
     {
         try {
-            // Lấy IP address từ request
+            // Get IP address from request
             $ipAddress = $request->ip();
-            $user = $authService->register($request->validated(), $ipAddress);
-            return response()->json([
-                'user' => $user,
-                'message' => __('validationMessages.register_success')
-            ], 201);
+            $user = $authService->register($request->validated(), $ipAddress, $request);
+            return $this->setStatusCode(201)
+                ->setReturnCode(self::RESPONSE_CREATED)
+                ->respondWithData(['user' => $user], __('validationMessages.register_success'));
         } catch (\Exception $e) {
-            // Xử lý lỗi spam hoặc các lỗi khác
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 429); // 429 Too Many Requests
+            // Handle spam or other errors
+            return $this->setStatusCode(429)
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError($e->getMessage());
         }
     }
 
+    /**
+     * Verify user email with token
+     * 
+     * @param Request $request
+     * @param string $token
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     */
     public function verifyEmailApi(Request $request, string $token)
     {
         $user = User::where('remember_token', $token)->first();
@@ -43,10 +57,7 @@ class AuthController extends Controller
             if ($redirect) {
                 return redirect($redirect)->with('email_verify', 'invalid');
             }
-            return response()->json([
-                'success' => false,
-                'message' => 'Token không hợp lệ hoặc đã được sử dụng.',
-            ], 404);
+            return $this->respondNotFound('Invalid or expired token');
         }
 
         $user->isValidEmail = User::IS_VALID_EMAIL;
@@ -58,55 +69,70 @@ class AuthController extends Controller
             return redirect($redirect)->with('email_verify', 'success');
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Xác thực email thành công.',
-            'user' => [
-                'id' => $user->id,
-                'email' => $user->email,
-                'isValidEmail' => (bool) $user->isValidEmail,
-                'friend_code' => $user->friend_code,
-            ],
-        ]);
+        return $this->respondWithData([
+            'id' => $user->id,
+            'email' => $user->email,
+            'isValidEmail' => (bool) $user->isValidEmail,
+            'friend_code' => $user->friend_code,
+        ], 'Email verified successfully');
     }
 
+    /**
+     * Login user
+     * 
+     * @param LoginRequest $request
+     * @param AuthService $authService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function login(LoginRequest $request, AuthService $authService)
     {
         $result = $authService->login($request->validated());
         if (!$result) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+            return $this->setStatusCode(401)
+                ->setReturnCode(self::ERROR_UNAUTHORIZED)
+                ->respondWithError('Invalid credentials');
         }
         if (isset($result['error'])) {
-            return response()->json(['message' => $result['error']], 401);
+            return $this->setStatusCode(401)
+                ->setReturnCode(self::ERROR_UNAUTHORIZED)
+                ->respondWithError($result['error']);
         }
-        return response()->json($result);
+        return $this->respondWithData($result, 'Login successful');
     }
 
+    /**
+     * Logout user
+     * 
+     * @param Request $req
+     * @param AuthService $authService
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function logoutUser(Request $req, AuthService $authService)
     {
         $result = $authService->logoutUser($req);
-        return response($result, 200);
+        return $this->respondWithMessage('Logout successful');
     }
 
     /**
      * Send reset password link to the logged-in user's email
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function sendResetPasswordLink(Request $request)
     {
         $user = $request->user();
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => __('validationMessages.unauthenticated')
-            ], 401);
+            return $this->setStatusCode(401)
+                ->setReturnCode(self::ERROR_UNAUTHORIZED)
+                ->respondWithError(__('validationMessages.unauthenticated'));
         }
         // Prevent resending within 5 minutes
         $cacheKey = 'reset_password_sent_' . $user->id;
         if (Cache::has($cacheKey)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'You can only request a password reset link once every 5 minutes.'
-            ], 429);
+            return $this->setStatusCode(429)
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError('You can only request a password reset link once every 5 minutes.');
         }
         // Create reset password token
         $token = app('auth.password.broker')->createToken($user);
@@ -115,14 +141,14 @@ class AuthController extends Controller
         Mail::to($user->email)->send(new ResetPasswordMail($user, $resetUrl));
         // Store cache to prevent resending for 5 minutes
         Cache::put($cacheKey, true, now()->addMinutes(5));
-        return response()->json([
-            'success' => true,
-            'message' => __('validationMessages.reset_link_sent')
-        ]);
+        return $this->respondWithMessage(__('validationMessages.reset_link_sent'));
     }
 
     /**
      * Handle reset password (from email link)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function resetPassword(Request $request)
     {
@@ -140,7 +166,7 @@ class AuthController extends Controller
             }
         );
         if ($status === Password::PASSWORD_RESET) {
-            return response(['success' => true, 'message' => 'Password has been reset successfully.']);
+            return $this->respondUpdated('Password has been reset successfully');
         }
         throw ValidationException::withMessages([
             'email' => [__($status)],
@@ -149,6 +175,9 @@ class AuthController extends Controller
 
     /**
      * Check if the reset password token is valid (for frontend pre-check)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function checkResetToken(Request $request)
     {
@@ -160,13 +189,13 @@ class AuthController extends Controller
         // Use Password broker to check token validity
         $user = User::where('email', $credentials['email'])->first();
         if (!$user) {
-            return response()->json(['success' => false, 'message' => 'User not found.'], 404);
+            return $this->respondNotFound('User not found');
         }
         $broker = app('auth.password.broker');
         if ($broker->tokenExists($user, $credentials['token'])) {
-            return response()->json(['success' => true, 'message' => 'Token is valid.']);
+            return $this->respondWithMessage('Token is valid');
         } else {
-            return response()->json(['success' => false, 'message' => 'Token is invalid or expired.'], 422);
+            return $this->respondValidationError('Token is invalid or expired');
         }
     }
 }

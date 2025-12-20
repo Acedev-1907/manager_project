@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import eventBus from "../../../helper/eventBus";
 import { makeHttpReq } from "../../../helper/makeHttpReq";

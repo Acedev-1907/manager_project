@@ -7,84 +7,67 @@ use App\Models\PostLike;
 use App\Models\PostComment;
 use App\Models\Post;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
-use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Services\SpamDetectionService;
 
+/**
+ * Post Service
+ * 
+ * Handles all business logic related to posts including creation,
+ * retrieval, likes, comments, and sharing.
+ */
 class PostService
 {
-    protected $postRepository;
+    protected PostRepository $postRepository;
+    protected SpamDetectionService $spamDetection;
 
-    public function __construct(PostRepository $postRepository)
+    /**
+     * Initialize the service
+     * 
+     * @param PostRepository $postRepository
+     * @param SpamDetectionService $spamDetection
+     */
+    public function __construct(PostRepository $postRepository, SpamDetectionService $spamDetection)
     {
         $this->postRepository = $postRepository;
+        $this->spamDetection = $spamDetection;
     }
 
+    /**
+     * Get all posts with user information, likes, and comments
+     * 
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
     public function getAllPosts()
     {
         return $this->postRepository->getAllPostsWithUser();
     }
 
-    public function getPostById($id)
+    /**
+     * Get a specific post by ID with relations
+     * 
+     * @param int $id
+     * @return Post
+     */
+    public function getPostById(int $id): Post
     {
         return $this->postRepository->getPostById($id);
     }
 
     /**
-     * Kiểm tra spam tạo bài post
-     * Nếu user tạo quá 5 bài liên tục (trong khoảng thời gian ngắn) thì block
+     * Create a new post with spam detection
+     * 
+     * @param array $data Post data (content, images, etc.)
+     * @param Request|null $request HTTP request object
+     * @return Post
+     * @throws \Exception
      */
-    protected function checkSpam($userId)
-    {
-        $blockKey = "post_spam_block_{$userId}";
-        
-        // Kiểm tra xem user có đang bị block không
-        if (Cache::has($blockKey)) {
-            $blockUntil = Cache::get("post_spam_block_until_{$userId}");
-            if ($blockUntil) {
-                $remainingMinutes = max(0, Carbon::parse($blockUntil)->diffInMinutes(Carbon::now()));
-                throw new \Exception("Bạn đã bị tạm khóa do tạo quá nhiều bài viết liên tục. Vui lòng đợi {$remainingMinutes} phút trước khi đăng bài tiếp theo.");
-            }
-            throw new \Exception('Bạn đã bị tạm khóa do tạo quá nhiều bài viết liên tục. Vui lòng đợi một chút trước khi đăng bài tiếp theo.');
-        }
-        
-        $maxPosts = 4; // Kiểm tra 4 bài gần nhất (bài hiện tại sẽ là bài thứ 5)
-        $timeWindow = 3; // 3 phút - khoảng thời gian để coi là "liên tục"
-        
-        // Lấy 4 bài post gần nhất của user (bài hiện tại sẽ là bài thứ 5)
-        $recentPosts = Post::where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->limit($maxPosts)
-            ->get(['created_at']);
-        
-        // Nếu có đủ 4 bài post gần nhất
-        if ($recentPosts->count() >= $maxPosts) {
-            $now = Carbon::now();
-            $oldestPostTime = Carbon::parse($recentPosts->last()->created_at);
-            
-            // Kiểm tra xem khoảng thời gian giữa bài cũ nhất và hiện tại có nhỏ hơn timeWindow không
-            $timeSpan = $now->diffInMinutes($oldestPostTime);
-            
-            // Nếu 4 bài được tạo trong vòng 3 phút -> đây sẽ là bài thứ 5 -> spam
-            if ($timeSpan <= $timeWindow) {
-                // Lưu vào cache để block user trong một khoảng thời gian
-                $blockDuration = 30; // Block 30 phút
-                $blockUntilTime = now()->addMinutes($blockDuration);
-                Cache::put($blockKey, true, $blockUntilTime);
-                Cache::put("post_spam_block_until_{$userId}", $blockUntilTime->toDateTimeString(), $blockUntilTime);
-                
-                throw new \Exception('Bạn đã tạo quá nhiều bài viết liên tục (5 bài trong vòng 3 phút). Tài khoản của bạn đã bị tạm khóa trong 30 phút. Vui lòng đợi trước khi đăng bài tiếp theo.');
-            }
-        }
-        
-        return true;
-    }
-
-    public function createPost(array $data)
+    public function createPost(array $data, ?Request $request = null): Post
     {
         $userId = Auth::id();
         
-        // Kiểm tra spam trước khi tạo bài post
-        $this->checkSpam($userId);
+        // Check spam using multiple factors (User ID, IP, fingerprint)
+        $this->spamDetection->checkPostSpam($userId, $request);
         
         $data['user_id'] = $userId;
         return $this->postRepository->create($data);
@@ -92,38 +75,49 @@ class PostService
 
     /**
      * Get user's images from their posts
+     * 
+     * @param int $userId
+     * @return array
      */
-    public function getUserImages($userId)
+    public function getUserImages(int $userId): array
     {
         return $this->postRepository->getUserImages($userId);
     }
 
     /**
-     * Toggle reaction on a post.
-     * - Nếu chưa có -> tạo mới với type.
-     * - Nếu đã có cùng type -> xoá (bỏ thích).
-     * - Nếu đã có khác type -> cập nhật sang type mới.
+     * Toggle reaction on a post
+     * 
+     * Logic:
+     * - If no like exists -> create new like with type
+     * - If like exists with same type -> delete (unlike)
+     * - If like exists with different type -> update to new type
+     * 
+     * @param int $postId
+     * @param string $type Reaction type (like, love, etc.)
+     * @return array
      */
-    public function toggleLike($postId, string $type = 'like')
+    public function toggleLike(int $postId, string $type = 'like'): array
     {
         $userId = Auth::id();
+        
         $like = PostLike::where('post_id', $postId)
             ->where('user_id', $userId)
             ->first();
 
         if ($like) {
             if ($like->type === $type) {
-                // cùng trạng thái -> bỏ thích
+                // Same type -> unlike (delete)
                 $like->delete();
                 return ['liked' => false, 'type' => null];
             }
 
-            // khác trạng thái -> đổi sang type mới
+            // Different type -> update to new type
             $like->type = $type;
             $like->save();
             return ['liked' => true, 'type' => $type];
         }
 
+        // No like exists -> create new
         PostLike::create([
             'post_id' => $postId,
             'user_id' => $userId,
@@ -134,21 +128,38 @@ class PostService
     }
 
     /**
-     * Add comment to a post
+     * Add a comment to a post with spam detection
+     * 
+     * @param int $postId
+     * @param string $content Comment content
+     * @param Request|null $request HTTP request object
+     * @return PostComment
+     * @throws \Exception
      */
-    public function addComment($postId, $content)
+    public function addComment(int $postId, string $content, ?Request $request = null): PostComment
     {
-        return PostComment::create([
+        $userId = Auth::id();
+        
+        // Check spam for comment creation
+        $this->spamDetection->checkCommentSpam($userId, $request);
+        
+        $comment = PostComment::create([
             'post_id' => $postId,
-            'user_id' => Auth::id(),
+            'user_id' => $userId,
             'content' => $content,
-        ])->load('user:id,name,avatar');
+        ]);
+        
+        // Load user relationship for response
+        return $comment->load('user:id,name,avatar');
     }
 
     /**
-     * Tăng số lần chia sẻ bài viết
+     * Increment share count for a post
+     * 
+     * @param int $postId
+     * @return int Updated share count
      */
-    public function sharePost($postId)
+    public function sharePost(int $postId): int
     {
         $post = $this->postRepository->getPostById($postId);
         $post->share_count = ($post->share_count ?? 0) + 1;
@@ -157,6 +168,3 @@ class PostService
         return $post->share_count;
     }
 }
-
-
-

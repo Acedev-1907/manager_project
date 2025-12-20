@@ -90,6 +90,11 @@ class UserController extends ApiController
 
     /**
      * Proxy Google Drive image to avoid CORS/hotlink issues
+     * 
+     * Note: This endpoint returns raw image data, not JSON, so it doesn't use ApiController methods
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\Response
      */
     public function proxyImage(Request $request)
     {
@@ -109,7 +114,7 @@ class UserController extends ApiController
             $res = $client->get($url, ['stream' => true]);
             $contentType = $res->getHeaderLine('Content-Type');
             $data = $res->getBody()->getContents();
-            // Lưu file cache
+            // Save file to cache
             if (!file_exists(dirname($cachePath))) {
                 mkdir(dirname($cachePath), 0777, true);
             }

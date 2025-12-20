@@ -5,9 +5,15 @@ namespace App\Http\Controllers;
 use App\Services\PostService;
 use App\Services\ImageKitService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Response;
+use App\Http\Controllers\Api\ApiController;
 
-class PostController extends Controller
+/**
+ * Post Controller
+ * 
+ * Handles all post-related operations including creating posts,
+ * uploading images, managing likes, comments, and shares.
+ */
+class PostController extends ApiController
 {
     protected $postService;
     protected $imageKitService;
@@ -18,12 +24,23 @@ class PostController extends Controller
         $this->imageKitService = $imageKitService;
     }
 
+    /**
+     * Get all posts
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function index()
     {
         $posts = $this->postService->getAllPosts();
-        return Response::json($posts);
+        return $this->respondWithData($posts, 'Posts retrieved successfully');
     }
 
+    /**
+     * Create a new post
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -48,32 +65,40 @@ class PostController extends Controller
                 $validated['images'] = $uploadedImages;
             }
 
-            $post = $this->postService->createPost($validated);
+            $post = $this->postService->createPost($validated, $request);
 
-            return Response::json([
-                'message' => 'Bài viết đã được đăng thành công!',
-                'post' => $post->load('user:id,name,avatar'),
-            ], 201);
+            return $this->setStatusCode(201)
+                ->setReturnCode(self::RESPONSE_CREATED)
+                ->respondWithData([
+                    'post' => $post->load('user:id,name,avatar')
+                ], 'Post created successfully');
         } catch (\Exception $e) {
-            // Xử lý lỗi spam hoặc các lỗi khác
-            return Response::json([
-                'error' => $e->getMessage(),
-            ], 429); // 429 Too Many Requests
+            // Handle spam or other errors
+            return $this->setStatusCode(429)
+                ->setReturnCode(self::ERROR_VALIDATION)
+                ->respondWithError($e->getMessage());
         }
     }
 
     /**
      * Get user's image library (from previous posts with images)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function getUserImages(Request $request)
     {
         $user = $request->user();
         $images = $this->postService->getUserImages($user->id);
-        return Response::json($images);
+        return $this->respondWithData($images, 'User images retrieved successfully');
     }
 
     /**
      * Upload images for post (separate endpoint) - supports multiple files
+     * 
+     * @param Request $request
+     * @param ImageKitService $imageKit
+     * @return \Illuminate\Http\JsonResponse
      */
     public function uploadImage(Request $request, ImageKitService $imageKit)
     {
@@ -82,7 +107,9 @@ class PostController extends Controller
             $files = $request->file('images');
             
             if (!$files || (is_array($files) && count($files) === 0)) {
-                return Response::json(['error' => 'No files provided'], 400);
+                return $this->setStatusCode(400)
+                    ->setReturnCode(self::ERROR_VALIDATION)
+                    ->respondWithError('No files provided');
             }
 
             // Ensure files is an array
@@ -112,29 +139,38 @@ class PostController extends Controller
             }
 
             if (count($uploadedImages) === 0) {
-                return Response::json(['error' => 'No valid images uploaded'], 422);
+                return $this->respondValidationError('No valid images uploaded');
             }
 
-            return Response::json([
-                'message' => 'Upload successful!',
+            return $this->respondWithData([
                 'images' => $uploadedImages
-            ]);
+            ], 'Upload successful');
         } catch (\Exception $e) {
-            return Response::json(['error' => $e->getMessage()], 422);
+            return $this->respondValidationError($e->getMessage());
         }
     }
 
     /**
      * Get post by ID with likes and comments
+     * 
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function show($id)
     {
         $post = $this->postService->getPostById($id);
-        return Response::json($post);
+        if (!$post) {
+            return $this->respondNotFound('Post not found');
+        }
+        return $this->respondWithData($post, 'Post retrieved successfully');
     }
 
     /**
      * Toggle like/reaction on a post
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function toggleLike(Request $request, $id)
     {
@@ -142,16 +178,20 @@ class PostController extends Controller
         $result = $this->postService->toggleLike($id, $type);
         $post = $this->postService->getPostById($id);
 
-        return Response::json([
+        return $this->respondWithData([
             'liked' => $result['liked'],
             'type' => $result['type'],
             'likes_count' => $post->likes_count,
             'likes' => $post->likes
-        ]);
+        ], 'Like toggled successfully');
     }
 
     /**
      * Add comment to a post
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function addComment(Request $request, $id)
     {
@@ -159,25 +199,29 @@ class PostController extends Controller
             'content' => 'required|string|max:1000',
         ]);
 
-        $comment = $this->postService->addComment($id, $validated['content']);
+        $comment = $this->postService->addComment($id, $validated['content'], $request);
         $post = $this->postService->getPostById($id);
         
-        return Response::json([
-            'message' => 'Bình luận đã được thêm!',
-            'comment' => $comment,
-            'comments_count' => $post->comments_count
-        ], 201);
+        return $this->setStatusCode(201)
+            ->setReturnCode(self::RESPONSE_CREATED)
+            ->respondWithData([
+                'comment' => $comment,
+                'comments_count' => $post->comments_count
+            ], 'Comment added successfully');
     }
 
     /**
-     * Tăng share_count cho bài viết
+     * Share a post (increment share count)
+     * 
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
      */
     public function share($id)
     {
         $shareCount = $this->postService->sharePost($id);
 
-        return Response::json([
+        return $this->respondWithData([
             'share_count' => $shareCount,
-        ]);
+        ], 'Post shared successfully');
     }
 }

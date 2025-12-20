@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
 import PostItem from './PostItem.vue';
 import CreatePost from './CreatePost.vue';
@@ -12,6 +12,20 @@ const hasMore = ref(true);
 const loadMoreTrigger = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
 
+// Helper function to filter out null/undefined posts
+const filterValidPosts = (postsArray: any): any[] => {
+    // Ensure postsArray is an array
+    if (!Array.isArray(postsArray)) {
+        return [];
+    }
+    return postsArray.filter(post => post != null && post.id != null);
+};
+
+// Computed property to ensure only valid posts are rendered
+const validPosts = computed(() => {
+    return filterValidPosts(posts.value);
+});
+
 const fetchPosts = async (isRefresh = false) => {
     if (isRefresh) {
         page.value = 1;
@@ -20,14 +34,26 @@ const fetchPosts = async (isRefresh = false) => {
     }
 
     try {
-        const res = await makeHttpReq<never, { data?: any[]; next_page_url?: string | null }>(`/posts?page=${page.value}`, 'GET');
+        const res = await makeHttpReq<never, { data?: any; next_page_url?: string | null }>(`/posts?page=${page.value}`, 'GET');
         if (res.data) {
-            if (isRefresh) {
-                posts.value = res.data;
-            } else {
-                posts.value = [...posts.value, ...res.data];
+            // Handle paginated response: res.data might be an object with 'data' property
+            let postsData: any[] = [];
+            if (Array.isArray(res.data)) {
+                postsData = res.data;
+            } else if (res.data.data && Array.isArray(res.data.data)) {
+                postsData = res.data.data;
             }
-            hasMore.value = res.next_page_url !== null;
+            
+            const validPosts = filterValidPosts(postsData);
+            if (isRefresh) {
+                posts.value = validPosts;
+            } else {
+                posts.value = filterValidPosts([...posts.value, ...validPosts]);
+            }
+            
+            // Check for next page
+            const nextPageUrl = res.data.next_page_url || (res.data as any)?.next_page_url || null;
+            hasMore.value = nextPageUrl !== null;
             page.value++;
         }
     } catch (error) {
@@ -38,18 +64,22 @@ const fetchPosts = async (isRefresh = false) => {
 };
 
 const handlePostCreated = (newPost: any) => {
-    posts.value.unshift(newPost);
+    if (newPost != null && newPost.id != null) {
+        posts.value.unshift(newPost);
+    }
 };
 
 const handlePostUpdated = (payload: { postId: number; likes_count: number; likes: any[]; liked: boolean; reactionType: string | null }) => {
     const index = posts.value.findIndex((p) => p.id === payload.postId);
     if (index !== -1) {
         const current = posts.value[index];
+        // Update the post object to ensure reactivity
         posts.value[index] = {
             ...current,
             likes_count: payload.likes_count,
-            likes: payload.likes,
-            user_reaction_type: payload.liked ? payload.reactionType ?? 'like' : null,
+            likes: payload.likes || current.likes || [],
+            // Set user_reaction_type based on liked status and reactionType
+            user_reaction_type: payload.liked ? (payload.reactionType || 'like') : null,
         };
     }
 };
@@ -100,7 +130,7 @@ onUnmounted(() => {
             <SkeletonCard v-for="i in 3" :key="i" class="mb-3" />
         </div>
 
-        <div v-else-if="posts.length === 0" class="no-posts-container">
+        <div v-else-if="validPosts.length === 0" class="no-posts-container">
             <div class="no-posts-card">
                 <div class="icon-circle">
                     <i class="bi bi-chat-square-text"></i>
@@ -112,7 +142,7 @@ onUnmounted(() => {
 
         <div v-else class="posts-list">
             <PostItem 
-                v-for="post in posts" 
+                v-for="post in validPosts" 
                 :key="post.id" 
                 :post="post" 
                 @postUpdated="handlePostUpdated" 

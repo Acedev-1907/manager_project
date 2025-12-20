@@ -17,6 +17,7 @@ class PostRepository extends BaseRepository
         
         return $this->model->with([
             'user:id,name,avatar',
+            'likes:id,post_id,user_id,type', // Include type field
             'likes.user:id,name,avatar',
             'comments.user:id,name,avatar'
         ])
@@ -30,6 +31,7 @@ class PostRepository extends BaseRepository
     {
         return $this->model->with([
             'user:id,name,avatar',
+            'likes:id,post_id,user_id,type', // Include type field
             'likes.user:id,name,avatar',
             'comments.user:id,name,avatar'
         ])

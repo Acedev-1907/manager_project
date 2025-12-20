@@ -16,7 +16,10 @@ class ChatController extends ApiController
     }
 
     /**
-     * Danh sách cuộc hội thoại của user (sidebar)
+     * Get list of conversations for the user (sidebar)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function conversations(Request $request)
     {
@@ -25,11 +28,14 @@ class ChatController extends ApiController
 
         $conversations = $this->chatService->getConversations($user, $perPage);
 
-        return $this->respondWithData($conversations);
+        return $this->respondWithData($conversations, 'Conversations retrieved successfully');
     }
 
     /**
-     * Lấy toàn bộ message giữa current user và 1 user khác
+     * Get all messages between current user and another user
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function messages(Request $request)
     {
@@ -38,7 +44,7 @@ class ChatController extends ApiController
         $perPage = (int) $request->get('per_page', 50);
 
         if (!$otherUserId) {
-            return $this->respondValidationError('user_id là bắt buộc');
+            return $this->respondValidationError('user_id is required');
         }
 
         $result = $this->chatService->getMessages($user, $otherUserId, $perPage);
@@ -47,11 +53,14 @@ class ChatController extends ApiController
             return $this->respondValidationError($result['error']);
         }
 
-        return $this->respondWithData($result);
+        return $this->respondWithData($result, 'Messages retrieved successfully');
     }
 
     /**
-     * Gửi tin nhắn 1-1
+     * Send a 1-on-1 message
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function send(Request $request)
     {
@@ -69,7 +78,7 @@ class ChatController extends ApiController
             return $this->respondValidationError($result['error']);
         }
 
-        return $this->respondWithData($result['message'], 'Gửi tin nhắn thành công');
+        return $this->respondWithData($result['message'], 'Message sent successfully');
     }
 }
 
