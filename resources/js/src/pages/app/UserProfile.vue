@@ -18,12 +18,9 @@ const router = useRouter();
 const route = useRoute();
 const user = ref({ id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' });
 const viewingUserId = ref<number | null>(null);
-const isCurrentUser = computed(() => {
-    // If no viewingUserId, means viewing own profile
-    if (!viewingUserId.value) {
-        return true;
-    }
-    
+
+// Get current user ID for comparison
+const currentUserId = computed(() => {
     // Get current user ID from multiple sources (priority order)
     // 1. From getUserData helper (most reliable)
     const currentIdFromHelper = getCurrentUserId();
@@ -34,13 +31,20 @@ const isCurrentUser = computed(() => {
     
     // Use the first available ID
     const currentId = currentIdFromHelper || currentIdFromCache || currentIdFromStore;
+    return currentId ? Number(currentId) : null;
+});
+
+const isCurrentUser = computed(() => {
+    // If no viewingUserId, means viewing own profile
+    if (!viewingUserId.value) {
+        return true;
+    }
     
     // If we have current user ID, compare with viewingUserId
-    if (currentId) {
+    if (currentUserId.value) {
         // Convert both to numbers for comparison
         const viewingId = Number(viewingUserId.value);
-        const currentIdNum = Number(currentId);
-        return viewingId === currentIdNum;
+        return viewingId === currentUserId.value;
     }
     
     // Fallback: if viewingUserId matches user.value.id, it's current user
@@ -912,7 +916,11 @@ onBeforeUnmount(() => {
             <!-- Center Column - Main Content -->
             <div class="center-column">
                 <div v-if="activeTab === 'timeline'">
-                    <PostList :hide-stories="true" />
+                    <PostList 
+                        :hide-stories="true" 
+                        :user-id="viewingUserId || user.id || null"
+                        :current-user-id="currentUserId"
+                    />
                 </div>
                 <div v-else-if="activeTab === 'about'" class="about-tab-content">
                     <div class="about-detail-card">

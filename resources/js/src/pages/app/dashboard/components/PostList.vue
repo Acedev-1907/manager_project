@@ -8,6 +8,8 @@ import SkeletonCard from '../../../../components/SkeletonCard.vue';
 
 const props = defineProps<{
     hideStories?: boolean;
+    userId?: number | null; // Filter posts by user ID (for profile page)
+    currentUserId?: number | null; // Current authenticated user ID (to show CreatePost on own profile)
 }>();
 
 const posts = ref<any[]>([]);
@@ -39,7 +41,12 @@ const fetchPosts = async (isRefresh = false) => {
     }
 
     try {
-        const res = await makeHttpReq<never, { data?: any; next_page_url?: string | null }>(`/posts?page=${page.value}`, 'GET');
+        // Build query with optional user_id filter
+        let query = `page=${page.value}`;
+        if (props.userId) {
+            query += `&user_id=${props.userId}`;
+        }
+        const res = await makeHttpReq<never, { data?: any; next_page_url?: string | null }>(`/posts?${query}`, 'GET');
         if (res.data) {
             // Handle paginated response: res.data might be an object with 'data' property
             let postsData: any[] = [];
@@ -69,12 +76,14 @@ const fetchPosts = async (isRefresh = false) => {
 };
 
 const handlePostCreated = (newPost: any) => {
-    if (newPost != null && newPost.id != null) {
+    // Only add new post if not filtering by user_id (i.e., on newsfeed or own profile)
+    // If filtering by user_id, the post will be added when the list refreshes
+    if (newPost != null && newPost.id != null && !props.userId) {
         // Check if post already exists to avoid duplicates
         const existingIndex = posts.value.findIndex(p => p.id === newPost.id);
         if (existingIndex === -1) {
             // Add new post to the beginning of the list
-        posts.value.unshift(newPost);
+            posts.value.unshift(newPost);
         } else {
             // Update existing post
             posts.value[existingIndex] = newPost;
@@ -98,6 +107,12 @@ const handlePostCreated = (newPost: any) => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         }, 150);
+    } else if (props.userId && newPost != null && newPost.id != null) {
+        // If filtering by user_id and new post belongs to that user, refresh the list
+        const postUserId = newPost.user_id || newPost.user?.id;
+        if (postUserId === props.userId) {
+            fetchPosts(true);
+        }
     }
 };
 
@@ -115,6 +130,13 @@ const handlePostUpdated = (payload: { postId: number; likes_count: number; likes
         };
     }
 };
+
+// Watch for userId changes and refetch posts
+watch(() => props.userId, (newUserId, oldUserId) => {
+    if (newUserId !== oldUserId) {
+        fetchPosts(true);
+    }
+}, { immediate: false });
 
 onMounted(() => {
     fetchPosts(true);
@@ -157,7 +179,10 @@ onUnmounted(() => {
 <template>
     <div class="news-feed-container">
         <StoriesSection v-if="!props.hideStories" />
-        <CreatePost @postCreated="handlePostCreated" />
+        <CreatePost 
+            v-if="!props.userId || (props.userId && props.currentUserId && props.userId === props.currentUserId)" 
+            @postCreated="handlePostCreated" 
+        />
         
         <div v-if="isLoading && posts.length === 0" class="loading-posts">
             <SkeletonCard v-for="i in 3" :key="i" class="mb-3" />

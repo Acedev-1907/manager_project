@@ -28,11 +28,13 @@ class PostController extends ApiController
     /**
      * Get all posts
      * 
+     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function index()
+    public function index(Request $request)
     {
-        $posts = $this->postService->getAllPosts();
+        $userId = $request->input('user_id');
+        $posts = $this->postService->getAllPosts($userId ? (int)$userId : null);
         return $this->respondWithData($posts, 'Posts retrieved successfully');
     }
 

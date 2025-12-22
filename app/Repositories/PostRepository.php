@@ -11,11 +11,9 @@ class PostRepository extends BaseRepository
         return Post::class;
     }
 
-    public function getAllPostsWithUser()
+    public function getAllPostsWithUser(?int $filterUserId = null)
     {
-        $userId = \Illuminate\Support\Facades\Auth::id();
-        
-        return $this->model->with([
+        $query = $this->model->with([
             'user:id,name,avatar',
             'likes:id,post_id,user_id,type', // Include type field
             'likes.user:id,name,avatar',
@@ -26,8 +24,14 @@ class PostRepository extends BaseRepository
             }
         ])
             ->withCount('likes')
-            ->withCount('comments')
-            ->orderBy('created_at', 'desc')
+            ->withCount('comments');
+        
+        // Filter by user_id if provided (for profile page)
+        if ($filterUserId !== null) {
+            $query->where('user_id', $filterUserId);
+        }
+        
+        return $query->orderBy('created_at', 'desc')
             ->paginate(10);
     }
 

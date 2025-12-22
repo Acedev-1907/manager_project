@@ -36,11 +36,12 @@ class PostService
     /**
      * Get all posts with user information, likes, and comments
      * 
+     * @param int|null $userId Optional user ID to filter posts by user
      * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
      */
-    public function getAllPosts()
+    public function getAllPosts(?int $userId = null)
     {
-        return $this->postRepository->getAllPostsWithUser();
+        return $this->postRepository->getAllPostsWithUser($userId);
     }
 
     /**
