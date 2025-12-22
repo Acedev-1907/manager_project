@@ -182,4 +182,54 @@ class UserController extends ApiController
         $users = $this->userService->getAvailableForInvitation($user, $query);
         return $this->respondWithData($users);
     }
+
+    /**
+     * Get profile of a specific user by ID
+     * This is separate from the current user's profile endpoint
+     * 
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getProfile(Request $request, $id)
+    {
+        try {
+            $targetUser = \App\Models\User::find($id);
+            
+            if (!$targetUser) {
+                return $this->setStatusCode(404)
+                    ->setReturnCode(self::ERROR_NOT_FOUND)
+                    ->respondWithError('User not found');
+            }
+
+            // Get user data
+            $data = $targetUser->only([
+                'id',
+                'name',
+                'email',
+                'phone',
+                'avatar',
+                'cover_photo',
+                'email_verified_at',
+                'created_at',
+                'updated_at'
+            ]);
+            
+            // Only show friend_code if email is verified
+            $data['friend_code'] = ($targetUser->isValidEmail == \App\Models\User::IS_VALID_EMAIL) 
+                ? $targetUser->friend_code 
+                : null;
+            
+            return $this->respondWithData($data, 'User profile retrieved successfully');
+        } catch (\Exception $e) {
+            \Log::error('Error fetching user profile: ' . $e->getMessage(), [
+                'user_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return $this->setStatusCode(500)
+                ->setReturnCode(self::ERROR_INTERNAL)
+                ->respondWithError('Failed to retrieve user profile');
+        }
+    }
 }

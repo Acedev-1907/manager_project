@@ -50,6 +50,7 @@ class PostController extends ApiController
             'content' => 'required|string',
             'images' => 'nullable|array',
             'images.*' => 'string|url',
+            'privacy' => 'nullable|in:public,friends,private',
         ]);
 
         try {
@@ -67,6 +68,11 @@ class PostController extends ApiController
                 }
 
                 $validated['images'] = $uploadedImages;
+            }
+
+            // Set default privacy if not provided
+            if (!isset($validated['privacy'])) {
+                $validated['privacy'] = 'public';
             }
 
             $post = $this->postService->createPost($validated, $request);

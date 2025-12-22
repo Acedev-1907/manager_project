@@ -29,11 +29,12 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::controller(UserController::class)->group(function () {
-        Route::get('/user', 'show')->name('users.show');
+        Route::get('/user', 'show')->name('users.show'); // Current user's profile
         Route::put('/user', 'update')->name('users.update');
         Route::post('/user/upload-avatar', 'uploadAvatar');
         Route::post('/user/upload-cover', 'uploadCover');
         Route::get('/users/all', 'all');
+        Route::get('/users/{id}/profile', 'getProfile')->whereNumber('id'); // Other user's profile
     });
 
     Route::controller(MemberController::class)->group(function () {

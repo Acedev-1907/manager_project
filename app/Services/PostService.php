@@ -41,7 +41,8 @@ class PostService
      */
     public function getAllPosts(?int $userId = null)
     {
-        return $this->postRepository->getAllPostsWithUser($userId);
+        $viewerUserId = Auth::id();
+        return $this->postRepository->getAllPostsWithUser($userId, $viewerUserId);
     }
 
     /**
@@ -52,7 +53,8 @@ class PostService
      */
     public function getPostById(int $id): Post
     {
-        return $this->postRepository->getPostById($id);
+        $viewerUserId = Auth::id();
+        return $this->postRepository->getPostById($id, $viewerUserId);
     }
 
     /**

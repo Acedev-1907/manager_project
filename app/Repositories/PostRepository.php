@@ -11,7 +11,7 @@ class PostRepository extends BaseRepository
         return Post::class;
     }
 
-    public function getAllPostsWithUser(?int $filterUserId = null)
+    public function getAllPostsWithUser(?int $filterUserId = null, ?int $viewerUserId = null)
     {
         $query = $this->model->with([
             'user:id,name,avatar',
@@ -31,13 +31,54 @@ class PostRepository extends BaseRepository
             $query->where('user_id', $filterUserId);
         }
         
+        // Filter by privacy settings
+        if ($viewerUserId !== null) {
+            $query->where(function($q) use ($viewerUserId) {
+                // Public posts: everyone can see
+                $q->where('privacy', 'public');
+                
+                // Private posts: only the post owner can see
+                $q->orWhere(function($subQ) use ($viewerUserId) {
+                    $subQ->where('privacy', 'private')
+                         ->where('user_id', $viewerUserId);
+                });
+                
+                // Friends posts: only friends of the post owner can see
+                $q->orWhere(function($subQ) use ($viewerUserId) {
+                    $subQ->where('privacy', 'friends')
+                         ->where(function($friendQ) use ($viewerUserId) {
+                             // Viewer is the post owner
+                             $friendQ->where('user_id', $viewerUserId)
+                                    // OR viewer is a friend of the post owner (check both directions in members table)
+                                    ->orWhereExists(function($memberQuery) use ($viewerUserId) {
+                                        $memberQuery->select(\DB::raw(1))
+                                                   ->from('members')
+                                                   ->where(function($m) use ($viewerUserId) {
+                                                       // Check if viewer is in post owner's friend list
+                                                       $m->whereColumn('members.user_id', 'posts.user_id')
+                                                         ->where('members.member_id', $viewerUserId);
+                                                   })
+                                                   ->orWhere(function($m) use ($viewerUserId) {
+                                                       // Check if post owner is in viewer's friend list (bidirectional)
+                                                       $m->whereColumn('members.member_id', 'posts.user_id')
+                                                         ->where('members.user_id', $viewerUserId);
+                                                   });
+                                    });
+                         });
+                });
+            });
+        } else {
+            // If no viewer, only show public posts
+            $query->where('privacy', 'public');
+        }
+        
         return $query->orderBy('created_at', 'desc')
             ->paginate(10);
     }
 
-    public function getPostById($id)
+    public function getPostById($id, ?int $viewerUserId = null)
     {
-        return $this->model->with([
+        $query = $this->model->with([
             'user:id,name,avatar',
             'likes:id,post_id,user_id,type', // Include type field
             'likes.user:id,name,avatar',
@@ -49,7 +90,50 @@ class PostRepository extends BaseRepository
         ])
             ->withCount('likes')
             ->withCount('comments')
-            ->findOrFail($id);
+            ->where('id', $id);
+        
+        // Filter by privacy settings
+        if ($viewerUserId !== null) {
+            $query->where(function($q) use ($viewerUserId) {
+                // Public posts: everyone can see
+                $q->where('privacy', 'public');
+                
+                // Private posts: only the post owner can see
+                $q->orWhere(function($subQ) use ($viewerUserId) {
+                    $subQ->where('privacy', 'private')
+                         ->where('user_id', $viewerUserId);
+                });
+                
+                // Friends posts: only friends of the post owner can see
+                $q->orWhere(function($subQ) use ($viewerUserId) {
+                    $subQ->where('privacy', 'friends')
+                         ->where(function($friendQ) use ($viewerUserId) {
+                             // Viewer is the post owner
+                             $friendQ->where('user_id', $viewerUserId)
+                                    // OR viewer is a friend of the post owner (check both directions in members table)
+                                    ->orWhereExists(function($memberQuery) use ($viewerUserId) {
+                                        $memberQuery->select(\DB::raw(1))
+                                                   ->from('members')
+                                                   ->where(function($m) use ($viewerUserId) {
+                                                       // Check if viewer is in post owner's friend list
+                                                       $m->whereColumn('members.user_id', 'posts.user_id')
+                                                         ->where('members.member_id', $viewerUserId);
+                                                   })
+                                                   ->orWhere(function($m) use ($viewerUserId) {
+                                                       // Check if post owner is in viewer's friend list (bidirectional)
+                                                       $m->whereColumn('members.member_id', 'posts.user_id')
+                                                         ->where('members.user_id', $viewerUserId);
+                                                   });
+                                    });
+                         });
+                });
+            });
+        } else {
+            // If no viewer, only show public posts
+            $query->where('privacy', 'public');
+        }
+        
+        return $query->firstOrFail();
     }
 
     public function getUserImages($userId)

@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, onMounted, onBeforeUnmount, computed } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { APP } from "../../../App/APP";
 import { useUserStore } from '../../../state/userStore';
 import { getAvatarSrc } from '../../../helper/avatar';
@@ -58,8 +58,25 @@ onBeforeUnmount(() => {
 });
 
 const route = useRoute()
+const router = useRouter()
+
 function isActive(link: string) {
     return route.path.startsWith(link)
+}
+
+// Navigate to own profile (remove user_id query if exists)
+function goToOwnProfile() {
+    closeMenu();
+    // Force navigate to profile without user_id query to show own profile
+    // Use replace to avoid adding to history and ensure clean navigation
+    // Add timestamp to force route change detection
+    router.replace({ 
+        path: '/profile', 
+        query: { _t: Date.now().toString() } // Add timestamp to force route change
+    }).then(() => {
+        // Remove timestamp after navigation
+        router.replace({ path: '/profile', query: {} });
+    });
 }
 
 // Thêm biến để kiểm soát hover label
@@ -127,9 +144,9 @@ const currentUser = computed(() => {
                 <hr class="custom-divider" />
                 <!-- Menu -->
                 <div class="custom-menu">
-                    <RouterLink to="/profile" class="custom-menu-item" @click="closeMenu"><i class="bi bi-person"></i>
+                    <div class="custom-menu-item" @click="goToOwnProfile"><i class="bi bi-person"></i>
                         Profile
-                    </RouterLink>
+                    </div>
                     <div class="custom-menu-item" @click="closeMenu(); emit('logout')"><i
                             class="bi bi-box-arrow-right"></i>
                         Logout</div>
@@ -207,9 +224,9 @@ const currentUser = computed(() => {
                     <hr class="custom-divider" />
                     <!-- Menu -->
                     <div class="custom-menu">
-                        <RouterLink to="/profile" class="custom-menu-item" @click="closeMenu"><i
+                        <div class="custom-menu-item" @click="goToOwnProfile"><i
                                 class="bi bi-person"></i>
-                            Profile</RouterLink>
+                            Profile</div>
                         <div class="custom-menu-item" @click="closeMenu(); emit('logout')"><i
                                 class="bi bi-box-arrow-right"></i>
                             Logout</div>

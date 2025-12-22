@@ -18,6 +18,7 @@ const router = useRouter();
 const route = useRoute();
 const user = ref({ id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' });
 const viewingUserId = ref<number | null>(null);
+const previousUserId = ref<number | null>(null); // Track previous user_id to detect changes
 
 // Get current user ID for comparison
 const currentUserId = computed(() => {
@@ -230,11 +231,39 @@ const stopActiveTabWatcher = watch(() => activeTab.value, (newTab) => {
     }
 });
 
-const { getOrFetch } = useCacheFetch(
-    { user: (userStore as any).userInfoCache },
+// Separate cache for own profile and other users' profiles
+const ownProfileCache = computed(() => {
+    return { user: (userStore as any).userInfoCache };
+});
+
+const otherUsersCache = ref<Record<string, any>>({});
+
+const { getOrFetch: getOrFetchOwn, refetch: refetchOwn } = useCacheFetch(
+    ownProfileCache.value,
     (_key, data) => (userStore as any).setUserInfoCache(data),
     () => (userStore as any).clearUserInfoCache()
 );
+
+// Helper function to get or fetch other user's profile
+const getOrFetchOther = async (userId: number, fetchFn: () => Promise<any>, setData: (data: any) => void) => {
+    const cacheKey = `user_${userId}`;
+    if (otherUsersCache.value[cacheKey]) {
+        setData(otherUsersCache.value[cacheKey]);
+        return;
+    }
+    const data = await fetchFn();
+    otherUsersCache.value[cacheKey] = data;
+    setData(data);
+};
+
+// Helper function to refetch other user's profile
+const refetchOther = async (userId: number | string, fetchFn: () => Promise<any>, setData: (data: any) => void) => {
+    const cacheKey = `user_${userId}`;
+    delete otherUsersCache.value[cacheKey];
+    const data = await fetchFn();
+    otherUsersCache.value[cacheKey] = data;
+    setData(data);
+};
 
 function onAvatarClick() {
     showViewAvatarModal.value = true;
@@ -380,7 +409,7 @@ async function closeCoverCropModalWithConfirm() {
     const ok = await showConfirm('Are you sure you want to cancel editing your cover photo?', 'Cancel Editing');
     if (ok) closeCoverCropModal();
 }
-async function fetchUser() {
+async function fetchUser(forceRefetch = false) {
     // Only fetch if we're on the profile route and component is mounted
     if (route.name !== 'profile' || !isMounted.value) {
         return;
@@ -395,22 +424,51 @@ async function fetchUser() {
     abortController.value = new AbortController();
     const currentController = abortController.value;
     
+    // Get user_id from query parameter FIRST, before setting loading state
+    const userId = route.query.user_id ? Number(route.query.user_id) : null;
+    
+    // Check if we're switching users (including from user profile to own profile)
+    const isSwitchingUsers = previousUserId.value !== userId && previousUserId.value !== null;
+    
+    // IMPORTANT: Reset state IMMEDIATELY when switching users to prevent showing wrong data
+    if (isSwitchingUsers || viewingUserId.value !== userId) {
+        // Clear user data immediately
+        user.value = { id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' };
+        viewingUserId.value = userId;
+        
+        // Clear cache of previous user if switching
+        if (isSwitchingUsers && previousUserId.value !== null) {
+            // Clear cache for previous user
+            (userStore as any).clearUserInfoCache();
+        }
+    }
+    
+    // Update previousUserId AFTER resetting state
+    previousUserId.value = userId;
+    
     loading.value = true;
     errorMessage.value = '';
     try {
-        // Get user_id from query parameter
-        const userId = route.query.user_id ? Number(route.query.user_id) : null;
-        
         // Check again before setting state
         if (!isMounted.value || route.name !== 'profile') {
             return;
         }
         
-        viewingUserId.value = userId;
+        // Use separate cache and fetch functions for own profile vs other users
+        // ALWAYS use refetch when switching users to ensure fresh data
+        // Also use refetch if forceRefetch is true
+        const shouldRefetch = forceRefetch || isSwitchingUsers;
         
-        const cacheKey = userId ? `user_${userId}` : 'user';
+        let fetchFn: any;
+        if (userId) {
+            // Other user's profile - use separate cache
+            fetchFn = shouldRefetch ? refetchOther : getOrFetchOther;
+        } else {
+            // Own profile - use userStore cache
+            fetchFn = shouldRefetch ? refetchOwn : getOrFetchOwn;
+        }
         
-        await getOrFetch(cacheKey, async () => {
+        await fetchFn(userId || 'user', async () => {
             // Check if aborted or unmounted
             if (currentController.signal.aborted || !isMounted.value || route.name !== 'profile') {
                 throw new Error('Aborted');
@@ -418,30 +476,15 @@ async function fetchUser() {
             
             let res: any;
             if (userId) {
-                // Fetch member by ID from members list
-                const membersRes = await makeHttpReq<never, any>(`/members?per_page=1000`, 'GET');
+                // Use dedicated endpoint for other user's profile
+                res = await makeHttpReq<never, any>(`/users/${userId}/profile`, 'GET');
                 
                 // Check again after async operation
                 if (currentController.signal.aborted || !isMounted.value || route.name !== 'profile') {
                     throw new Error('Aborted');
                 }
-                
-                let membersData: any[] = [];
-                if (membersRes && membersRes.data) {
-                    if (Array.isArray(membersRes.data.data)) {
-                        membersData = membersRes.data.data;
-                    } else if (Array.isArray(membersRes.data)) {
-                        membersData = membersRes.data;
-                    }
-                } else if (Array.isArray(membersRes)) {
-                    membersData = membersRes;
-                }
-                const member = membersData.find((m: any) => m.id === userId);
-                if (!member) {
-                    throw new Error('User not found');
-                }
-                res = { data: member };
             } else {
+                // Use current user's profile endpoint
                 res = await makeHttpReq<undefined, any>('user', 'GET');
                 
                 // Check again after async operation
@@ -459,7 +502,7 @@ async function fetchUser() {
                 cover_photo: res.data.cover_photo || '',
                 friend_code: res.data.friend_code || null,
             };
-        }, (data) => {
+        }, (data: any) => {
             // Only update state if component is still mounted and on profile route
             if (!isMounted.value || route.name !== 'profile' || currentController.signal.aborted) {
                 return;
@@ -679,13 +722,73 @@ async function updateUser() {
 }
 // Removed unused function goToChangePassword
 // Watch for route changes to reload user when user_id changes
-const stopWatcher = watch(() => route.query.user_id, () => {
+const stopWatcher = watch(() => route.query.user_id, (newUserId, oldUserId) => {
     // Only fetch if component is mounted and we're still on the profile route
     if (isMounted.value && route.name === 'profile') {
-        fetchUser();
-        fetchUserImages();
+        // Reset state immediately when user_id changes to prevent showing wrong data
+        const userId = newUserId ? Number(newUserId) : null;
+        const oldUserIdNum = oldUserId ? Number(oldUserId) : null;
+        
+        // Always reset when user_id changes (including when going from user profile to own profile)
+        if (userId !== oldUserIdNum) {
+            // Reset user data immediately to prevent showing cached data
+            user.value = { id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' };
+            viewingUserId.value = userId;
+            // Reset other related data
+            galleryImages.value = [];
+            friendsList.value = [];
+            activeTab.value = 'timeline';
+            // Clear loading states
+            loading.value = true;
+            galleryLoading.value = false;
+            friendsLoading.value = false;
+            
+            // Use nextTick to ensure state is reset before fetching
+            nextTick(() => {
+                if (isMounted.value && route.name === 'profile') {
+                    fetchUser();
+                    fetchUserImages();
+                }
+            });
+        }
     }
 }, { immediate: false });
+
+// Also watch the entire route object to catch navigation to /profile without user_id
+const stopRouteQueryWatcher = watch(() => route.query, (newQuery, oldQuery) => {
+    // Only handle if we're on profile route and component is mounted
+    if (isMounted.value && route.name === 'profile') {
+        const newUserId = newQuery.user_id ? Number(newQuery.user_id) : null;
+        const oldUserId = oldQuery.user_id ? Number(oldQuery.user_id) : null;
+        
+        // If user_id changed (including from user_id to null/undefined)
+        if (newUserId !== oldUserId) {
+            // Clear cache of old user immediately
+            if (oldUserId !== null && oldUserId !== undefined) {
+                (userStore as any).clearUserInfoCache();
+            }
+            
+            // Reset state immediately
+            user.value = { id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' };
+            viewingUserId.value = newUserId;
+            previousUserId.value = oldUserId ? Number(oldUserId) : null; // Update previousUserId before fetch
+            galleryImages.value = [];
+            friendsList.value = [];
+            activeTab.value = 'timeline';
+            loading.value = true;
+            galleryLoading.value = false;
+            friendsLoading.value = false;
+            
+            // Fetch new data with force refetch
+            nextTick(() => {
+                if (isMounted.value && route.name === 'profile') {
+                    fetchUser(true); // Force refetch when switching users
+                    fetchUserImages();
+                }
+            });
+        }
+    }
+}, { immediate: false, deep: true });
 
 // Watch for route name changes to reset state when leaving profile
 const stopRouteWatcher = watch(() => route.name, (newRouteName, oldRouteName) => {
@@ -738,6 +841,7 @@ onBeforeUnmount(() => {
         
         // Cleanup watchers
         stopWatcher();
+        stopRouteQueryWatcher();
         stopActiveTabWatcher();
         stopRouteWatcher();
         

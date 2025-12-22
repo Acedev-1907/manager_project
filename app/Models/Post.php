@@ -17,6 +17,7 @@ class Post extends Model
         'image_url',
         'images',
         'share_count',
+        'privacy',
     ];
 
     protected $casts = [

@@ -42,10 +42,36 @@
                         />
                         <div class="user-details">
                             <div class="user-name">{{ currentUser?.name || 'User' }}</div>
-                            <div class="privacy-selector">
-                                <i class="bi bi-lock-fill"></i>
-                                <span>Chỉ mình tôi</span>
+                            <div class="privacy-selector" ref="privacySelectorRef" @click.stop="showPrivacyDropdown = !showPrivacyDropdown">
+                                <i :class="getPrivacyIcon(privacy)"></i>
+                                <span>{{ getPrivacyLabel(privacy) }}</span>
                                 <i class="bi bi-chevron-down"></i>
+                                <div v-if="showPrivacyDropdown" class="privacy-dropdown" @click.stop>
+                                    <div 
+                                        class="privacy-option" 
+                                        :class="{ 'active': privacy === 'public' }"
+                                        @click.stop="selectPrivacy('public')"
+                                    >
+                                        <i class="bi bi-globe"></i>
+                                        <span>Công khai</span>
+                                    </div>
+                                    <div 
+                                        class="privacy-option" 
+                                        :class="{ 'active': privacy === 'friends' }"
+                                        @click.stop="selectPrivacy('friends')"
+                                    >
+                                        <i class="bi bi-people-fill"></i>
+                                        <span>Bạn bè</span>
+                                    </div>
+                                    <div 
+                                        class="privacy-option" 
+                                        :class="{ 'active': privacy === 'private' }"
+                                        @click.stop="selectPrivacy('private')"
+                                    >
+                                        <i class="bi bi-lock-fill"></i>
+                                        <span>Chỉ mình tôi</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -178,6 +204,9 @@ const selectedImages = ref<string[]>([]);
 const showImagePicker = ref(false);
 const selectedColor = ref<string | null>(null);
 const showColorPalette = ref(false);
+const privacy = ref<'public' | 'friends' | 'private'>('private');
+const showPrivacyDropdown = ref(false);
+const privacySelectorRef = ref<HTMLElement | null>(null);
 
 const colorOptions = [
     'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // Purple-pink
@@ -265,6 +294,8 @@ const resetForm = async () => {
     selectedImages.value = [];
     selectedColor.value = null;
     showColorPalette.value = false;
+    privacy.value = 'private';
+    showPrivacyDropdown.value = false;
     
     await nextTick();
     
@@ -283,6 +314,37 @@ const resetForm = async () => {
     }
     
     await nextTick();
+};
+
+const getPrivacyIcon = (privacyType: string) => {
+    switch (privacyType) {
+        case 'public':
+            return 'bi bi-globe';
+        case 'friends':
+            return 'bi bi-people-fill';
+        case 'private':
+            return 'bi bi-lock-fill';
+        default:
+            return 'bi bi-lock-fill';
+    }
+};
+
+const getPrivacyLabel = (privacyType: string) => {
+    switch (privacyType) {
+        case 'public':
+            return 'Công khai';
+        case 'friends':
+            return 'Bạn bè';
+        case 'private':
+            return 'Chỉ mình tôi';
+        default:
+            return 'Chỉ mình tôi';
+    }
+};
+
+const selectPrivacy = (privacyType: 'public' | 'friends' | 'private') => {
+    privacy.value = privacyType;
+    showPrivacyDropdown.value = false;
 };
 
 const closeModal = () => {
@@ -352,9 +414,10 @@ const handlePost = async () => {
     
     isSubmitting.value = true;
     try {
-        const res = await makeHttpReq<{ content: string; images: string[] | null }, { code?: number; data?: { post?: any }; message?: string }>('/posts', 'POST', {
+        const res = await makeHttpReq<{ content: string; images: string[] | null; privacy: string }, { code?: number; data?: { post?: any }; message?: string }>('/posts', 'POST', {
             content: postContent,
-            images: postImages.length > 0 ? postImages : null
+            images: postImages.length > 0 ? postImages : null,
+            privacy: privacy.value
         });
         
         const newPost = res.data?.post || (res as any).post;
@@ -380,7 +443,9 @@ const handlePost = async () => {
             notifications.value.unshift(newNotification);
             notificationCount.value = (notificationCount.value || 0) + 1;
             
-            closeModal();
+            // Close modal after successful post creation
+            isSubmitting.value = false;
+            showModal.value = false;
         } else {
             console.error('Post creation response missing post data:', res);
             showError('Không thể lấy thông tin bài viết mới. Vui lòng tải lại trang.');
@@ -400,12 +465,20 @@ const handleEscape = (e: KeyboardEvent) => {
     }
 };
 
+const handleClickOutside = (event: MouseEvent) => {
+    if (showPrivacyDropdown.value && privacySelectorRef.value && !privacySelectorRef.value.contains(event.target as Node)) {
+        showPrivacyDropdown.value = false;
+    }
+};
+
 onMounted(() => {
     document.addEventListener('keydown', handleEscape);
+    document.addEventListener('click', handleClickOutside);
 });
 
 onUnmounted(() => {
     document.removeEventListener('keydown', handleEscape);
+    document.removeEventListener('click', handleClickOutside);
 });
 </script>
 
@@ -619,6 +692,49 @@ onUnmounted(() => {
 .privacy-selector i:last-child {
     font-size: 0.7rem;
     color: #65676b;
+}
+
+.privacy-selector {
+    position: relative;
+}
+
+.privacy-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    min-width: 180px;
+    z-index: 1000;
+    overflow: hidden;
+    border: 1px solid #e4e6eb;
+}
+
+.privacy-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 0.875rem;
+    color: #050505;
+}
+
+.privacy-option:hover {
+    background: #f0f2f5;
+}
+
+.privacy-option.active {
+    background: #e7f3ff;
+    color: #1877f2;
+}
+
+.privacy-option i {
+    font-size: 1rem;
+    width: 18px;
+    text-align: center;
 }
 
 .modal-content-area {
