@@ -367,7 +367,7 @@ const handleSelectReaction = async (reactionType: string) => {
 </script>
 
 <template>
-    <div class="post-item">
+    <div class="post-item" :data-post-id="post.id">
         <div class="post-header">
             <div class="header-left">
                 <img :src="getAvatarSrc(post.user.avatar, post.user.name)" class="user-avatar" alt="Avatar">
@@ -402,7 +402,7 @@ const handleSelectReaction = async (reactionType: string) => {
             </div>
         </div>
 
-        <div class="post-stats" v-if="(post.likes_count || 0) > 0 || (post.comments_count || 0) > 0">
+        <div class="post-stats" v-if="(post.likes_count || 0) > 0 || (post.comments_count || 0) > 0 || (post.share_count || 0) > 0">
             <div class="stats-left" v-if="(post.likes_count || 0) > 0">
                 <template v-if="isSingleLikeByCurrentUser && currentUser">
                     <img
@@ -418,8 +418,9 @@ const handleSelectReaction = async (reactionType: string) => {
                 </template>
                 <span class="stats-text">{{ likesLabel }}</span>
             </div>
-            <div class="stats-right" v-if="(post.comments_count || 0) > 0">
-                <span class="stats-text">{{ post.comments_count }} bình luận</span>
+            <div class="stats-right" v-if="(post.comments_count || 0) > 0 || (post.share_count || 0) > 0">
+                <span v-if="(post.comments_count || 0) > 0" class="stats-text">{{ post.comments_count }} Bình luận</span>
+                <span v-if="(post.share_count || 0) > 0" class="stats-text">{{ post.share_count }} Chia sẻ</span>
             </div>
         </div>
 
@@ -461,7 +462,7 @@ const handleSelectReaction = async (reactionType: string) => {
             </div>
 
             <button class="action-btn" @click.stop="openComments">
-                <i class="bi bi-chat"></i> 
+                <i class="bi bi-chat-dots"></i> 
                 <span>Bình luận</span>
             </button>
             <button class="action-btn" @click.stop="openShareModal">
@@ -469,6 +470,7 @@ const handleSelectReaction = async (reactionType: string) => {
                 <span>Chia sẻ</span>
             </button>
         </div>
+
 
         <!-- Featured Comments Section (Always visible if has comments) -->
         <div v-if="post.comments && post.comments.length > 0" class="featured-comments">
@@ -615,11 +617,16 @@ const handleSelectReaction = async (reactionType: string) => {
 <style scoped>
 .post-item {
     background: #fff;
-    border-radius: 8px;
+    border-radius: 12px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    padding: 12px 16px;
-    margin-bottom: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
     width: 100%;
+    transition: box-shadow 0.2s;
+}
+
+.post-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .post-header {
@@ -639,6 +646,7 @@ const handleSelectReaction = async (reactionType: string) => {
     height: 40px;
     border-radius: 50%;
     object-fit: cover;
+    border: 2px solid #e4e6eb;
 }
 
 .user-info {
@@ -684,11 +692,12 @@ const handleSelectReaction = async (reactionType: string) => {
 }
 
 .post-content {
-    margin-bottom: 12px;
-    font-size: 0.95rem;
-    line-height: 1.4;
+    margin-bottom: 16px;
+    font-size: 1rem;
+    line-height: 1.5;
     color: #050505;
     white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .post-images-container {
@@ -786,6 +795,11 @@ const handleSelectReaction = async (reactionType: string) => {
     justify-content: space-between;
     padding: 10px 0;
     border-bottom: 1px solid #e4e6e9;
+}
+
+.stats-right {
+    display: flex;
+    gap: 16px;
 }
 
 .stats-left, .stats-right {

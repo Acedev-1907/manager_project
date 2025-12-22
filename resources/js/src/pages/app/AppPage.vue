@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed } from 'vue';
 import NarBar from './components/NarBar.vue';
+import MobileFooter from './components/MobileFooter.vue';
 import { useLogOutUser } from './actions/Logout';
 import { getUserData } from '../../helper/getUserData';
 import { clearCacheOnLogout } from '../../composables/useLocalStorage';
@@ -98,6 +99,7 @@ const userAvatar = computed(() => {
                 </transition>
             </router-view>
         </div>
+        <MobileFooter />
     </div>
 </template>
 
@@ -113,7 +115,6 @@ const userAvatar = computed(() => {
     flex: 1;
     min-width: 0;
     position: relative;
-    padding-top: 10px;
     padding-left: 0;
     padding-right: 0;
 }
@@ -123,6 +124,7 @@ const userAvatar = computed(() => {
         padding-top: 10px;
         padding-left: 0;
         padding-right: 0;
+        padding-bottom: 80px; /* Space for mobile footer */
     }
 }
 

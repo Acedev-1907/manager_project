@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
 import PostItem from './PostItem.vue';
 import CreatePost from './CreatePost.vue';
+import StoriesSection from './StoriesSection.vue';
 import SkeletonCard from '../../../../components/SkeletonCard.vue';
 
 const posts = ref<any[]>([]);
@@ -65,7 +66,34 @@ const fetchPosts = async (isRefresh = false) => {
 
 const handlePostCreated = (newPost: any) => {
     if (newPost != null && newPost.id != null) {
-        posts.value.unshift(newPost);
+        // Check if post already exists to avoid duplicates
+        const existingIndex = posts.value.findIndex(p => p.id === newPost.id);
+        if (existingIndex === -1) {
+            // Add new post to the beginning of the list
+            posts.value.unshift(newPost);
+        } else {
+            // Update existing post
+            posts.value[existingIndex] = newPost;
+        }
+        
+        // Force reactivity update
+        posts.value = [...posts.value];
+        
+        // Scroll to top to show new post
+        setTimeout(() => {
+            const firstPost = document.querySelector(`[data-post-id="${newPost.id}"]`);
+            if (firstPost) {
+                firstPost.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Highlight the new post
+                firstPost.classList.add('new-post-highlight');
+                setTimeout(() => {
+                    firstPost.classList.remove('new-post-highlight');
+                }, 2000);
+            } else {
+                // Fallback: scroll to top of feed
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }, 150);
     }
 };
 
@@ -124,6 +152,7 @@ onUnmounted(() => {
 
 <template>
     <div class="news-feed-container">
+        <StoriesSection />
         <CreatePost @postCreated="handlePostCreated" />
         
         <div v-if="isLoading && posts.length === 0" class="loading-posts">
@@ -226,6 +255,28 @@ onUnmounted(() => {
     display: flex;
     justify-content: center;
     padding: 10px 0 20px 0;
+}
+
+/* Highlight animation for new post */
+:deep(.new-post-highlight) {
+    animation: highlightPost 2s ease-out;
+    border: 2px solid #1877f2 !important;
+    box-shadow: 0 0 0 4px rgba(24, 119, 242, 0.1) !important;
+}
+
+@keyframes highlightPost {
+    0% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 4px rgba(24, 119, 242, 0.2) !important;
+    }
+    50% {
+        transform: scale(1.01);
+        box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.15) !important;
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+    }
 }
 </style>
 

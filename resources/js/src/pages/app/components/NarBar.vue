@@ -85,43 +85,26 @@ const currentUser = computed(() => {
 </script>
 <template>
     <nav class="top-navbar">
-        <div class="navbar-top-row d-flex d-md-none">
-            <div class="navbar-left">
-                <img :src="`${APP.baseURL}/others/logo.png`" class="navbar-logo" alt="TaskMgr Logo">
-                <span class="navbar-app-name">TaskMgr</span>
+        <!-- Mobile Header -->
+        <div class="navbar-mobile-header d-flex d-md-none">
+            <div class="mobile-header-left">
+                <img :src="`${APP.baseURL}/others/logo.png`" class="mobile-logo" alt="Friendbook Logo">
+                <span class="mobile-app-name">Friendbook</span>
             </div>
-            <div
-                style="display: flex; align-items: center; margin-left: auto; position: relative; gap: 0.4rem; padding-right: 0.5rem;">
-                <BellNotification />
-                <div class="navbar-avatar-btn" @click="toggleMenu($event)" style="position: relative;">
-                    <template v-if="currentUser && currentUser.name">
-                        <span v-if="currentUser.avatar && currentUser.avatar.length > 0" class="avatar-circle">
-                            <img :src="getAvatarSrc(currentUser.avatar, currentUser.name)" alt="avatar"
-                                style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
-                        </span>
-                        <span v-else-if="currentUser.name && currentUser.name.length > 0" class="avatar-circle">
-                            {{ currentUser.name.charAt(0).toUpperCase() }}
-                        </span>
-                        <span v-else class="avatar-circle">?</span>
-                    </template>
-                    <span class="avatar-caret">
-                        <i class="bi bi-caret-down-fill"></i>
-                    </span>
-                </div>
+            <div class="mobile-header-search">
+                <i class="bi bi-search"></i>
+                <input type="text" placeholder="Find Friends..." class="mobile-search-input" />
+            </div>
+            <div class="mobile-header-actions">
+                <button class="mobile-header-icon-btn">
+                    <i class="bi bi-moon"></i>
+                </button>
+                <button class="mobile-header-icon-btn" @click="toggleMenu($event)">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                </button>
             </div>
         </div>
-        <ul class="navbar-menu d-flex d-md-none">
-            <li v-for="(nav, idx) in navigation" :key="nav.name" class="navbar-icon-item">
-                <RouterLink :to="nav.link" class="navbar-link" :class="{ active: isActive(nav.link) }"
-                    @mouseenter="handleNavMouseEnter(idx)" @mouseleave="handleNavMouseLeave" @click="handleNavClick">
-                    <div class="navbar-icon-bg">
-                        <i :class="nav.icon"></i>
-                    </div>
-                    <span class="navbar-underline"></span>
-                </RouterLink>
-            </li>
-        </ul>
-        <!-- Dropdown menu khi bấm avatar (mobile & desktop dùng chung) -->
+        <!-- Dropdown menu khi bấm grid icon (mobile) -->
         <transition name="fade">
             <div v-if="menuOpen" class="custom-dropdown d-md-none" ref="dropdownRef">
                 <!-- Tài khoản -->
@@ -157,7 +140,11 @@ const currentUser = computed(() => {
         <!-- Desktop layout -->
         <div class="navbar-left d-none d-md-flex">
             <img :src="`${APP.baseURL}/others/logo.png`" class="navbar-logo" alt="TaskMgr Logo">
-            <span class="navbar-app-name">TaskMgr</span>
+            <span class="navbar-app-name">Friendbook</span>
+        </div>
+        <div class="navbar-search d-none d-md-flex">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Tìm bạn bè..." class="search-input" />
         </div>
         <ul class="navbar-menu d-none d-md-flex">
             <li v-for="(nav, idx) in navigation" :key="nav.name" class="navbar-icon-item">
@@ -235,14 +222,14 @@ const currentUser = computed(() => {
     position: sticky;
     top: 0;
     z-index: 50;
-    background: #fff;
-    box-shadow: 0 2px 12px rgba(36, 112, 220, 0.10), 0 1.5px 8px rgba(36, 112, 220, 0.07);
+    background: #1877f2;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15), 0 1.5px 8px rgba(0, 0, 0, 0.1);
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 1.25rem;
     min-height: 64px;
-    border-radius: 0 0 1.2rem 1.2rem;
+    border-radius: 0;
 }
 
 .navbar-top-row {
@@ -256,6 +243,17 @@ const currentUser = computed(() => {
     display: flex;
     align-items: center;
     gap: 0.7rem;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.navbar-left:hover {
+    opacity: 0.9;
+}
+
+.navbar-left:hover .navbar-logo {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .navbar-logo {
@@ -266,14 +264,15 @@ const currentUser = computed(() => {
     background: #fff;
     border: 2px solid #e0e7ef;
     box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
+    transition: all 0.2s ease;
 }
 
 .navbar-app-name {
     font-size: 1.25rem;
     font-weight: 800;
-    color: #2563eb;
+    color: #fff;
     letter-spacing: 0.04em;
-    text-shadow: 0 2px 8px #e0e7ef;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .navbar-menu {
@@ -308,40 +307,46 @@ const currentUser = computed(() => {
 
 .navbar-link:not(.active):hover,
 .navbar-link:not(.active):focus {
-    color: #2563eb;
-    background: #e3edfa;
-    border-radius: 7%;
+    color: #fff;
 }
 
 .navbar-link:not(.active):hover .navbar-icon-bg,
 .navbar-link:not(.active):focus .navbar-icon-bg {
-    background: #e3edfa;
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
 }
 
 .navbar-link:not(.active):hover .navbar-icon-bg i,
 .navbar-link:not(.active):focus .navbar-icon-bg i {
-    color: #2563eb;
+    color: #fff;
+    transform: scale(1.1);
 }
 
 .navbar-link .navbar-icon-bg {
     width: 48px;
     height: 48px;
-    border-radius: 16px;
+    border-radius: 12px;
     background: none;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 4px;
+    transition: all 0.2s ease;
+    cursor: pointer;
 }
 
 .navbar-link .navbar-icon-bg i {
     font-size: 1.5rem;
-    color: #888;
-    transition: color 0.2s;
+    color: rgba(255, 255, 255, 0.8);
+    transition: all 0.2s ease;
+}
+
+.navbar-link.active .navbar-icon-bg {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .navbar-link.active .navbar-icon-bg i {
-    color: #2563eb;
+    color: #fff;
 }
 
 .navbar-label {
@@ -370,14 +375,63 @@ const currentUser = computed(() => {
     top: calc(100% + 16px);
 }
 
-.navbar-link:hover {
-    background: #e3edfa;
-    color: #2470dc;
+
+.navbar-search {
+    flex: 1;
+    max-width: 400px;
+    margin: 0 20px;
+    position: relative;
+}
+
+.navbar-search i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    border-radius: 20px;
+    color: #fff;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.search-input:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+    transition: color 0.2s ease;
+}
+
+.search-input:focus {
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+.search-input:focus::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.navbar-search:hover i {
+    color: rgba(255, 255, 255, 0.9);
+    transform: translateY(-50%) scale(1.1);
 }
 
 .navbar-user {
     display: flex;
     align-items: center;
+    gap: 12px;
 }
 
 .navbar-email {
@@ -584,10 +638,11 @@ const currentUser = computed(() => {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background-color: #e0e7ef;
-    color: #2563eb;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
     font-size: 1.3rem;
     font-weight: 700;
+    border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .custom-avatar-img {
@@ -657,7 +712,7 @@ const currentUser = computed(() => {
 }
 
 .navbar-link.active .navbar-underline {
-    background: #2563eb;
+    background: #fff;
 }
 
 .navbar-link:not(.active) .navbar-underline {
@@ -681,22 +736,26 @@ const currentUser = computed(() => {
     max-width: 44px;
     max-height: 44px;
     border-radius: 50%;
-    background: #e0e7ef;
+    background: rgba(255, 255, 255, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.25rem;
     font-weight: 600;
-    color: #2563eb;
-    box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     cursor: pointer;
-    transition: box-shadow 0.18s;
+    transition: all 0.2s ease;
     z-index: 2100;
     position: relative;
+    border: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .navbar-avatar-btn:hover {
-    box-shadow: 0 4px 16px rgba(36, 112, 220, 0.18);
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
 .navbar-desktop-dropdown {
@@ -731,19 +790,19 @@ const currentUser = computed(() => {
 
 .avatar-caret {
     position: absolute;
-    right: 0;
-    top: 31px;
+    right: -2px;
+    bottom: -2px;
     width: 18px;
     height: 18px;
-    background: #f3f4f6;
+    background: #fff;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #444;
+    color: #1877f2;
     font-size: 13px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    border: 2px solid #1877f2;
     z-index: 2;
 }
 
@@ -884,6 +943,105 @@ const currentUser = computed(() => {
     margin-top: 2px;
 }
 
+/* Mobile Header Styles */
+.navbar-mobile-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    gap: 12px;
+    background: #1877f2;
+}
+
+.mobile-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.mobile-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.mobile-app-name {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.mobile-header-search {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 8px 12px 8px 36px;
+    min-width: 0;
+}
+
+.mobile-header-search i {
+    position: absolute;
+    left: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+}
+
+.mobile-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    color: #fff;
+    font-size: 0.9rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.mobile-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.mobile-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.mobile-header-icon-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #fff;
+    padding: 0;
+}
+
+.mobile-header-icon-btn i {
+    font-size: 1.1rem;
+}
+
+.mobile-header-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.05);
+}
+
 @media (max-width: 767.98px) {
     .top-navbar {
         flex-direction: column;
@@ -891,72 +1049,20 @@ const currentUser = computed(() => {
         padding: 0;
     }
 
+    .navbar-mobile-header {
+        display: flex;
+    }
+
     .navbar-top-row {
-        display: flex;
-        flex-direction: row;
-        width: 100%;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.8rem 0.5rem 0 0.5rem;
-        min-height: 40px;
+        display: none;
     }
 
-    .navbar-menu {
-        display: flex;
-        flex-direction: row;
-        width: 100%;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 0.2rem 0 0.2rem;
-        background: none;
-        box-shadow: none;
-        gap: 0;
-        clear: both;
-    }
-
-    .navbar-icon-item {
-        flex: 1 1 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-width: 0;
-    }
-
-    .navbar-avatar-btn {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
-        max-width: 44px;
-        max-height: 44px;
-    }
-
-    .avatar-circle {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        min-height: 44px;
-        max-width: 44px;
-        max-height: 44px;
-        font-size: 1.45rem;
-    }
-
-    .navbar-top-row>div:last-child {
-        padding-right: 0.5rem;
-    }
-
-    .navbar-link:focus,
-    .navbar-link:hover {
-        background: none !important;
-        color: #2563eb;
+    .navbar-menu.d-md-none {
+        display: none;
     }
 
     .custom-dropdown {
         top: 68px;
-    }
-
-    .navbar-underline {
-        bottom: -2px;
     }
 }
 </style>

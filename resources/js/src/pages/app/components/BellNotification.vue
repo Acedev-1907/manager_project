@@ -212,30 +212,37 @@ function formatTime(dateStr: string) {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: #e0e3e8;
+    background: rgba(255, 255, 255, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     z-index: 2100;
     cursor: pointer;
-    transition: box-shadow 0.18s, background 0.18s;
-    box-shadow: 0 2px 8px rgba(36, 112, 220, 0.10);
-    border: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     margin-right: 0.5rem;
 }
 
 .custom-bell-btn i {
-    color: #222;
-    font-size: 1.6rem;
+    color: #fff;
+    font-size: 1.2rem;
     display: block;
     margin: 0;
     padding: 0;
+    transition: transform 0.2s ease;
 }
 
 .custom-bell-btn:hover {
-    background: #f0f2f5;
-    box-shadow: 0 4px 16px rgba(36, 112, 220, 0.18);
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.custom-bell-btn:hover i {
+    transform: scale(1.1);
 }
 
 /* ===== Badge số lượng thông báo ===== */

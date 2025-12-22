@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { Teleport } from 'vue';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
 import { showError } from '../../../../helper/alert';
 
@@ -20,10 +21,32 @@ const hasImages = computed(() => userImages.value.length > 0);
 const fetchUserImages = async () => {
     isLoading.value = true;
     try {
-        const res = await makeHttpReq<never, any[]>('/posts/user-images', 'GET');
-        userImages.value = Array.isArray(res) ? res : [];
+        const res = await makeHttpReq<never, any>('/posts/user-images', 'GET');
+        console.log('User images response:', res);
+        
+        // Handle response structure: { code: 1000, data: [...], message: "..." }
+        // or direct array
+        let imagesData: any[] = [];
+        
+        if (Array.isArray(res)) {
+            // Direct array response
+            imagesData = res;
+        } else if (res && typeof res === 'object') {
+            // Object response with data property
+            if (Array.isArray(res.data)) {
+                imagesData = res.data;
+            } else if (Array.isArray((res as any).images)) {
+                imagesData = (res as any).images;
+            }
+        }
+        
+        console.log('Extracted images data:', imagesData);
+        userImages.value = imagesData;
+        console.log('userImages.value after assignment:', userImages.value);
+        console.log('userImages.value.length:', userImages.value.length);
     } catch (error) {
         console.error('Lỗi khi tải thư viện hình:', error);
+        userImages.value = [];
     } finally {
         isLoading.value = false;
     }
@@ -140,15 +163,47 @@ const handleFileSelect = async (event: Event) => {
         });
 
         const res = await response.json();
+        console.log('Upload response:', res);
 
         if (!response.ok) {
-            throw new Error(res.error || 'Upload failed');
+            throw new Error(res.error || res.message || 'Upload failed');
         }
 
-        if (res.images && res.images.length > 0) {
-            const uploadedUrls = res.images.map((img: any) => img.url);
-            selectedImages.value = [...selectedImages.value, ...uploadedUrls];
-            emit('select', uploadedUrls);
+        // Handle response structure: res.data.images or res.images
+        const imagesData = res.data?.images || res.images || [];
+        console.log('Images data from response:', imagesData);
+
+        if (imagesData && imagesData.length > 0) {
+            const uploadedUrls = imagesData.map((img: any) => {
+                // Handle different response formats
+                if (typeof img === 'string') return img;
+                // Response có structure: { url, file_id, thumbnail }
+                return img.url || img.path || img;
+            }).filter((url: any) => url && typeof url === 'string'); // Remove any null/undefined/non-string
+            
+            console.log('Uploaded URLs after mapping:', uploadedUrls);
+            
+            if (uploadedUrls.length > 0) {
+                // Chỉ thêm vào selectedImages, không emit ngay
+                // User sẽ bấm "Chọn" để confirm
+                const currentSelected = [...selectedImages.value];
+                const newSelected = [...currentSelected, ...uploadedUrls];
+                selectedImages.value = newSelected;
+                console.log('Selected images after upload:', selectedImages.value);
+                console.log('selectedImages.value.length:', selectedImages.value.length);
+                
+                // Force reactivity bằng cách tạo array mới
+                await nextTick();
+                selectedImages.value = [...selectedImages.value];
+                console.log('After nextTick - selectedImages:', selectedImages.value);
+                
+                // Refresh user images để hiển thị hình mới
+                await fetchUserImages();
+            } else {
+                console.warn('No valid URLs extracted from response');
+            }
+        } else {
+            console.warn('No images in response:', res);
         }
     } catch (error: any) {
         showError(error?.message || 'Không thể upload hình. Vui lòng thử lại.');
@@ -179,15 +234,25 @@ const openFileDialog = () => {
 };
 
 const confirmSelection = () => {
-    if (selectedImages.value.length > 0) {
-        emit('select', [...selectedImages.value]);
-        closeModal();
+    console.log('confirmSelection called, selectedImages:', selectedImages.value);
+    if (selectedImages.value && selectedImages.value.length > 0) {
+        const imagesToEmit = [...selectedImages.value];
+        console.log('Emitting images:', imagesToEmit);
+        emit('select', imagesToEmit);
+        selectedImages.value = [];
+        emit('close');
+        document.body.style.overflow = '';
+    } else {
+        console.warn('No images selected to confirm');
     }
 };
 
 const closeModal = () => {
-    selectedImages.value = [];
-    emit('close');
+    if (!isUploading.value) {
+        selectedImages.value = [];
+        emit('close');
+        document.body.style.overflow = '';
+    }
 };
 
 onMounted(() => {
@@ -201,12 +266,16 @@ import { watch } from 'vue';
 watch(() => props.visible, (newVal) => {
     if (newVal) {
         fetchUserImages();
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
     }
 });
 </script>
 
 <template>
-    <div v-if="visible" class="modal-overlay" @click.self="closeModal">
+    <Teleport to="body">
+        <div v-if="visible" class="modal-overlay" @click.self="closeModal">
         <div class="modal-container" @click.stop>
             <div class="modal-header">
                 <h3>Chọn hình ảnh</h3>
@@ -226,14 +295,18 @@ watch(() => props.visible, (newVal) => {
                 />
 
                 <!-- Selected images preview - Compact at top -->
-                <div v-if="selectedImages.length > 0" class="selected-preview">
+                <div v-if="selectedImages && selectedImages.length > 0" class="selected-preview">
                     <div class="selected-header">
                         <span class="selected-count">{{ selectedImages.length }} đã chọn</span>
                         <button class="clear-all-btn" @click="selectedImages = []">Xóa tất cả</button>
                     </div>
                     <div class="selected-scroll">
-                        <div v-for="(url, index) in selectedImages" :key="index" class="selected-item">
-                            <img :src="url" :alt="`Selected ${index}`" />
+                        <div 
+                            v-for="(url, index) in selectedImages" 
+                            :key="`selected-${index}-${url}`" 
+                            class="selected-item"
+                        >
+                            <img :src="url" :alt="`Selected ${index}`" @error="console.error('Image load error:', url)" />
                             <button class="remove-selected" @click="toggleImage(url)">
                                 <i class="bi bi-x"></i>
                             </button>
@@ -278,6 +351,26 @@ watch(() => props.visible, (newVal) => {
                 </div>
 
                 <div v-else-if="!hasImages && !isLoading" class="empty-library">
+                    <!-- Show selected images preview if any -->
+                    <div v-if="selectedImages && selectedImages.length > 0" class="selected-preview-main">
+                        <div class="selected-header">
+                            <span class="selected-count">{{ selectedImages.length }} đã chọn</span>
+                            <button class="clear-all-btn" @click="selectedImages = []">Xóa tất cả</button>
+                        </div>
+                        <div class="selected-grid">
+                            <div 
+                                v-for="(url, index) in selectedImages" 
+                                :key="`main-selected-${index}-${url}`" 
+                                class="selected-item-main"
+                            >
+                                <img :src="url" :alt="`Selected ${index}`" />
+                                <button class="remove-selected-main" @click="toggleImage(url)">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div 
                         class="empty-upload-card" 
                         @click="openFileDialog" 
@@ -288,10 +381,10 @@ watch(() => props.visible, (newVal) => {
                             <i v-else class="bi bi-plus-lg"></i>
                         </div>
                         <p class="empty-upload-title">
-                            {{ selectedImages.length > 0 ? 'Thêm hình mới từ máy' : 'Chưa có hình ảnh nào' }}
+                            {{ selectedImages && selectedImages.length > 0 ? 'Thêm hình mới từ máy' : 'Chưa có hình ảnh nào' }}
                         </p>
                         <p class="empty-upload-subtitle">
-                            {{ selectedImages.length > 0 
+                            {{ selectedImages && selectedImages.length > 0 
                                 ? 'Nhấn để tải thêm hình lên từ máy của bạn' 
                                 : 'Nhấn để tải hình lên từ máy của bạn' }}
                         </p>
@@ -311,6 +404,7 @@ watch(() => props.visible, (newVal) => {
             </div>
         </div>
     </div>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -321,55 +415,93 @@ watch(() => props.visible, (newVal) => {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 1070 !important;
     padding: 20px;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 .modal-container {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 12px;
     width: 100%;
-    max-width: 560px;
-    max-height: 85vh;
+    max-width: 500px;
+    max-height: 90vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     overflow: hidden;
+    animation: slideUp 0.3s ease;
+    position: relative;
+    z-index: 1071;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid #e4e6e9;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e4e6eb;
     flex-shrink: 0;
+    position: relative;
 }
 
 .modal-header h3 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     font-weight: 700;
-    color: #1c1e21;
-    letter-spacing: -0.3px;
+    color: #050505;
+    text-align: center;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
 }
 
 .close-btn {
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     color: #65676b;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 4px;
     border-radius: 50%;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    z-index: 1;
 }
 
 .close-btn:hover {
-    background: #f2f2f2;
+    background: #f0f2f5;
+    color: #050505;
 }
 
 .modal-body {
@@ -541,6 +673,58 @@ watch(() => props.visible, (newVal) => {
     background: #f8f9fa;
     border-radius: 8px;
     padding: 12px;
+    margin-bottom: 16px;
+}
+
+.selected-preview-main {
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.selected-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.selected-item-main {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid #1877f2;
+    background: #f0f2f5;
+}
+
+.selected-item-main img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.remove-selected-main {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+}
+
+.remove-selected-main:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: scale(1.1);
 }
 
 .selected-header {
@@ -631,31 +815,31 @@ watch(() => props.visible, (newVal) => {
 .modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
-    padding: 14px 20px;
-    border-top: 1px solid #e4e6e9;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #e4e6eb;
     flex-shrink: 0;
-    background: #fafbfc;
+    background: #fff;
 }
 
 .cancel-btn, .confirm-btn {
-    padding: 9px 20px;
-    border-radius: 8px;
+    padding: 8px 20px;
+    border-radius: 6px;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.9375rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     min-width: 80px;
 }
 
 .cancel-btn {
     background: #f0f2f5;
-    color: #1c1e21;
+    color: #050505;
     border: none;
 }
 
 .cancel-btn:hover {
-    background: #e4e6e9;
+    background: #e4e6eb;
 }
 
 .confirm-btn {
@@ -666,11 +850,15 @@ watch(() => props.visible, (newVal) => {
 
 .confirm-btn:hover:not(:disabled) {
     background: #166fe5;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(24, 119, 242, 0.3);
 }
 
 .confirm-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    background: #e4e6eb;
+    color: #bcc0c4;
 }
 
 .empty-library {
@@ -686,41 +874,55 @@ watch(() => props.visible, (newVal) => {
 
 .empty-upload-card {
     border: 2px dashed #d1d5db;
-    border-radius: 16px;
-    padding: 32px 24px;
-    max-width: 320px;
+    border-radius: 12px;
+    padding: 40px 24px;
+    max-width: 100%;
     width: 100%;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    transition: all 0.2s;
-    background: #f9fafb;
+    gap: 12px;
+    transition: all 0.2s ease;
+    background: #fafbfc;
+    min-height: 200px;
 }
 
 .empty-upload-card:hover {
-    border-color: #4f46e5;
-    background: #eef2ff;
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+    border-color: #1877f2;
+    background: #f0f2f5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .empty-upload-card.uploading {
     cursor: wait;
     opacity: 0.8;
+    border-color: #1877f2;
+    background: #e3f2fd;
+}
+
+.empty-upload-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #1877f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
 }
 
 .empty-upload-icon i {
-    font-size: 2.2rem;
-    color: #4f46e5;
+    font-size: 2rem;
+    color: #fff;
 }
 
 .empty-upload-title {
-    margin: 8px 0 0;
+    margin: 0;
     font-size: 1rem;
     font-weight: 600;
-    color: #111827;
+    color: #050505;
 }
 
 .empty-upload-subtitle {

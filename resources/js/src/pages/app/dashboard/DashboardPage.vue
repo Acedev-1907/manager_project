@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { onMounted, onActivated, ref, onUnmounted } from 'vue';
 import PostList from './components/PostList.vue';
+import RightSidebar from './components/RightSidebar.vue';
+import LeftSidebar from './components/LeftSidebar.vue';
 import { useGetPinnedProject } from './actions/GetPinnedProject';
 import { useGetTotalProject } from './actions/countProject';
 import LoadingPage from '../../../components/LoadingPage.vue';
@@ -507,11 +509,25 @@ onUnmounted(() => {
 <template>
     <div class="dashboard-container">
         <LoadingPage :visible="isLoading" />
-        <div class="feed-layout">
-            <PostList />
+        <div class="friendbook-layout">
+            <!-- Left Sidebar -->
+            <div class="left-sidebar-wrapper">
+                <LeftSidebar />
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="main-content">
+                <PostList />
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="right-sidebar-wrapper">
+                <RightSidebar />
+            </div>
         </div>
     </div>
 </template>
+
 
 <style scoped>
 .dashboard-container {
@@ -519,14 +535,60 @@ onUnmounted(() => {
     flex-direction: column;
     min-height: calc(100vh - 64px);
     background-color: #f0f2f5;
-    padding: 1.5rem 1rem;
+    padding: 0;
 }
 
-.feed-layout {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    max-width: 680px;
+.friendbook-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr 320px;
+    gap: 20px;
+    max-width: 1400px;
     margin: 0 auto;
+    padding: 20px;
+    width: 100%;
+    align-items: start;
+}
+
+.left-sidebar-wrapper {
+    height: fit-content;
+    align-self: start;
+}
+
+
+.main-content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.right-sidebar-wrapper {
+    height: fit-content;
+    align-self: start;
+}
+
+@media (max-width: 1200px) {
+    .friendbook-layout {
+        grid-template-columns: 320px 1fr;
+    }
+    
+    .right-sidebar-wrapper {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .friendbook-layout {
+        grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 12px;
+    }
+    
+    .left-sidebar-wrapper {
+        display: none;
+    }
+    
+    .dashboard-container {
+        padding: 0;
+    }
 }
 </style>
