@@ -32,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user', 'show')->name('users.show');
         Route::put('/user', 'update')->name('users.update');
         Route::post('/user/upload-avatar', 'uploadAvatar');
+        Route::post('/user/upload-cover', 'uploadCover');
         Route::get('/users/all', 'all');
     });
 

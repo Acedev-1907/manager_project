@@ -87,6 +87,33 @@ class UserService
     }
 
     /**
+     * Upload user cover photo, validate, upload to ImageKit, update user cover_photo field
+     * @param $user
+     * @param UploadedFile $file
+     * @param ImageKitService $imageKit
+     * @return array
+     * @throws \Exception
+     */
+    public function uploadCover($user, UploadedFile $file, ImageKitService $imageKit)
+    {
+        // Validate file
+        $validator = Validator::make(['cover_photo' => $file], [
+            'cover_photo' => 'required|file|mimes:jpg,jpeg,png|max:51200' // 50MB max for cover photos
+        ]);
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first('cover_photo'));
+        }
+        if ($file->getSize() > 10 * 1024 * 1024) {
+            throw new \Exception('File too large. Please compress image to under 10MB before uploading.');
+        }
+        $folder = env('IMAGEKIT_AVATAR_FOLDER', 'app-manager-project') . '/covers/' . $user->id;
+        $result = $imageKit->upload($file, $folder);
+        $user->cover_photo = $result['url'];
+        $user->save();
+        return $result;
+    }
+
+    /**
      * Get users for autocomplete: status = friend, invited, available
      */
     public function getAvailableForInvitation($user, $query = null)

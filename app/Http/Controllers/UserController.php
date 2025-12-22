@@ -32,6 +32,7 @@ class UserController extends ApiController
             'email',
             'phone',
             'avatar',
+            'cover_photo',
             'email_verified_at',
             'created_at',
             'updated_at'
@@ -59,6 +60,7 @@ class UserController extends ApiController
             'email',
             'phone',
             'avatar',
+            'cover_photo',
             'friend_code',
             'email_verified_at',
             'updated_at'
@@ -69,13 +71,56 @@ class UserController extends ApiController
 
     /**
      * Upload user avatar to ImageKit
+     * Only allows user to upload their own avatar
      */
     public function uploadAvatar(Request $request, ImageKitService $imageKit)
     {
         try {
             $user = $request->user();
+            if (!$user) {
+                return $this->setStatusCode(401)
+                    ->respondWithError('Unauthorized');
+            }
+            
             $file = $request->file('avatar');
+            if (!$file) {
+                return $this->setStatusCode(422)
+                    ->respondWithError('No file provided');
+            }
+            
             $result = $this->userService->uploadAvatar($user, $file, $imageKit);
+            return $this->respondWithData([
+                'message' => 'Upload successful!',
+                'file_id' => $result['file_id'],
+                'link' => $result['url'],
+                'thumbnail' => $result['thumbnail']
+            ]);
+        } catch (\Exception $e) {
+            return $this->setStatusCode(422)
+                ->respondWithError($e->getMessage());
+        }
+    }
+
+    /**
+     * Upload user cover photo to ImageKit
+     * Only allows user to upload their own cover photo
+     */
+    public function uploadCover(Request $request, ImageKitService $imageKit)
+    {
+        try {
+            $user = $request->user();
+            if (!$user) {
+                return $this->setStatusCode(401)
+                    ->respondWithError('Unauthorized');
+            }
+            
+            $file = $request->file('cover_photo');
+            if (!$file) {
+                return $this->setStatusCode(422)
+                    ->respondWithError('No file provided');
+            }
+            
+            $result = $this->userService->uploadCover($user, $file, $imageKit);
             return $this->respondWithData([
                 'message' => 'Upload successful!',
                 'file_id' => $result['file_id'],

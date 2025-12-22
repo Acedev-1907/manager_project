@@ -98,29 +98,7 @@
             </div>
             <div class="card-subtitle">Sinh nhật bạn bè hôm nay</div>
             
-            <div v-if="birthdayFriend" class="birthday-content">
-                <div class="birthday-icon">
-                    <i class="bi bi-cake2-fill"></i>
-                </div>
-                <div class="birthday-avatar-wrapper">
-                    <img 
-                        :src="getAvatarSrc(birthdayFriend.avatar, birthdayFriend.name)" 
-                        class="birthday-avatar" 
-                        :alt="birthdayFriend.name"
-                    />
-                    <div class="birthday-badge">20+</div>
-                </div>
-                <div class="birthday-info">
-                    <div class="birthday-name">{{ birthdayFriend.name }}</div>
-                    <div class="birthday-location">{{ birthdayFriend.location || 'Glasgow, Scotland' }}</div>
-                    <div class="birthday-date">Lorem 5th Sept 2019 dummy text of the printing and typesetting industry.</div>
-                </div>
-                <button class="birthday-btn">
-                    Chúc mừng sinh nhật bạn
-                    <i class="bi bi-arrow-right"></i>
-                </button>
-            </div>
-            <div v-else class="no-birthday">
+            <div class="no-birthday">
                 <p>Không có sinh nhật nào hôm nay</p>
             </div>
         </div> -->
@@ -154,9 +132,6 @@
             <div class="card-header">
                 <h5 class="card-title">Your Games <span class="count">24 Games</span></h5>
                 <div class="card-actions">
-                    <button class="icon-btn" @click="refreshGames">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
                     <button class="icon-btn">
                         <i class="bi bi-gear"></i>
                     </button>
@@ -249,12 +224,8 @@ const allFriends = ref<Array<{
     email?: string;
 }>>([]);
 
-const birthdayFriend = ref<{
-    id: number;
-    name: string;
-    avatar?: string;
-    location?: string;
-} | null>(null);
+// Removed unused birthdayFriend - function loadBirthday was removed
+// Removed unused birthdayFriend - function loadBirthday was removed
 
 const galleryPhotos = ref<string[]>([]);
 
@@ -296,17 +267,27 @@ const refreshGallery = async () => {
     await loadGallery();
 };
 
-const refreshGames = async () => {
-    // Refresh games if needed
-};
+// Removed unused function refreshGames
 
 const loadFriends = async () => {
     try {
         // Load friends from API
-        const res = await makeHttpReq<never, { data?: any[] }>('/members?per_page=50', 'GET');
+        const res = await makeHttpReq<never, any>('/members?per_page=50', 'GET');
         
+        // Handle different response structures
+        let data: any;
         if (res && res.data && Array.isArray(res.data.data)) {
-            allFriends.value = res.data.data.map((member: any) => ({
+            // Laravel resource format { data: { data: [], ...paging... } }
+            data = res.data;
+        } else if (res && res.data) {
+            // Direct response format
+            data = res.data;
+        } else {
+            data = res;
+        }
+        
+        if (data && Array.isArray(data.data)) {
+            allFriends.value = data.data.map((member: any) => ({
                 id: member.id,
                 name: member.name,
                 avatar: member.avatar,
@@ -341,18 +322,7 @@ const handleFriendAdded = () => {
     loadFriends();
 };
 
-const loadBirthday = async () => {
-    try {
-        // Mock data - replace with actual API call
-        birthdayFriend.value = {
-            id: 1,
-            name: 'Sufiya Elija',
-            location: 'Glasgow, Scotland'
-        };
-    } catch (error) {
-        console.error('Error loading birthday:', error);
-    }
-};
+// Removed unused function loadBirthday
 
 const loadGallery = async () => {
     try {

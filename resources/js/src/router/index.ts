@@ -65,8 +65,8 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         {
-          path: "/dashboard",
-          name: "dashboard",
+          path: "/newsfeed",
+          name: "newsfeed",
           component: () => import("../pages/app/dashboard/DashboardPage.vue"),
         },
         {
@@ -120,9 +120,9 @@ router.beforeEach((to, from, next) => {
   const isAuthenticated = checkAuth();
   const isAuthPage = isAuthRoute(to.path);
 
-  // If authenticated and trying to access auth pages, redirect to dashboard
+  // If authenticated and trying to access auth pages, redirect to newsfeed
   if (isAuthenticated && isAuthPage) {
-    next({ path: "/dashboard" });
+    next({ path: "/newsfeed" });
     return;
   }
 

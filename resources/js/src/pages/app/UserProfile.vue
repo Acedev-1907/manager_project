@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue';
 import { makeHttpReq } from '../../helper/makeHttpReq';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { getUserData } from '../../helper/getUserData';
 import { APP } from '../../App/APP';
 import { useUserStore } from '../../state/userStore';
@@ -11,12 +11,50 @@ import 'cropperjs/dist/cropper.css';
 import { showSuccess, showError, showConfirm } from '../../helper/alert';
 import { getAvatarSrc } from '../../helper/avatar';
 import { useCacheFetch } from '../../helper/useCacheFetch';
-import CreatePost from './dashboard/components/CreatePost.vue';
+import { getCurrentUserId } from '../../helper/getUserData';
 import PostList from './dashboard/components/PostList.vue';
 
 const router = useRouter();
+const route = useRoute();
 const user = ref({ id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' });
+const viewingUserId = ref<number | null>(null);
+const isCurrentUser = computed(() => {
+    // If no viewingUserId, means viewing own profile
+    if (!viewingUserId.value) {
+        return true;
+    }
+    
+    // Get current user ID from multiple sources (priority order)
+    // 1. From getUserData helper (most reliable)
+    const currentIdFromHelper = getCurrentUserId();
+    // 2. From userStore cache
+    const currentIdFromCache = (userStore as any).userInfoCache?.id;
+    // 3. From userStore user object
+    const currentIdFromStore = (userStore as any).user?.id;
+    
+    // Use the first available ID
+    const currentId = currentIdFromHelper || currentIdFromCache || currentIdFromStore;
+    
+    // If we have current user ID, compare with viewingUserId
+    if (currentId) {
+        // Convert both to numbers for comparison
+        const viewingId = Number(viewingUserId.value);
+        const currentIdNum = Number(currentId);
+        return viewingId === currentIdNum;
+    }
+    
+    // Fallback: if viewingUserId matches user.value.id, it's current user
+    // This handles case when viewing own profile but viewingUserId was set
+    if (user.value.id && user.value.id !== 0) {
+        return Number(viewingUserId.value) === Number(user.value.id);
+    }
+    
+    // If we can't determine, assume it's not current user (safer)
+    return false;
+});
+const isMounted = ref(false);
 const loading = ref(false);
+const abortController = ref<AbortController | null>(null);
 const avatarLoading = ref(false);
 const coverLoading = ref(false);
 const successMessage = ref('');
@@ -41,6 +79,9 @@ const zoomValue = ref(1);
 const minZoom = ref(1);
 const maxZoom = ref(2);
 const activeTab = ref('timeline');
+const photosSubTab = ref('your-photos'); // 'your-photos', 'tagged-photos', 'albums'
+const photoMenuOpen = ref<number | null>(null);
+const selectedPhotoId = ref<number | null>(null);
 
 // User stats
 const userStats = ref({
@@ -58,12 +99,69 @@ const aboutInfo = ref({
     bloodGroup: 'A+ Positive'
 });
 
-// Gallery images (mock)
-const galleryImages = ref([
-    { id: 1, url: 'https://via.placeholder.com/300x300?text=Photo1' },
-    { id: 2, url: 'https://via.placeholder.com/300x300?text=Photo2' },
-    { id: 3, url: 'https://via.placeholder.com/300x300?text=Photo3' }
-]);
+// Gallery images
+const galleryImages = ref<Array<{ id: number; url: string }>>([]);
+const galleryLoading = ref(false);
+
+// Fetch user images from API
+const fetchUserImages = async () => {
+    // Only fetch if we're on the profile route and component is mounted
+    if (route.name !== 'profile' || !isMounted.value) {
+        return;
+    }
+    
+    galleryLoading.value = true;
+    try {
+        const res = await makeHttpReq<never, any>('/posts/user-images', 'GET');
+        
+        // Check if component is still mounted before updating state
+        if (!isMounted.value || route.name !== 'profile') {
+            return;
+        }
+        
+        console.log('User images response:', res);
+        
+        // Handle response structure: { code: 1000, data: [...], message: "..." }
+        let imagesData: any[] = [];
+        
+        if (Array.isArray(res)) {
+            // Direct array response
+            imagesData = res;
+        } else if (res && typeof res === 'object') {
+            // Object response with data property
+            if (Array.isArray(res.data)) {
+                imagesData = res.data;
+            } else if (Array.isArray((res as any).images)) {
+                imagesData = (res as any).images;
+            }
+        }
+        
+        // Check again before updating state
+        if (!isMounted.value || route.name !== 'profile') {
+            return;
+        }
+        
+        // Map to gallery format
+        galleryImages.value = imagesData.map((img: any, index: number) => ({
+            id: img.id || index + 1,
+            url: img.url || img.image_url || img.path || ''
+        })).filter((img: any) => img.url); // Filter out images without URL
+        
+        console.log('Gallery images loaded:', galleryImages.value.length);
+    } catch (error: any) {
+        // Ignore if component unmounted
+        if (!isMounted.value || route.name !== 'profile') {
+            return;
+        }
+        console.error('Error loading user images:', error);
+        galleryImages.value = [];
+    } finally {
+        // Only update loading state if component is still mounted
+        if (isMounted.value && route.name === 'profile') {
+            galleryLoading.value = false;
+        }
+    }
+};
 
 // Friends list
 const friendsList = ref<any[]>([]);
@@ -72,6 +170,11 @@ const friendsSearchQuery = ref('');
 
 // Fetch friends from API
 const fetchFriends = async () => {
+    // Only fetch if we're on the profile route and component is mounted
+    if (route.name !== 'profile' || !isMounted.value) {
+        return;
+    }
+    
     friendsLoading.value = true;
     try {
         const res = await makeHttpReq<never, any>(`/members?per_page=100${friendsSearchQuery.value ? `&query=${encodeURIComponent(friendsSearchQuery.value)}` : ''}`, 'GET');
@@ -109,19 +212,24 @@ const fetchFriends = async () => {
 };
 
 // Watch for activeTab changes to fetch friends when tab is opened
-watch(() => activeTab.value, (newTab) => {
+const stopActiveTabWatcher = watch(() => activeTab.value, (newTab) => {
+    // Only fetch if component is mounted and on profile route
+    if (!isMounted.value || route.name !== 'profile') {
+        return;
+    }
+    
     if (newTab === 'friends' && friendsList.value.length === 0) {
         fetchFriends();
+    }
+    if (newTab === 'photos' && galleryImages.value.length === 0) {
+        fetchUserImages();
     }
 });
 
 const { getOrFetch } = useCacheFetch(
-    // @ts-expect-error - Pinia store type inference issue
-    { user: userStore.userInfoCache },
-    // @ts-expect-error - Pinia store type inference issue
-    (_key, data) => userStore.setUserInfoCache(data),
-    // @ts-expect-error - Pinia store type inference issue
-    () => userStore.clearUserInfoCache()
+    { user: (userStore as any).userInfoCache },
+    (_key, data) => (userStore as any).setUserInfoCache(data),
+    () => (userStore as any).clearUserInfoCache()
 );
 
 function onAvatarClick() {
@@ -130,11 +238,97 @@ function onAvatarClick() {
 function closeViewAvatarModal() {
     showViewAvatarModal.value = false;
 }
+
+// Photo menu functions
+function openPhotoMenu(photoId: number) {
+    if (photoMenuOpen.value === photoId) {
+        photoMenuOpen.value = null;
+    } else {
+        photoMenuOpen.value = photoId;
+        selectedPhotoId.value = photoId;
+    }
+}
+
+function closePhotoMenu(event?: Event) {
+    // Don't close if clicking inside the menu or edit button
+    if (event) {
+        const target = event.target as HTMLElement;
+        if (target.closest('.photo-menu-overlay') || target.closest('.photo-edit-btn')) {
+            return;
+        }
+    }
+    photoMenuOpen.value = null;
+    selectedPhotoId.value = null;
+}
+
+function handleUseAltText(photoId: number) {
+    closePhotoMenu();
+    // TODO: Implement alt text editing
+    console.log('Edit alt text for photo:', photoId);
+}
+
+function handleEditLocation(photoId: number) {
+    closePhotoMenu();
+    // TODO: Implement location editing
+    console.log('Edit location for photo:', photoId);
+}
+
+async function handleDeletePhoto(photoId: number) {
+    closePhotoMenu();
+    const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa ảnh này?', 'Xóa ảnh');
+    if (confirmed) {
+        try {
+            // TODO: Implement delete photo API call
+            console.log('Delete photo:', photoId);
+            // Remove from galleryImages
+            galleryImages.value = galleryImages.value.filter(img => img.id !== photoId);
+            showSuccess('Đã xóa ảnh thành công');
+        } catch (error: any) {
+            showError(error?.message || 'Không thể xóa ảnh');
+        }
+    }
+}
+
+function handleDownloadPhoto(photoId: number, url: string) {
+    closePhotoMenu();
+    try {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `photo-${photoId}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showSuccess('Đang tải xuống ảnh...');
+    } catch (error: any) {
+        showError('Không thể tải xuống ảnh');
+    }
+}
+
+async function handleSetAsAvatar(photoId: number, url: string) {
+    closePhotoMenu();
+    const confirmed = await showConfirm('Bạn có muốn đặt ảnh này làm ảnh đại diện không?', 'Đặt làm ảnh đại diện');
+    if (confirmed) {
+        try {
+            // TODO: Implement set as avatar API call
+            user.value.avatar = url;
+            (userStore as any).setAvatar(url);
+            showSuccess('Đã đặt làm ảnh đại diện thành công');
+        } catch (error: any) {
+            showError(error?.message || 'Không thể đặt làm ảnh đại diện');
+        }
+    }
+}
 function onCameraClick() {
+    if (!isCurrentUser.value) {
+        return;
+    }
     if (avatarFileInput.value) avatarFileInput.value.value = '';
     avatarFileInput.value?.click();
 }
 function onCoverClick() {
+    if (!isCurrentUser.value) {
+        return;
+    }
     if (coverFileInput.value) coverFileInput.value.value = '';
     coverFileInput.value?.click();
 }
@@ -183,12 +377,77 @@ async function closeCoverCropModalWithConfirm() {
     if (ok) closeCoverCropModal();
 }
 async function fetchUser() {
+    // Only fetch if we're on the profile route and component is mounted
+    if (route.name !== 'profile' || !isMounted.value) {
+        return;
+    }
+    
+    // Cancel previous request if exists
+    if (abortController.value) {
+        abortController.value.abort();
+    }
+    
+    // Create new AbortController
+    abortController.value = new AbortController();
+    const currentController = abortController.value;
+    
     loading.value = true;
     errorMessage.value = '';
     try {
-        await getOrFetch('user', async () => {
-            const res = await makeHttpReq<undefined, any>('user', 'GET');
+        // Get user_id from query parameter
+        const userId = route.query.user_id ? Number(route.query.user_id) : null;
+        
+        // Check again before setting state
+        if (!isMounted.value || route.name !== 'profile') {
+            return;
+        }
+        
+        viewingUserId.value = userId;
+        
+        const cacheKey = userId ? `user_${userId}` : 'user';
+        
+        await getOrFetch(cacheKey, async () => {
+            // Check if aborted or unmounted
+            if (currentController.signal.aborted || !isMounted.value || route.name !== 'profile') {
+                throw new Error('Aborted');
+            }
+            
+            let res: any;
+            if (userId) {
+                // Fetch member by ID from members list
+                const membersRes = await makeHttpReq<never, any>(`/members?per_page=1000`, 'GET');
+                
+                // Check again after async operation
+                if (currentController.signal.aborted || !isMounted.value || route.name !== 'profile') {
+                    throw new Error('Aborted');
+                }
+                
+                let membersData: any[] = [];
+                if (membersRes && membersRes.data) {
+                    if (Array.isArray(membersRes.data.data)) {
+                        membersData = membersRes.data.data;
+                    } else if (Array.isArray(membersRes.data)) {
+                        membersData = membersRes.data;
+                    }
+                } else if (Array.isArray(membersRes)) {
+                    membersData = membersRes;
+                }
+                const member = membersData.find((m: any) => m.id === userId);
+                if (!member) {
+                    throw new Error('User not found');
+                }
+                res = { data: member };
+            } else {
+                res = await makeHttpReq<undefined, any>('user', 'GET');
+                
+                // Check again after async operation
+                if (currentController.signal.aborted || !isMounted.value || route.name !== 'profile') {
+                    throw new Error('Aborted');
+                }
+            }
+            
             return {
+                id: res.data.id || userId || 0,
                 name: res.data.name,
                 email: res.data.email,
                 phone: res.data.phone || '',
@@ -197,19 +456,39 @@ async function fetchUser() {
                 friend_code: res.data.friend_code || null,
             };
         }, (data) => {
+            // Only update state if component is still mounted and on profile route
+            if (!isMounted.value || route.name !== 'profile' || currentController.signal.aborted) {
+                return;
+            }
+            
             user.value = data;
-            // @ts-expect-error - Pinia store type inference issue
-            userStore.setUser({ 
-                id: data.id,
-                name: data.name, 
-                avatar: data.avatar, 
-                friend_code: data.friend_code 
-            });
+            // Only update store if viewing current user
+            if (!userId) {
+                (userStore as any).setUser({ 
+                    id: data.id,
+                    name: data.name,
+                    email: data.email,
+                    phone: data.phone,
+                    avatar: data.avatar, 
+                    friend_code: data.friend_code 
+                });
+            }
         });
     } catch (err: any) {
+        // Ignore abort errors and unmount cases
+        if (err.message === 'Aborted' || err.name === 'AbortError' || currentController.signal.aborted) {
+            return;
+        }
+        // Only update state if component is still mounted and on profile route
+        if (isMounted.value && route.name === 'profile') {
         errorMessage.value = err?.message || 'Failed to load user info.';
+            console.error('Error fetching user:', err);
+        }
     } finally {
+        // Only update loading state if component is still mounted
+        if (isMounted.value && route.name === 'profile') {
         loading.value = false;
+        }
     }
 }
 function closeCropModal() {
@@ -283,6 +562,10 @@ function onCoverCropperReady() {
     }
 }
 async function saveCroppedAvatar() {
+    if (!isCurrentUser.value) {
+        showError('Bạn không có quyền chỉnh sửa avatar này');
+        return;
+    }
     if (!cropper.value) return;
     (cropper.value as any).getCroppedCanvas({ width: 320, height: 320, imageSmoothingQuality: 'high' }).toBlob(async (blob: any) => {
         if (!blob) return;
@@ -309,10 +592,8 @@ async function saveCroppedAvatar() {
                 showError(data.message || 'Upload failed.');
             } else {
                 user.value.avatar = data.data.link;
-                // @ts-expect-error - Pinia store type inference issue
-                userStore.setAvatar(data.data.link);
-                // @ts-expect-error - Pinia store type inference issue
-                userStore.setUser({ ...user.value });
+                (userStore as any).setAvatar(data.data.link);
+                (userStore as any).setUser({ ...user.value });
                 await nextTick();
                 closeCropModal();
                 showSuccess(data.message || 'Avatar updated successfully!');
@@ -326,6 +607,10 @@ async function saveCroppedAvatar() {
     }, 'image/jpeg', 0.7);
 }
 async function saveCroppedCover() {
+    if (!isCurrentUser.value) {
+        showError('Bạn không có quyền chỉnh sửa cover photo này');
+        return;
+    }
     if (!coverCropper.value) return;
     (coverCropper.value as any).getCroppedCanvas({ width: 1200, height: 675, imageSmoothingQuality: 'high' }).toBlob(async (blob: any) => {
         if (!blob) return;
@@ -360,6 +645,10 @@ async function saveCroppedCover() {
     }, 'image/jpeg', 0.8);
 }
 async function updateUser() {
+    if (!isCurrentUser.value) {
+        showError('Bạn không có quyền chỉnh sửa profile này');
+        return;
+    }
     if (loading.value) return;
     loading.value = true;
     errorMessage.value = '';
@@ -372,8 +661,7 @@ async function updateUser() {
         };
         const res = await makeHttpReq<typeof payload, any>('user', 'PUT', payload);
         successMessage.value = res.message || 'Profile updated successfully!';
-        // @ts-expect-error - Pinia store type inference issue
-        userStore.setUser({ 
+        (userStore as any).setUser({ 
             id: user.value.id,
             name: user.value.name, 
             avatar: user.value.avatar, 
@@ -385,29 +673,107 @@ async function updateUser() {
         loading.value = false;
     }
 }
-function goToChangePassword() {
-    router.push('/change-password');
-}
-onMounted(fetchUser);
+// Removed unused function goToChangePassword
+// Watch for route changes to reload user when user_id changes
+const stopWatcher = watch(() => route.query.user_id, () => {
+    // Only fetch if component is mounted and we're still on the profile route
+    if (isMounted.value && route.name === 'profile') {
+        fetchUser();
+        fetchUserImages();
+    }
+}, { immediate: false });
+
+// Watch for route name changes to reset state when leaving profile
+const stopRouteWatcher = watch(() => route.name, (newRouteName, oldRouteName) => {
+    // Only reset if component is mounted and we're actually leaving profile route
+    if (!isMounted.value) {
+        return;
+    }
+    
+    // If we're leaving profile route, reset state immediately
+    if (oldRouteName === 'profile' && newRouteName !== 'profile') {
+        try {
+            viewingUserId.value = null;
+            user.value = { id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' };
+            galleryImages.value = [];
+            friendsList.value = [];
+            activeTab.value = 'timeline';
+            loading.value = false;
+            galleryLoading.value = false;
+            friendsLoading.value = false;
+        } catch (err) {
+            console.error('Error resetting state:', err);
+        }
+    }
+}, { immediate: false });
+
+onMounted(() => {
+    try {
+        isMounted.value = true;
+        if (route.name === 'profile') {
+            fetchUser();
+            fetchUserImages();
+        }
+        // Close photo menu when clicking outside
+        document.addEventListener('click', closePhotoMenu);
+    } catch (err) {
+        console.error('Error in onMounted:', err);
+        isMounted.value = false;
+    }
+});
+
+onBeforeUnmount(() => {
+    try {
+        isMounted.value = false;
+        
+        // Cancel any pending requests
+        if (abortController.value) {
+            abortController.value.abort();
+            abortController.value = null;
+        }
+        
+        // Cleanup watchers
+        stopWatcher();
+        stopActiveTabWatcher();
+        stopRouteWatcher();
+        
+        // Remove event listener
+        document.removeEventListener('click', closePhotoMenu);
+        
+        // Reset state
+        viewingUserId.value = null;
+        user.value = { id: 0, name: '', email: '', phone: '', avatar: '', cover_photo: '' };
+        galleryImages.value = [];
+        friendsList.value = [];
+        activeTab.value = 'timeline';
+        loading.value = false;
+        galleryLoading.value = false;
+        friendsLoading.value = false;
+        photoMenuOpen.value = null;
+        selectedPhotoId.value = null;
+    } catch (err) {
+        console.error('Error in onBeforeUnmount:', err);
+    }
+});
 </script>
 
 <template>
-    <div class="profile-page">
+    <div class="user-profile-wrapper">
+        <div class="profile-page">
         <!-- Cover Photo Section -->
         <div class="cover-photo-section">
             <div 
                 class="cover-photo" 
                 :style="{ backgroundImage: user.cover_photo ? `url(${user.cover_photo})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }"
             >
-                <button class="edit-cover-btn" @click="onCoverClick">
+                <button v-if="isCurrentUser" class="edit-cover-btn" @click="onCoverClick">
                     <i class="bi bi-camera-fill"></i>
                     Edit Cover
                 </button>
                 <input ref="coverFileInput" type="file" accept="image/*" style="display:none" @change="onCoverFileInputChange" />
-            </div>
-            
-            <!-- Profile Card Overlay -->
-            <div class="profile-card-overlay">
+                
+                <!-- Profile Card Overlay - Inside Cover Photo -->
+                <div class="profile-card-overlay">
                 <div class="profile-avatar-wrapper">
                     <img 
                         :src="getAvatarSrc(user.avatar, user.name)" 
@@ -415,18 +781,18 @@ onMounted(fetchUser);
                         @click="onAvatarClick"
                         class="profile-avatar"
                     />
-                    <button class="avatar-camera-btn" @click="onCameraClick" type="button">
+                    <button v-if="isCurrentUser" class="avatar-camera-btn" @click="onCameraClick" type="button">
                         <i class="bi bi-camera-fill"></i>
                     </button>
                     <div class="verified-badge">
                         <i class="bi bi-check-circle-fill"></i>
-                    </div>
-                    <input ref="avatarFileInput" type="file" accept="image/*" style="display:none" @change="onAvatarFileInputChange" />
                 </div>
+                    <input ref="avatarFileInput" type="file" accept="image/*" style="display:none" @change="onAvatarFileInputChange" />
+            </div>
                 <div class="profile-info">
                     <div class="profile-name">{{ user.name || 'User' }} ❤️</div>
                     <div class="profile-email">{{ user.email || 'user@example.com' }}</div>
-                </div>
+        </div>
                 <div class="profile-stats">
                     <div class="stat-item">
                         <div class="stat-number">{{ userStats.following }}</div>
@@ -441,9 +807,10 @@ onMounted(fetchUser);
                         <div class="stat-label">Followers</div>
                     </div>
                 </div>
-                <button class="edit-profile-btn" @click="updateUser">
+                <button v-if="isCurrentUser" class="edit-profile-btn" @click="updateUser">
                     Edit Profile
                 </button>
+                </div>
             </div>
         </div>
 
@@ -483,29 +850,19 @@ onMounted(fetchUser);
                     Photos
                 </button>
             </div>
-            <div class="nav-actions">
-                <div class="search-box">
-                    <i class="bi bi-search"></i>
-                    <input type="text" placeholder="Search Here..." />
-                </div>
-                <button class="activity-feed-btn">
-                    <i class="bi bi-list"></i>
-                    Activity Feed
-                </button>
-            </div>
         </div>
 
         <!-- Main Content Area -->
-        <div class="profile-content">
+        <div class="profile-content" :class="{ 'friends-layout': activeTab === 'friends', 'photos-layout': activeTab === 'photos' }">
             <!-- Left Column - About -->
-            <div class="left-column">
+            <div class="left-column" v-if="activeTab !== 'friends' && activeTab !== 'photos'">
                 <div class="about-card">
                     <div class="card-header">
                         <div>
                             <h6 class="card-title">About</h6>
                             <span class="card-subtitle">Intro My Self</span>
                         </div>
-                        <button class="edit-icon-btn">
+                        <button v-if="isCurrentUser" class="edit-icon-btn">
                             <i class="bi bi-pencil"></i>
                         </button>
                     </div>
@@ -555,8 +912,7 @@ onMounted(fetchUser);
             <!-- Center Column - Main Content -->
             <div class="center-column">
                 <div v-if="activeTab === 'timeline'">
-                    <CreatePost @postCreated="() => {}" />
-                    <PostList />
+                    <PostList :hide-stories="true" />
                 </div>
                 <div v-else-if="activeTab === 'about'" class="about-tab-content">
                     <div class="about-detail-card">
@@ -597,24 +953,11 @@ onMounted(fetchUser);
                                     <i class="bi bi-check-circle-fill"></i>
                                 </div>
                             </div>
-                            <div class="friend-name">{{ friend.name }} ❤️</div>
-                            <div class="friend-email">{{ friend.email }}</div>
-                            <div class="friend-stats">
-                                <div class="friend-stat-item">
-                                    <div class="friend-stat-number">{{ friend.stats.following }}</div>
-                                    <div class="friend-stat-label">Following</div>
-                                </div>
-                                <div class="friend-stat-divider"></div>
-                                <div class="friend-stat-item">
-                                    <div class="friend-stat-number">{{ friend.stats.likes }}</div>
-                                    <div class="friend-stat-label">Likes</div>
-                                </div>
-                                <div class="friend-stat-divider"></div>
-                                <div class="friend-stat-item">
-                                    <div class="friend-stat-number">{{ friend.stats.followers }}</div>
-                                    <div class="friend-stat-label">Followers</div>
-                                </div>
+                            <div class="friend-name">
+                                {{ friend.name }}
+                                <i class="bi bi-heart-fill heart-icon"></i>
                             </div>
+                            <div class="friend-email">{{ friend.email }}</div>
                             <button class="view-profile-btn-small" @click="router.push(`/profile?user_id=${friend.id}`)">
                                 View Profile
                             </button>
@@ -622,18 +965,116 @@ onMounted(fetchUser);
                     </div>
                 </div>
                 <div v-else-if="activeTab === 'photos'" class="photos-tab-content">
-                    <div class="photos-grid">
-                        <div v-for="img in galleryImages" :key="img.id" class="photo-item">
-                            <img :src="img.url" :alt="`Photo ${img.id}`" />
+                    <!-- Photos Navigation Tabs -->
+                    <div class="photos-nav-tabs">
+                        <button 
+                            class="photos-nav-tab" 
+                            :class="{ active: photosSubTab === 'your-photos' }"
+                            @click="photosSubTab = 'your-photos'"
+                        >
+                            Ảnh của bạn
+                        </button>
+                        <button 
+                            class="photos-nav-tab" 
+                            :class="{ active: photosSubTab === 'tagged-photos' }"
+                            @click="photosSubTab = 'tagged-photos'"
+                        >
+                            Ảnh có mặt bạn
+                        </button>
+                        <button 
+                            class="photos-nav-tab" 
+                            :class="{ active: photosSubTab === 'albums' }"
+                            @click="photosSubTab = 'albums'"
+                        >
+                            Album
+                        </button>
+                    </div>
+
+                    <!-- Photos Content -->
+                    <div v-if="photosSubTab === 'your-photos'" class="photos-content">
+                        <div v-if="galleryLoading" class="photos-loading">
+                            <div class="spinner-border spinner-border-sm me-2"></div>
+                            Loading photos...
+                        </div>
+                        <div v-else-if="galleryImages.length === 0" class="photos-empty">
+                            <p>No photos yet</p>
+                        </div>
+                        <div v-else class="photos-grid">
+                            <div 
+                                v-for="img in galleryImages" 
+                                :key="img.id" 
+                                class="photo-item"
+                                @click.stop
+                            >
+                                <img :src="img.url" :alt="`Photo ${img.id}`" />
+                                <button 
+                                    class="photo-edit-btn"
+                                    @click.stop="openPhotoMenu(img.id)"
+                                >
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <!-- Photo Menu Overlay -->
+                                <div 
+                                    v-if="photoMenuOpen === img.id" 
+                                    class="photo-menu-overlay"
+                                    @click.stop
+                                >
+                                    <button 
+                                        class="photo-menu-item"
+                                        @click="handleUseAltText(img.id)"
+                                    >
+                                        <i class="bi bi-search"></i>
+                                        <span>Dùng văn bản thay thế khác</span>
+                                    </button>
+                                    <button 
+                                        class="photo-menu-item"
+                                        @click="handleEditLocation(img.id)"
+                                    >
+                                        <i class="bi bi-send"></i>
+                                        <span>Chỉnh sửa vị trí</span>
+                                    </button>
+                                    <button 
+                                        class="photo-menu-item"
+                                        @click="handleDeletePhoto(img.id)"
+                                    >
+                                        <i class="bi bi-trash"></i>
+                                        <span>Xóa ảnh</span>
+                                    </button>
+                                    <button 
+                                        class="photo-menu-item"
+                                        @click="handleDownloadPhoto(img.id, img.url)"
+                                    >
+                                        <i class="bi bi-download"></i>
+                                        <span>Tải xuống</span>
+                                    </button>
+                                    <button 
+                                        class="photo-menu-item"
+                                        @click="handleSetAsAvatar(img.id, img.url)"
+                                    >
+                                        <i class="bi bi-person"></i>
+                                        <span>Đặt làm ảnh đại diện</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else-if="photosSubTab === 'tagged-photos'" class="photos-content">
+                        <div class="photos-empty">
+                            <p>Chưa có ảnh nào có mặt bạn</p>
+                        </div>
+                    </div>
+                    <div v-else-if="photosSubTab === 'albums'" class="photos-content">
+                        <div class="photos-empty">
+                            <p>Chưa có album nào</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Right Column - Widgets -->
-            <div class="right-column">
+            <div class="right-column" v-if="activeTab !== 'friends' && activeTab !== 'photos'">
                 <!-- College Meet Widget -->
-                <div class="college-meet-card">
+                <!-- <div class="college-meet-card">
                     <div class="card-header">
                         <div>
                             <h6 class="card-title">College Meet</h6>
@@ -670,23 +1111,22 @@ onMounted(fetchUser);
                         Send Invitation
                         <i class="bi bi-arrow-right"></i>
                     </button>
-                </div>
+                </div> -->
 
                 <!-- Gallery Widget -->
                 <div class="gallery-card">
-                    <div class="card-header">
-                        <h6 class="card-title">Gallery <span class="count">156 Photos</span></h6>
-                        <div class="card-actions">
-                            <button class="icon-btn-small">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
-                            <button class="icon-btn-small">
-                                <i class="bi bi-gear"></i>
-                            </button>
-                        </div>
+                    <div class="gallery-header">
+                        <h6 class="gallery-title">Ảnh</h6>
+                        <a href="#" class="view-all-photos-link" @click.prevent="activeTab = 'photos'">Xem tất cả ảnh</a>
                     </div>
-                    <div class="gallery-grid">
-                        <div v-for="img in galleryImages" :key="img.id" class="gallery-item">
+                    <div v-if="galleryLoading" class="gallery-loading">
+                        <div class="spinner-border spinner-border-sm"></div>
+                    </div>
+                    <div v-else-if="galleryImages.length === 0" class="gallery-empty">
+                        <p>No photos yet</p>
+                    </div>
+                    <div v-else class="gallery-grid">
+                        <div v-for="img in galleryImages.slice(0, 9)" :key="img.id" class="gallery-item" @click="activeTab = 'photos'">
                             <img :src="img.url" :alt="`Gallery ${img.id}`" />
                         </div>
                     </div>
@@ -696,39 +1136,39 @@ onMounted(fetchUser);
     </div>
 
     <!-- Avatar Crop Modal -->
-    <div v-if="showCropModal" class="modal-overlay">
-        <div class="modal-cropper modal-cropper-edit-avatar modal-cropper-ui-strict">
-            <div class="modal-cropper-header-ui-strict modal-cropper-header-ui-strict--with-border">
-                <span class="modal-cropper-title">Edit Profile Picture</span>
-                <button class="close-view-avatar-ui-strict" @click="closeCropModalWithConfirm">&times;</button>
-            </div>
-            <div class="cropper-container-ui-strict" style="position:relative;">
+        <div v-if="showCropModal" class="modal-overlay">
+            <div class="modal-cropper modal-cropper-edit-avatar modal-cropper-ui-strict">
+                <div class="modal-cropper-header-ui-strict modal-cropper-header-ui-strict--with-border">
+                    <span class="modal-cropper-title">Edit Profile Picture</span>
+                    <button class="close-view-avatar-ui-strict" @click="closeCropModalWithConfirm">&times;</button>
+                </div>
+                <div class="cropper-container-ui-strict" style="position:relative;">
                 <img :src="cropImageUrl" ref="cropperContainer" @load="onCropperReady" :style="{ opacity: avatarLoading ? 0.5 : 1 }" />
-                <div v-if="avatarLoading" class="avatar-loading-overlay">
-                    <svg class="spinner spinner-large" viewBox="0 0 50 50">
-                        <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
-                    </svg>
+                    <div v-if="avatarLoading" class="avatar-loading-overlay">
+                        <svg class="spinner spinner-large" viewBox="0 0 50 50">
+                            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+                        </svg>
+                    </div>
+                </div>
+                <div class="cropper-zoom-bar-ui-strict">
+                    <button type="button" class="zoom-btn" @click="zoomOut" :disabled="zoomValue <= minZoom">-</button>
+                <input :type="'range'" :min="minZoom" :max="maxZoom" step="0.01" v-model.number="zoomValue" :value="zoomValue" @input="onZoomInput" />
+                    <button type="button" class="zoom-btn" @click="zoomIn" :disabled="zoomValue >= maxZoom">+</button>
+                </div>
+                <div class="modal-actions-ui-strict">
+                <button @click="closeCropModalWithConfirm" class="cancel-ui-strict" :disabled="avatarLoading">Cancel</button>
+                    <button @click="saveCroppedAvatar" class="save-ui-strict" :disabled="avatarLoading">
+                        <span v-if="avatarLoading">
+                            <svg class="spinner spinner-btn" width="28" height="28" viewBox="0 0 50 50">
+                                <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="6"></circle>
+                            </svg>
+                            Saving...
+                        </span>
+                        <span v-else>Save</span>
+                    </button>
                 </div>
             </div>
-            <div class="cropper-zoom-bar-ui-strict">
-                <button type="button" class="zoom-btn" @click="zoomOut" :disabled="zoomValue <= minZoom">-</button>
-                <input :type="'range'" :min="minZoom" :max="maxZoom" step="0.01" v-model.number="zoomValue" :value="zoomValue" @input="onZoomInput" />
-                <button type="button" class="zoom-btn" @click="zoomIn" :disabled="zoomValue >= maxZoom">+</button>
-            </div>
-            <div class="modal-actions-ui-strict">
-                <button @click="closeCropModalWithConfirm" class="cancel-ui-strict" :disabled="avatarLoading">Cancel</button>
-                <button @click="saveCroppedAvatar" class="save-ui-strict" :disabled="avatarLoading">
-                    <span v-if="avatarLoading">
-                        <svg class="spinner spinner-btn" width="28" height="28" viewBox="0 0 50 50">
-                            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="6"></circle>
-                        </svg>
-                        Saving...
-                    </span>
-                    <span v-else>Save</span>
-                </button>
-            </div>
         </div>
-    </div>
 
     <!-- Cover Photo Crop Modal -->
     <div v-if="showCoverCropModal" class="modal-overlay">
@@ -743,8 +1183,8 @@ onMounted(fetchUser);
                     <svg class="spinner spinner-large" viewBox="0 0 50 50">
                         <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
                     </svg>
+        </div>
                 </div>
-            </div>
             <div class="modal-actions-ui-strict">
                 <button @click="closeCoverCropModalWithConfirm" class="cancel-ui-strict" :disabled="coverLoading">Cancel</button>
                 <button @click="saveCroppedCover" class="save-ui-strict" :disabled="coverLoading">
@@ -766,13 +1206,20 @@ onMounted(fetchUser);
             <img :src="getAvatarSrc(user.avatar, user.name)" alt="Avatar" style="max-width: 90vw; max-height: 80vh; border-radius: 16px;" />
             <button class="close-view-avatar" @click="closeViewAvatarModal">&times;</button>
         </div>
+        </div>
     </div>
 </template>
 
 <style scoped>
+.user-profile-wrapper {
+    width: 100%;
+    min-height: 100%;
+}
+
 .profile-page {
     min-height: 100vh;
     background: #f0f2f5;
+    padding-top: 0;
     padding-bottom: 40px;
 }
 
@@ -795,9 +1242,9 @@ onMounted(fetchUser);
     position: absolute;
     bottom: 20px;
     right: 20px;
-    background: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    border: none;
+    background: #e7f3ff;
+    color: #1877f2;
+    border: 1px solid #1877f2;
     border-radius: 8px;
     padding: 10px 20px;
     font-size: 0.95rem;
@@ -806,37 +1253,42 @@ onMounted(fetchUser);
     display: flex;
     align-items: center;
     gap: 8px;
-    transition: background 0.2s;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .edit-cover-btn:hover {
-    background: rgba(0, 0, 0, 0.8);
+    background: #1877f2;
+    color: #fff;
+    box-shadow: 0 4px 8px rgba(24, 119, 242, 0.3);
 }
 
 .profile-card-overlay {
     position: absolute;
-    bottom: -80px;
+    bottom: 20px;
     left: 40px;
     background: #fff;
     border-radius: 12px;
-    padding: 24px;
+    padding: 16px 20px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    min-width: 280px;
+    min-width: 260px;
+    max-width: 300px;
     text-align: center;
+    z-index: 10;
 }
 
 .profile-avatar-wrapper {
     position: relative;
     display: inline-block;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .profile-avatar {
-    width: 120px;
-    height: 120px;
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid #fff;
+    border: 3px solid #fff;
     cursor: pointer;
 }
 
@@ -877,28 +1329,26 @@ onMounted(fetchUser);
 }
 
 .profile-info {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .profile-name {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #050505;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .profile-email {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: #65676b;
 }
 
 .profile-stats {
     display: flex;
     justify-content: space-around;
-    padding: 16px 0;
-    border-top: 1px solid #e4e6eb;
-    border-bottom: 1px solid #e4e6eb;
-    margin-bottom: 16px;
+    padding: 12px 0;
+    margin-bottom: 0;
 }
 
 .stat-item {
@@ -906,14 +1356,14 @@ onMounted(fetchUser);
 }
 
 .stat-number {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #050505;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .stat-label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #65676b;
 }
 
@@ -925,19 +1375,23 @@ onMounted(fetchUser);
     border-radius: 8px;
     color: #fff;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s;
+    margin-top: 12px;
+    box-shadow: 0 2px 4px rgba(24, 119, 242, 0.2);
 }
 
 .edit-profile-btn:hover {
     background: #166fe5;
+    box-shadow: 0 4px 8px rgba(24, 119, 242, 0.3);
+    transform: translateY(-1px);
 }
 
 /* Navigation Tabs */
 .nav-tabs-section {
     max-width: 1400px;
-    margin: 100px auto 0;
+    margin: 20px auto 0;
     padding: 0 20px;
     display: flex;
     justify-content: space-between;
@@ -1035,6 +1489,11 @@ onMounted(fetchUser);
     align-items: start;
 }
 
+.profile-content.friends-layout,
+.profile-content.photos-layout {
+    grid-template-columns: 1fr;
+}
+
 /* Left Column - About */
 .about-card {
     background: #fff;
@@ -1080,7 +1539,7 @@ onMounted(fetchUser);
 
 .about-list {
     display: flex;
-    flex-direction: column;
+        flex-direction: column;
     gap: 16px;
     margin-bottom: 20px;
 }
@@ -1254,23 +1713,63 @@ onMounted(fetchUser);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.gallery-card .card-title .count {
-    font-weight: 400;
+.gallery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.gallery-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #050505;
+    margin: 0;
+}
+
+.gallery-card .view-all-photos-link {
+    color: #1877f2;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: color 0.2s;
+}
+
+.gallery-card .view-all-photos-link:hover {
+    color: #166fe5;
+    text-decoration: underline;
+}
+
+.gallery-loading,
+.gallery-empty {
+    text-align: center;
+    padding: 20px;
     color: #65676b;
-    font-size: 0.85rem;
 }
 
 .gallery-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 4px;
-    margin-top: 12px;
+    margin-top: 0;
+}
+
+@media (max-width: 768px) {
+    .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .gallery-item {
     aspect-ratio: 1;
     overflow: hidden;
     border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.gallery-item:hover {
+    transform: scale(1.05);
 }
 
 .gallery-item img {
@@ -1320,6 +1819,7 @@ onMounted(fetchUser);
     margin-bottom: 24px;
     padding-bottom: 16px;
     border-bottom: 1px solid #e4e6eb;
+    gap: 16px;
 }
 
 .friends-title {
@@ -1336,8 +1836,8 @@ onMounted(fetchUser);
     background: #f0f2f5;
     border-radius: 20px;
     padding: 8px 16px;
-    flex: 1;
-    max-width: 400px;
+    flex: 0 0 auto;
+    min-width: 300px;
 }
 
 .friends-search-box input {
@@ -1379,8 +1879,26 @@ onMounted(fetchUser);
 
 .friends-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 20px;
+}
+
+@media (max-width: 1200px) {
+    .friends-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .friends-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .friends-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .friend-card {
@@ -1407,7 +1925,7 @@ onMounted(fetchUser);
     height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid #e4e6eb;
+    border: 3px solid #1877f2;
 }
 
 .verified-badge-small {
@@ -1434,6 +1952,15 @@ onMounted(fetchUser);
     font-weight: 700;
     color: #050505;
     margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.heart-icon {
+    color: #e41e3f;
+    font-size: 1rem;
 }
 
 .friend-email {
@@ -1442,72 +1969,204 @@ onMounted(fetchUser);
     margin-bottom: 16px;
 }
 
-.friend-stats {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 16px 0;
-    border-top: 1px solid #e4e6eb;
-    border-bottom: 1px solid #e4e6eb;
-    margin-bottom: 16px;
-}
-
-.friend-stat-item {
-    text-align: center;
-    flex: 1;
-}
-
-.friend-stat-divider {
-    width: 1px;
-    height: 30px;
-    background: #e4e6eb;
-}
-
-.friend-stat-number {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #050505;
-    margin-bottom: 4px;
-}
-
-.friend-stat-label {
-    font-size: 0.85rem;
-    color: #65676b;
-}
 
 .view-profile-btn-small {
     width: 100%;
     padding: 10px 16px;
-    background: #1877f2;
-    border: none;
+    background: #e7f3ff;
+    border: 2px solid #1877f2;
     border-radius: 8px;
-    color: #fff;
+    color: #1877f2;
     font-weight: 600;
     font-size: 0.95rem;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.3s ease;
+    margin-top: 16px;
 }
 
 .view-profile-btn-small:hover {
-    background: #166fe5;
+    background: #1877f2;
+    color: #fff;
+    border-color: #1877f2;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
+}
+
+.view-profile-btn-small:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(24, 119, 242, 0.2);
+}
+
+.photos-tab-content {
+    background: #fff;
+        border-radius: 12px;
+    padding: 20px;
+    min-height: 500px;
+}
+
+/* Photos Navigation Tabs */
+.photos-nav-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #e4e6eb;
+    margin-bottom: 20px;
+    background: #fff;
+}
+
+.photos-nav-tab {
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #65676b;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.photos-nav-tab:hover {
+    background: #f0f2f5;
+    color: #050505;
+}
+
+.photos-nav-tab.active {
+    color: #1877f2;
+    border-bottom-color: #1877f2;
+    background: transparent;
+}
+
+.photos-content {
+    min-height: 400px;
+}
+
+.photos-loading,
+.photos-empty {
+    text-align: center;
+    padding: 40px;
+    color: #65676b;
 }
 
 .photos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+@media (max-width: 1200px) {
+    .photos-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .photos-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .photos-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .photo-item {
+    position: relative;
     aspect-ratio: 1;
     overflow: hidden;
     border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.photo-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.photo-item:hover .photo-edit-btn {
+        opacity: 1;
 }
 
 .photo-item img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.photo-edit-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    z-index: 10;
+}
+
+.photo-edit-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+    opacity: 1;
+}
+
+.photo-edit-btn i {
+    font-size: 14px;
+}
+
+/* Photo Menu Overlay */
+.photo-menu-overlay {
+    position: absolute;
+    top: 40px;
+    right: 8px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    min-width: 240px;
+    z-index: 1000;
+    overflow: hidden;
+    padding: 4px 0;
+}
+
+.photo-menu-item {
+    width: 100%;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #050505;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.photo-menu-item:hover {
+    background: #f0f2f5;
+}
+
+.photo-menu-item i {
+    font-size: 18px;
+    color: #65676b;
+    width: 20px;
+    text-align: center;
+}
+
+.photo-menu-item span {
+    flex: 1;
 }
 
 /* Modals */
@@ -1526,7 +2185,7 @@ onMounted(fetchUser);
 
 .modal-cropper {
     background: #fff;
-    border-radius: 16px;
+        border-radius: 16px;
     padding: 24px;
     min-width: 420px;
     max-width: 98vw;
@@ -1795,7 +2454,7 @@ onMounted(fetchUser);
     }
     
     .nav-tabs-section {
-        margin-top: 80px;
+        margin-top: 20px;
     }
 }
 </style>

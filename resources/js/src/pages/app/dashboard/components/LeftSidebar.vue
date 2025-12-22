@@ -3,12 +3,37 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '../../../../state/userStore';
 import { getAvatarSrc } from '../../../../helper/avatar';
+import { makeHttpReq } from '../../../../helper/makeHttpReq';
 
 const router = useRouter();
 
 const userStore = useUserStore();
-// @ts-expect-error - Pinia store type inference issue
-const currentUser = computed(() => userStore.user);
+// Get user from store, fallback to userInfoCache for email
+const currentUser = computed(() => {
+    const user = (userStore as any).user;
+    const cache = (userStore as any).userInfoCache;
+    
+    // If user has email, return user
+    if (user?.email) {
+        return user;
+    }
+    
+    // If cache has email, merge with user
+    if (cache?.email && user) {
+        return {
+            ...user,
+            email: cache.email,
+            phone: cache.phone || user.phone,
+        };
+    }
+    
+    // Return cache if it exists and user doesn't
+    if (cache) {
+        return cache;
+    }
+    
+    return user;
+});
 
 // User stats (mock data for now, can be fetched from API later)
 const userStats = ref({
@@ -114,7 +139,56 @@ const fetchLikedPages = async () => {
     }
 };
 
+// Fetch user info if email is missing
+const fetchUserInfo = async () => {
+    const user = (userStore as any).user;
+    const cache = (userStore as any).userInfoCache;
+    
+    // If user already has email, no need to fetch
+    if (user?.email) {
+        return;
+    }
+    
+    // If cache has email, update userStore
+    if (cache?.email && user) {
+        (userStore as any).setUser({
+            ...user,
+            email: cache.email,
+            phone: cache.phone || user.phone,
+        });
+        return;
+    }
+    
+    // Fetch from API if no email in both user and cache
+    try {
+        const res = await makeHttpReq<undefined, { data: any }>('user', 'GET');
+        if (res.data) {
+            (userStore as any).setUser({
+                id: res.data.id,
+                name: res.data.name,
+                email: res.data.email,
+                phone: res.data.phone,
+                avatar: res.data.avatar || '',
+                friend_code: res.data.friend_code || null,
+            });
+            // Also update cache
+            (userStore as any).setUserInfoCache({
+                id: res.data.id,
+                name: res.data.name,
+                email: res.data.email,
+                phone: res.data.phone,
+                avatar: res.data.avatar || '',
+                cover_photo: res.data.cover_photo || '',
+                friend_code: res.data.friend_code || null,
+            });
+        }
+    } catch (error) {
+        console.warn('Failed to fetch user info in LeftSidebar:', error);
+    }
+};
+
 onMounted(() => {
+    fetchUserInfo();
     fetchFriendSuggestions();
     fetchLikedPages();
 });
@@ -146,8 +220,8 @@ onMounted(() => {
             <div class="profile-name">
                 {{ currentUser?.name || 'User' }}
             </div>
-            <div class="profile-email">
-                {{ currentUser?.email || 'user@example.com' }}
+            <div class="profile-email" v-if="currentUser?.email">
+                {{ currentUser.email }}
             </div>
             <div class="profile-bio">
                 Lorem Ipsum is simply dummy text of the printing and typesetting industry.

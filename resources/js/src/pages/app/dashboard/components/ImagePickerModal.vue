@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { ref, onMounted, computed, nextTick, watch } from 'vue';
-import { Teleport } from 'vue';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
 import { showError } from '../../../../helper/alert';
 
@@ -262,7 +261,6 @@ onMounted(() => {
 });
 
 // Watch for visibility changes
-import { watch } from 'vue';
 watch(() => props.visible, (newVal) => {
     if (newVal) {
         fetchUserImages();

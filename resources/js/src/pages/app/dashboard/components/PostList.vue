@@ -6,6 +6,10 @@ import CreatePost from './CreatePost.vue';
 import StoriesSection from './StoriesSection.vue';
 import SkeletonCard from '../../../../components/SkeletonCard.vue';
 
+const props = defineProps<{
+    hideStories?: boolean;
+}>();
+
 const posts = ref<any[]>([]);
 const isLoading = ref(true);
 const page = ref(1);
@@ -70,7 +74,7 @@ const handlePostCreated = (newPost: any) => {
         const existingIndex = posts.value.findIndex(p => p.id === newPost.id);
         if (existingIndex === -1) {
             // Add new post to the beginning of the list
-            posts.value.unshift(newPost);
+        posts.value.unshift(newPost);
         } else {
             // Update existing post
             posts.value[existingIndex] = newPost;
@@ -152,7 +156,7 @@ onUnmounted(() => {
 
 <template>
     <div class="news-feed-container">
-        <StoriesSection />
+        <StoriesSection v-if="!props.hideStories" />
         <CreatePost @postCreated="handlePostCreated" />
         
         <div v-if="isLoading && posts.length === 0" class="loading-posts">

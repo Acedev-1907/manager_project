@@ -88,10 +88,10 @@ export function useAuth() {
     }
 
     // Lưu user info vào user-store trước
-    // @ts-expect-error - Pinia store type inference issue
-    userStore.setUser({
+    (userStore as any).setUser({
       id: loginData.user.id,
       name: loginData.user.name,
+      email: loginData.user.email,
       avatar: loginData.user.avatar || '',
       friend_code: null, // Sẽ được cập nhật từ API
     });
@@ -109,10 +109,11 @@ export function useAuth() {
     // Fetch latest user data from API và cập nhật user-store
     try {
       const userRes = await makeHttpReq<undefined, { data: any }>('user', 'GET');
-      // @ts-expect-error - Pinia store type inference issue
-      userStore.setUser({
+      (userStore as any).setUser({
         id: userRes.data.id,
         name: userRes.data.name,
+        email: userRes.data.email,
+        phone: userRes.data.phone,
         avatar: userRes.data.avatar || '',
         friend_code: userRes.data.friend_code || null,
       });
@@ -124,8 +125,8 @@ export function useAuth() {
     // Clear cache on login
     clearCacheOnLogin();
 
-    // Navigate to dashboard
-    router.push('/dashboard');
+    // Navigate to newsfeed
+    router.push('/newsfeed');
   };
 
   /**

@@ -50,7 +50,7 @@
                         </div>
                         <button 
                             class="add-btn"
-                            :disabled="isAdding || isFriend(user.id)"
+                            :disabled="isAdding !== null || isFriend(user.id)"
                             @click="addFriend(user.id)"
                         >
                             <span v-if="isAdding === user.id" class="spinner-border spinner-border-sm"></span>
@@ -114,9 +114,21 @@ const isFriend = (userId: number) => {
 
 const loadMyFriends = async () => {
     try {
-        const res = await makeHttpReq<never, { data?: any[] }>('/members?per_page=100', 'GET');
+        const res = await makeHttpReq<never, any>('/members?per_page=100', 'GET');
+        // Handle different response structures
+        let data: any;
         if (res && res.data && Array.isArray(res.data.data)) {
-            myFriends.value = res.data.data.map((member: any) => member.id);
+            // Laravel resource format { data: { data: [], ...paging... } }
+            data = res.data;
+        } else if (res && res.data) {
+            // Direct response format
+            data = res.data;
+        } else {
+            data = res;
+        }
+        
+        if (data && Array.isArray(data.data)) {
+            myFriends.value = data.data.map((member: any) => member.id);
         }
     } catch (error) {
         // Silently fail

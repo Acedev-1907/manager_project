@@ -517,7 +517,7 @@ onUnmounted(() => {
 
             <!-- Main Content Area -->
             <div class="main-content">
-                <PostList />
+            <PostList />
             </div>
 
             <!-- Right Sidebar -->

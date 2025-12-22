@@ -2,7 +2,7 @@
     <div class="stories-section">
         <div class="stories-container">
             <!-- Add Story Card -->
-            <div class="story-card add-story-card">
+            <!-- <div class="story-card add-story-card">
                 <div class="story-avatar-wrapper">
                     <img 
                         :src="getAvatarSrc(currentUser?.avatar, currentUser?.name)" 
@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <div class="story-label">Thêm tin</div>
-            </div>
+            </div> -->
 
             <!-- User Stories -->
             <div 
@@ -40,14 +40,9 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue';
-import { useUserStore } from '../../../../state/userStore';
+import { ref, onMounted } from 'vue';
 import { getAvatarSrc } from '../../../../helper/avatar';
 import { makeHttpReq } from '../../../../helper/makeHttpReq';
-
-const userStore = useUserStore();
-// @ts-expect-error - Pinia store type inference issue
-const currentUser = computed(() => userStore.user);
 
 const stories = ref<Array<{
     id: number;

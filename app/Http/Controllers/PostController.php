@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\PostService;
 use App\Services\ImageKitService;
+use App\Notifications\PostCreated;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Api\ApiController;
 
@@ -50,10 +51,11 @@ class PostController extends ApiController
         ]);
 
         try {
+            $user = $request->user();
+            
             // Handle multiple image uploads if files are provided
             if ($request->hasFile('images')) {
                 $files = $request->file('images');
-                $user = $request->user();
                 $folder = env('IMAGEKIT_AVATAR_FOLDER', 'app-manager-project') . '/posts/' . $user->id;
                 $uploadedImages = [];
 
@@ -66,6 +68,9 @@ class PostController extends ApiController
             }
 
             $post = $this->postService->createPost($validated, $request);
+            
+            // Gửi notification cho user tạo post (lưu vào database và broadcast)
+            $user->notify(new PostCreated($post, $user));
 
             return $this->setStatusCode(201)
                 ->setReturnCode(self::RESPONSE_CREATED)

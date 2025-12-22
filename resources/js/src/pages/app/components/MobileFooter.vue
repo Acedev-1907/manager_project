@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
@@ -8,7 +7,7 @@ const router = useRouter();
 const navItems = [
     { 
         name: 'Home', 
-        path: '/dashboard', 
+        path: '/newsfeed', 
         icon: 'bi-house-fill',
         activeIcon: 'bi-house-fill'
     },

@@ -28,6 +28,7 @@ class UpdateUserRequest extends FormRequest
             'email' => 'sometimes|email|unique:users,email,' . $userId,
             'phone' => 'sometimes|nullable|string|max:20',
             'avatar' => 'sometimes|nullable|string|max:255',
+            'cover_photo' => 'sometimes|nullable|string|max:500',
             'password' => 'sometimes|string|min:6|confirmed',
             'password_confirmation' => 'sometimes|required_with:password',
         ];

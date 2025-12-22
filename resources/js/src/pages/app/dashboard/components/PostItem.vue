@@ -215,7 +215,7 @@ const openComments = () => {
 };
 
 const shareLink = computed(() => {
-    return `${window.location.origin}/app/dashboard?postId=${props.post.id}`;
+    return `${window.location.origin}/app/newsfeed?postId=${props.post.id}`;
 });
 
 const openShareModal = async () => {

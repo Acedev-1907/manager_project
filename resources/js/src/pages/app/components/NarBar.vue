@@ -9,7 +9,7 @@ import { listenRealtime, fetchNotifications } from '../../../state/notificationS
 import eventBus from '../../../helper/eventBus';
 
 const navigation = ref([
-    { name: "Feed", link: "/dashboard", icon: "bi bi-newspaper" },
+    { name: "Feed", link: "/newsfeed", icon: "bi bi-newspaper" },
     { name: "Projects", link: "/projects", icon: "bi bi-kanban" },
     { name: "Members", link: "/members", icon: "bi bi-people" },
 ]);
@@ -94,7 +94,7 @@ const currentUser = computed(() => {
             <div class="mobile-header-search">
                 <i class="bi bi-search"></i>
                 <input type="text" placeholder="Find Friends..." class="mobile-search-input" />
-            </div>
+                </div>
             <div class="mobile-header-actions">
                 <button class="mobile-header-icon-btn">
                     <i class="bi bi-moon"></i>
@@ -163,14 +163,17 @@ const currentUser = computed(() => {
             <BellNotification />
             <div class="navbar-avatar-btn" @click="toggleMenu($event)" style="position: relative;">
                 <template v-if="currentUser && currentUser.name">
-                    <span v-if="currentUser.avatar && currentUser.avatar.length > 0" class="avatar-circle">
-                        <img :src="getAvatarSrc(currentUser.avatar, currentUser.name)" alt="avatar"
-                            style="width:100%;height:100%;object-fit:cover;border-radius:50%;" loading="lazy" />
-                    </span>
-                    <span v-else-if="currentUser.name && currentUser.name.length > 0" class="avatar-circle">
+                    <img 
+                        v-if="currentUser.avatar && currentUser.avatar.length > 0" 
+                        :src="getAvatarSrc(currentUser.avatar, currentUser.name)" 
+                        alt="avatar"
+                        class="navbar-avatar-img"
+                        loading="lazy" 
+                    />
+                    <span v-else-if="currentUser.name && currentUser.name.length > 0" class="navbar-avatar-initial">
                         {{ currentUser.name.charAt(0).toUpperCase() }}
                     </span>
-                    <span v-else class="avatar-circle">?</span>
+                    <span v-else class="navbar-avatar-initial">?</span>
                 </template>
                 <span class="avatar-caret">
                     <i class="bi bi-caret-down-fill"></i>
@@ -749,6 +752,25 @@ const currentUser = computed(() => {
     z-index: 2100;
     position: relative;
     border: 2px solid rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+}
+
+.navbar-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.navbar-avatar-initial {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #fff;
 }
 
 .navbar-avatar-btn:hover {
@@ -952,11 +974,11 @@ const currentUser = computed(() => {
     padding: 12px 16px;
     gap: 12px;
     background: #1877f2;
-}
+    }
 
 .mobile-header-left {
-    display: flex;
-    align-items: center;
+        display: flex;
+        align-items: center;
     gap: 8px;
     flex-shrink: 0;
 }
@@ -976,12 +998,12 @@ const currentUser = computed(() => {
     color: #fff;
     letter-spacing: 0.02em;
     white-space: nowrap;
-}
+    }
 
 .mobile-header-search {
     flex: 1;
     position: relative;
-    display: flex;
+        display: flex;
     align-items: center;
     background: rgba(255, 255, 255, 0.15);
     border-radius: 20px;
@@ -1003,7 +1025,7 @@ const currentUser = computed(() => {
     outline: none;
     color: #fff;
     font-size: 0.9rem;
-    width: 100%;
+        width: 100%;
     min-width: 0;
 }
 
@@ -1013,7 +1035,7 @@ const currentUser = computed(() => {
 
 .mobile-header-actions {
     display: flex;
-    align-items: center;
+        align-items: center;
     gap: 8px;
     flex-shrink: 0;
 }
@@ -1024,8 +1046,8 @@ const currentUser = computed(() => {
     border: none;
     background: rgba(255, 255, 255, 0.15);
     border-radius: 50%;
-    display: flex;
-    align-items: center;
+        display: flex;
+        align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1035,7 +1057,7 @@ const currentUser = computed(() => {
 
 .mobile-header-icon-btn i {
     font-size: 1.1rem;
-}
+    }
 
 .mobile-header-icon-btn:hover {
     background: rgba(255, 255, 255, 0.25);

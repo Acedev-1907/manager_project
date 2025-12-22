@@ -5,46 +5,73 @@ export interface User {
   name: string;
   email?: string;
   avatar?: string;
+  phone?: string;
+  cover_photo?: string;
   friend_code?: string | null;
 }
 
+export interface UserInfoCache {
+  id: number | string;
+  name: string;
+  email?: string;
+  phone?: string;
+  avatar?: string;
+  cover_photo?: string;
+  friend_code?: string | null;
+}
+
+interface UserState {
+  user: User | null;
+  avatar: string;
+  userInfoCache: UserInfoCache | null;
+  lastFetched: number | null;
+}
+
 export const useUserStore = defineStore("user", {
-  state: () => ({
-    user: null as User | null,
+  state: (): UserState => ({
+    user: null,
     avatar: "",
-    userInfoCache: null as any, // cache user info (runtime only, not persisted)
-    lastFetched: null as number | null, // thời gian fetch gần nhất (runtime only)
+    userInfoCache: null, // cache user info (runtime only, not persisted)
+    lastFetched: null, // thời gian fetch gần nhất (runtime only)
   }),
   
   getters: {
-    isLoggedIn: (state: { user: User | null }) => state.user !== null,
-    userId: (state: { user: User | null }) => state.user?.id,
-    userName: (state: { user: User | null; avatar: string }) => state.user?.name || '',
-    userAvatar: (state: { user: User | null; avatar: string }) => state.user?.avatar || state.avatar || '',
+    isLoggedIn(): boolean {
+      return this.user !== null;
+    },
+    userId(): number | string | undefined {
+      return this.user?.id;
+    },
+    userName(): string {
+      return this.user?.name || '';
+    },
+    userAvatar(): string {
+      return this.user?.avatar || this.avatar || '';
+    },
   },
   
   actions: {
-    setUser(user: User | null) {
+    setUser(user: User | null): void {
       this.user = user;
       if (user?.avatar) {
         this.avatar = user.avatar;
       }
     },
-    setAvatar(avatar: string) {
+    setAvatar(avatar: string): void {
       this.avatar = avatar;
       if (this.user) {
         this.user.avatar = avatar;
       }
     },
-    setUserInfoCache(data: any) {
+    setUserInfoCache(data: UserInfoCache | null): void {
       this.userInfoCache = data;
-      this.lastFetched = Date.now();
+      this.lastFetched = data ? Date.now() : null;
     },
-    clearUserInfoCache() {
+    clearUserInfoCache(): void {
       this.userInfoCache = null;
       this.lastFetched = null;
     },
-    clearUser() {
+    clearUser(): void {
       this.user = null;
       this.avatar = '';
       this.userInfoCache = null;
