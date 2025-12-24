@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Helpers\LocaleHelper;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -65,14 +66,16 @@ class GroqAIService
             
             if (!isset($data['choices'][0]['message']['content'])) {
                 Log::error('Groq API: No content in response', ['data' => $data]);
-                throw new \Exception('Không nhận được phản hồi từ AI. Vui lòng thử lại.');
+                $locale = app()->getLocale();
+                throw new \Exception(trans('ai.errors.api_error', [], $locale));
             }
 
             $content = $data['choices'][0]['message']['content'];
             
             if (empty(trim($content))) {
                 Log::warning('Groq API: Empty content response', ['data' => $data]);
-                throw new \Exception('AI trả về phản hồi rỗng. Vui lòng thử lại.');
+                $locale = app()->getLocale();
+                throw new \Exception(trans('ai.errors.empty_response', [], $locale));
             }
 
             return $content;
@@ -90,11 +93,15 @@ class GroqAIService
      */
     protected function buildSystemPrompt(array $context): string
     {
-        $prompt = "Bạn là AI Assistant cho hệ thống quản lý dự án. Bạn giúp người dùng quản lý projects, tasks, và team collaboration.\n\n";
+        $locale = app()->getLocale();
+        $prompt = trans('ai.system_prompt.intro', [], $locale) . "\n\n";
 
         if (isset($context['user'])) {
             $user = $context['user'];
-            $prompt .= "Người dùng: {$user->name} ({$user->email})\n";
+            $prompt .= trans('ai.system_prompt.user_info', [
+                'name' => $user->name,
+                'email' => $user->email
+            ], $locale) . "\n";
         }
 
         // Add projects information if available
@@ -108,48 +115,123 @@ class GroqAIService
         
         if ($projectsCount > 0) {
             $projectsCount = $context['projects_count'] ?? $projectsCount;
-            $prompt .= "\n=== THÔNG TIN DỰ ÁN CỦA NGƯỜI DÙNG ===\n";
-            $prompt .= "Tổng số dự án: {$projectsCount}\n\n";
+            $prompt .= "\n" . trans('ai.system_prompt.projects_section', [], $locale) . "\n";
+            $prompt .= trans('ai.system_prompt.total_projects', ['count' => $projectsCount], $locale) . "\n\n";
             
             // Convert to array if it's a Collection
             $projectsArray = is_array($userProjects) ? $userProjects : $userProjects->toArray();
             
             foreach ($projectsArray as $project) {
-                $prompt .= "Dự án: {$project['name']}\n";
-                $prompt .= "  - ID: {$project['id']}\n";
-                $prompt .= "  - Trạng thái: {$project['status']}\n";
-                $prompt .= "  - Tiến độ: {$project['progress_percentage']}% ({$project['completed_tasks']}/{$project['total_tasks']} tasks)\n";
+                $prompt .= trans('ai.system_prompt.project_name', ['name' => $project['name']], $locale) . "\n";
+                $prompt .= "  " . trans('ai.system_prompt.project_id', ['id' => $project['id']], $locale) . "\n";
+                $prompt .= "  " . trans('ai.system_prompt.project_status', ['status' => $project['status']], $locale) . "\n";
+                $prompt .= "  " . trans('ai.system_prompt.project_progress', [
+                    'percentage' => $project['progress_percentage'],
+                    'completed' => $project['completed_tasks'],
+                    'total' => $project['total_tasks']
+                ], $locale) . "\n";
                 if ($project['start_date']) {
-                    $prompt .= "  - Ngày bắt đầu: {$project['start_date']}\n";
+                    $prompt .= "  " . trans('ai.system_prompt.project_start_date', ['date' => $project['start_date']], $locale) . "\n";
                 }
                 if ($project['end_date']) {
-                    $prompt .= "  - Ngày kết thúc: {$project['end_date']}\n";
+                    $prompt .= "  " . trans('ai.system_prompt.project_end_date', ['date' => $project['end_date']], $locale) . "\n";
                 }
                 if ($project['is_pinned']) {
-                    $prompt .= "  - ⭐ Đã ghim\n";
+                    $prompt .= "  " . trans('ai.system_prompt.project_pinned', [], $locale) . "\n";
                 }
+                
+                // Add tasks information
+                if (isset($project['tasks']) && is_array($project['tasks']) && count($project['tasks']) > 0) {
+                    $prompt .= "  " . trans('ai.system_prompt.tasks_section', [], $locale) . "\n";
+                    foreach ($project['tasks'] as $task) {
+                        $prompt .= "    " . trans('ai.system_prompt.task_item', [
+                            'id' => $task['id'],
+                            'name' => $task['name'],
+                            'status' => $task['status_text']
+                        ], $locale) . "\n";
+                        if (!empty($task['content'])) {
+                            $content = mb_substr($task['content'], 0, 100);
+                            $prompt .= "      " . trans('ai.system_prompt.task_description', [
+                                'content' => $content . (mb_strlen($task['content']) > 100 ? '...' : '')
+                            ], $locale) . "\n";
+                        }
+                    }
+                }
+                
+                // Add members information for task assignment
+                if (isset($project['members']) && is_array($project['members']) && count($project['members']) > 0) {
+                    $prompt .= "  " . trans('ai.system_prompt.members_section', [], $locale) . "\n";
+                    foreach ($project['members'] as $member) {
+                        $prompt .= "    " . trans('ai.system_prompt.member_item', [
+                            'id' => $member['id'],
+                            'name' => $member['name'],
+                            'email' => $member['email']
+                        ], $locale) . "\n";
+                    }
+                }
+                
                 $prompt .= "\n";
             }
             
-            $prompt .= "Bạn có thể:\n";
-            $prompt .= "- Phân tích số lượng dự án và tiến độ\n";
-            $prompt .= "- Đưa ra nhận xét về tình trạng các dự án\n";
-            $prompt .= "- Gợi ý cải thiện hoặc quản lý dự án\n";
-            $prompt .= "- Trả lời câu hỏi về các dự án cụ thể\n";
+            // Add capabilities
+            $capabilities = trans('ai.system_prompt.capabilities', [], $locale);
+            if (is_array($capabilities)) {
+                foreach ($capabilities as $capability) {
+                    $prompt .= $capability . "\n";
+                }
+            }
         } else {
-            $prompt .= "\nNgười dùng hiện chưa có dự án nào.\n";
-            $prompt .= "Bạn có thể giúp họ tạo dự án mới.\n";
+            $noProjects = trans('ai.system_prompt.no_projects', [], $locale);
+            if (is_array($noProjects)) {
+                foreach ($noProjects as $line) {
+                    $prompt .= $line . "\n";
+                }
+            }
         }
 
         if (isset($context['project'])) {
             $project = $context['project'];
-            $prompt .= "\n=== DỰ ÁN ĐANG XEM ===\n";
-            $prompt .= "Tên: {$project->name}\n";
-            $prompt .= "Trạng thái: {$project->status}\n";
+            $prompt .= "\n" . trans('ai.system_prompt.current_project', [], $locale) . "\n";
+            $prompt .= trans('ai.system_prompt.current_project_name', ['name' => $project->name], $locale) . "\n";
+            $prompt .= trans('ai.system_prompt.current_project_status', ['status' => $project->status], $locale) . "\n";
         }
 
-        $prompt .= "\nHãy trả lời một cách hữu ích, rõ ràng và ngắn gọn. Sử dụng tiếng Việt.";
-        $prompt .= "Khi người dùng hỏi về dự án, hãy sử dụng thông tin trên để trả lời chính xác.";
+        // Add creation rules
+        $creationRules = trans('ai.system_prompt.creation_rules', [], $locale);
+        $prompt .= "\n" . $creationRules['title'] . "\n";
+        $prompt .= $creationRules['intro'] . "\n";
+        $prompt .= $creationRules['step1'] . "\n";
+        $prompt .= $creationRules['step2'] . "\n";
+        $prompt .= $creationRules['step3'] . "\n\n";
+        
+        $prompt .= $creationRules['task_format'] . "\n";
+        $prompt .= $creationRules['task_format_example'] . "\n\n";
+        
+        $prompt .= $creationRules['project_format'] . "\n";
+        $prompt .= $creationRules['project_format_example'] . "\n\n";
+        
+        $prompt .= $creationRules['important'] . ":\n";
+        $prompt .= $creationRules['important1'] . "\n";
+        $prompt .= $creationRules['important2'] . "\n";
+        $prompt .= $creationRules['important3'] . "\n";
+        $prompt .= $creationRules['important4'] . "\n";
+        
+        // Add usage guide with language instruction
+        $usageGuide = trans('ai.system_prompt.usage_guide', [], $locale);
+        $prompt .= "\n" . $usageGuide['title'] . "\n";
+        $prompt .= $usageGuide['rule1'] . "\n";
+        $prompt .= $usageGuide['rule2'] . "\n";
+        $prompt .= $usageGuide['rule3'] . "\n";
+        $prompt .= $usageGuide['language_rule'] . "\n";
+        
+        // Add detailed creation rules
+        $detailedRules = trans('ai.system_prompt.creation_rules_detailed', [], $locale);
+        $prompt .= "\n" . $detailedRules['title'] . "\n";
+        $prompt .= $detailedRules['rule1'] . "\n";
+        $prompt .= $detailedRules['rule2'] . "\n";
+        $prompt .= $detailedRules['rule3'] . "\n";
+        $prompt .= $detailedRules['rule4'] . "\n";
+        $prompt .= $detailedRules['rule5'] . "\n";
 
         return $prompt;
     }

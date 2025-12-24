@@ -118,10 +118,22 @@ class AIChatController extends ApiController
                 $request->message
             );
 
-            return $this->respondWithData([
+            $response = [
                 'user_message' => $result['user_message'],
                 'ai_message' => $result['ai_message'],
-            ], 'Message sent successfully');
+            ];
+            
+            // Include created tasks if any
+            if (isset($result['created_tasks']) && !empty($result['created_tasks'])) {
+                $response['created_tasks'] = $result['created_tasks'];
+            }
+            
+            // Include created projects if any
+            if (isset($result['created_projects']) && !empty($result['created_projects'])) {
+                $response['created_projects'] = $result['created_projects'];
+            }
+            
+            return $this->respondWithData($response, 'Message sent successfully');
         } catch (\Exception $e) {
             return $this->respondValidationError('Failed to send message: ' . $e->getMessage());
         }

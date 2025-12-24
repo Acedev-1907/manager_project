@@ -160,6 +160,30 @@ onMounted(async () => {
         }
     });
 
+    // Listen for new project created event (from AI or manual creation)
+    eventBus.on('new-project-for-members', async () => {
+        try {
+            // Clear cache to force refresh
+            projectCache.value.value = {};
+            // Refresh project list
+            await fetchProjects(1, query.value, false, true);
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
+    // Listen for project cache cleared event
+    eventBus.on('project-cache-cleared', async () => {
+        try {
+            // Clear cache to force refresh
+            projectCache.value.value = {};
+            // Refresh project list
+            await fetchProjects(1, query.value, false, true);
+        } catch (error) {
+            // Silent error handling
+        }
+    });
+
     // Listen for page visibility changes
     document.addEventListener('visibilitychange', handleVisibilityChange);
 });
@@ -391,6 +415,8 @@ onUnmounted(() => {
     eventBus.off('force-cache-clear');
     eventBus.off('project-realtime-event');
     eventBus.off('project-progress-updated');
+    eventBus.off('new-project-for-members');
+    eventBus.off('project-cache-cleared');
 
     // Remove page visibility listener
     document.removeEventListener('visibilitychange', handleVisibilityChange);

@@ -29,6 +29,7 @@ class User extends Authenticatable
         'isValidEmail',
         'remember_token',
         'friend_code',
+        'locale',
     ];
 
     /**

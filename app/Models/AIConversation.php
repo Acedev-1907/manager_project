@@ -14,6 +14,7 @@ class AIConversation extends Model
     protected $guarded = [];
 
     protected $casts = [
+        'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, nextTick, watch } from "vue";
+import { ref, nextTick, watch } from "vue";
 import { makeHttpReq } from "../helper/makeHttpReq";
 import { showError } from "../helper/alert";
 
@@ -240,6 +240,17 @@ async function handleSend() {
   newMessage.value = "";
   sending.value = true;
 
+  // Optimistic update: Add user message immediately
+  const tempUserMessage: AIMessage = {
+    id: Date.now(), // Temporary ID
+    ai_conversation_id: activeConversation.value.id,
+    role: 'user',
+    content: messageText,
+    created_at: new Date().toISOString(),
+  };
+  messages.value.push(tempUserMessage);
+  scrollToBottom();
+
   try {
     const res = await makeHttpReq<any, any>(
       `/ai/conversations/${activeConversation.value.id}/messages`,
@@ -252,9 +263,15 @@ async function handleSend() {
     // Handle response format: res.data or res directly
     const data = res?.data || res;
     
-    // Add user message
+    // Replace temporary user message with real one from server
     if (data?.user_message) {
-      messages.value.push(data.user_message);
+      const tempIndex = messages.value.findIndex(m => m.id === tempUserMessage.id);
+      if (tempIndex !== -1) {
+        messages.value[tempIndex] = data.user_message;
+      } else {
+        // If not found, add it (shouldn't happen but safe fallback)
+        messages.value.push(data.user_message);
+      }
     }
     
     // Add AI message
@@ -265,13 +282,20 @@ async function handleSend() {
     // If response doesn't have user_message/ai_message, try to extract from data
     if (!data?.user_message && !data?.ai_message) {
       console.warn('Unexpected response format:', data);
-      // Try to reload messages
+      // Try to reload messages to get both messages
       await fetchMessages(activeConversation.value.id);
     }
     
     scrollToBottom();
   } catch (e: any) {
     console.error('Error sending message:', e);
+    
+    // Remove temporary user message on error
+    const tempIndex = messages.value.findIndex(m => m.id === tempUserMessage.id);
+    if (tempIndex !== -1) {
+      messages.value.splice(tempIndex, 1);
+    }
+    
     // Restore message on error
     newMessage.value = messageText;
     showError(e?.message || e?.response?.message || 'Không thể gửi tin nhắn');
