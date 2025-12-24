@@ -105,6 +105,11 @@ const router = createRouter({
           name: "chat",
           component: () => import("../pages/app/chat/ChatPage.vue"),
         },
+        {
+          path: "/ai-chat",
+          name: "ai-chat",
+          component: () => import("../pages/app/ai-chat/AIChatPage.vue"),
+        },
       ],
     },
     // Catch all route - redirect to login

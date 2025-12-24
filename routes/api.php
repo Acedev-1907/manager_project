@@ -8,7 +8,8 @@ use App\Http\Controllers\{
     ProjectController,
     TaskController,
     PostController,
-    ChatController
+    ChatController,
+    AIChatController
 };
 
 Route::controller(AuthController::class)->group(function () {
@@ -95,6 +96,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/chat/conversations', 'conversations');
         Route::get('/chat/messages', 'messages');
         Route::post('/chat/messages', 'send');
+    });
+
+    // API AI Chat
+    Route::prefix('ai')->controller(AIChatController::class)->group(function () {
+        Route::get('/conversations', 'conversations');
+        Route::post('/conversations', 'createConversation');
+        Route::get('/conversations/{conversation}/messages', 'getMessages');
+        Route::post('/conversations/{conversation}/messages', 'sendMessage');
+        Route::delete('/conversations/{conversation}', 'deleteConversation');
     });
 
     // API notification cho user

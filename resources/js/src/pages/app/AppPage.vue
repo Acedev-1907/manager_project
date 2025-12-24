@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue';
 import NarBar from './components/NarBar.vue';
 import MobileFooter from './components/MobileFooter.vue';
+import AIFloatingChat from '../../components/AIFloatingChat.vue';
 import { useLogOutUser } from './actions/Logout';
 import { getUserData } from '../../helper/getUserData';
 import { clearCacheOnLogout } from '../../composables/useLocalStorage';
@@ -100,6 +101,7 @@ const userAvatar = computed(() => {
             </router-view>
         </div>
         <MobileFooter />
+        <AIFloatingChat />
     </div>
 </template>
 

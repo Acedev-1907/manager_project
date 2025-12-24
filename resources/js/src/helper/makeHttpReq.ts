@@ -114,15 +114,35 @@ export async function makeHttpReq<TInput, TResponse>(
           handleAuthError();
           throw new Error("Not authenticated");
         }
-        throw new Error("Invalid response format");
+        // Try to get text response for better error message
+        const textResponse = await response.text();
+        console.error('Non-JSON response:', {
+          status: response.status,
+          contentType,
+          url,
+          text: textResponse.substring(0, 500)
+        });
+        throw new Error(`Invalid response format (${response.status}): ${textResponse.substring(0, 100)}`);
         }
-      } catch (e) {
+      } catch (e: any) {
       // Lỗi parse JSON nhưng status là 401 → coi như lỗi auth
       if (response.status === 401) {
         handleAuthError();
         throw new Error("Not authenticated");
       }
-      throw new Error("Failed to parse response");
+      // If it's already our custom error, re-throw it
+      if (e.message && e.message.includes("Invalid response format")) {
+        throw e;
+      }
+      // Otherwise, it's a JSON parse error
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('Failed to parse JSON response:', {
+        status: response.status,
+        url,
+        error: e.message,
+        responseText: errorText.substring(0, 500)
+      });
+      throw new Error(`Failed to parse response (${response.status}): ${errorText.substring(0, 100)}`);
       }
 
       // Handle non-successful responses
