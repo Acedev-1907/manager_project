@@ -424,7 +424,12 @@ onMounted(async () => {
     eventBus.on('task-status-changed-realtime', async (eventData: any) => {
         try {
             if (ProjectData.value?.data?.id && Number(eventData?.projectId) === Number(ProjectData.value.data.id)) {
-                if (isCurrentUser(eventData.userId)) {
+                const tasks = ProjectData.value?.data?.tasks || [];
+                const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
+                const isNewTask = idx === -1;
+                
+                // If current user and task already exists, skip update (optimistic update already handled)
+                if (isCurrentUser(eventData.userId) && !isNewTask) {
                     if (eventData.taskId) {
                         const taskIdNum = Number(eventData.taskId);
                         lockedTasks.value.delete(taskIdNum);
@@ -443,21 +448,23 @@ onMounted(async () => {
 
                 const updatedTask = eventData.task;
                 if (updatedTask) {
-                    const tasks = ProjectData.value?.data?.tasks || [];
-                    const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
                     if (idx !== -1) {
+                        // Update existing task
                         tasks[idx] = {
                             ...tasks[idx],
                             ...updatedTask,
                             status: updatedTask?.status ?? eventData.status
                         };
+                    } else {
+                        // Add new task if it doesn't exist (e.g., created by AI or other user)
+                        tasks.push({
+                            ...updatedTask,
+                            status: updatedTask?.status ?? eventData.status ?? 0
+                        });
                     }
-                } else if (eventData.taskId) {
-                    const tasks = ProjectData.value?.data?.tasks || [];
-                    const idx = tasks.findIndex((t: any) => Number(t.id) === Number(eventData.taskId));
-                    if (idx !== -1) {
-                        tasks.splice(idx, 1);
-                    }
+                } else if (eventData.taskId && idx !== -1) {
+                    // Remove task if task data is null and task exists
+                    tasks.splice(idx, 1);
                 }
                 ProjectData.value = { ...ProjectData.value };
                 

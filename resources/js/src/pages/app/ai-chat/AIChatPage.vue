@@ -32,8 +32,11 @@
           <button
             class="ai-delete-btn"
             @click.stop="handleDeleteConversation(conv.id)"
+            :disabled="deleting === conv.id"
+            :title="deleting === conv.id ? 'Đang xóa...' : 'Xóa cuộc hội thoại'"
           >
-            <i class="fas fa-trash"></i>
+            <i v-if="deleting === conv.id" class="fas fa-spinner fa-spin"></i>
+            <i v-else class="fas fa-trash"></i>
           </button>
         </div>
         <div
@@ -69,8 +72,11 @@
           <button
             class="ai-delete-conversation-btn"
             @click="handleDeleteConversation(activeConversation.id)"
+            :disabled="deleting === activeConversation.id"
           >
-            <i class="fas fa-trash"></i> Xóa
+            <i v-if="deleting === activeConversation.id" class="fas fa-spinner fa-spin"></i>
+            <i v-else class="fas fa-trash"></i>
+            {{ deleting === activeConversation.id ? 'Đang xóa...' : 'Xóa' }}
           </button>
         </div>
 
@@ -125,7 +131,7 @@
 <script setup lang="ts">
 import { onMounted, ref, nextTick, watch } from "vue";
 import { makeHttpReq } from "../../../helper/makeHttpReq";
-import { showConfirm, showError } from "../../../helper/alert";
+import { showConfirm, showError, showSuccess } from "../../../helper/alert";
 
 interface AIConversation {
   id: number;
@@ -155,6 +161,7 @@ const activeConversationId = ref<number | null>(null);
 const newMessage = ref("");
 const sending = ref(false);
 const loading = ref(false);
+const deleting = ref<number | null>(null); // Track which conversation is being deleted
 const messageContainer = ref<HTMLElement | null>(null);
 
 onMounted(() => {
@@ -275,8 +282,13 @@ async function handleDeleteConversation(conversationId: number) {
   
   if (!confirmed) return;
 
+  deleting.value = conversationId;
+
   try {
     await makeHttpReq<never, any>(`/ai/conversations/${conversationId}`, 'DELETE');
+    
+    // Show success message
+    showSuccess('Đã xóa cuộc hội thoại thành công', 'Thành công');
     
     // Remove from list
     conversations.value = conversations.value.filter(c => c.id !== conversationId);
@@ -289,6 +301,8 @@ async function handleDeleteConversation(conversationId: number) {
     }
   } catch (e: any) {
     showError(e?.message || 'Không thể xóa cuộc hội thoại');
+  } finally {
+    deleting.value = null;
   }
 }
 
@@ -475,8 +489,13 @@ function handleNewLine() {
   opacity: 1;
 }
 
-.ai-delete-btn:hover {
+.ai-delete-btn:hover:not(:disabled) {
   color: #e74c3c;
+}
+
+.ai-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .ai-chat-empty {
@@ -584,8 +603,13 @@ function handleNewLine() {
   gap: 8px;
 }
 
-.ai-delete-conversation-btn:hover {
+.ai-delete-conversation-btn:hover:not(:disabled) {
   background: #fff5f5;
+}
+
+.ai-delete-conversation-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .ai-chat-messages {

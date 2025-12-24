@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Events\TaskStatusChanged;
 use App\Helpers\LanguageDetector;
 use App\Helpers\LocaleHelper;
 use App\Models\AIConversation;
 use App\Models\AIMessage;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\TaskProgress;
 use App\Models\User;
 use App\Services\GroqAIService;
@@ -166,24 +168,82 @@ class AIConversationService
             $hasError = false;
             $modelUsed = 'unknown';
             $createdTasks = [];
+            
+            // Check if user is confirming or rejecting a pending action FIRST
+            // This avoids unnecessary AI calls when user is just confirming
+            $pendingAction = $this->getPendingAction($conversation);
+            $isConfirmation = $this->isConfirmationMessage($userMessage);
+            $isRejection = $this->isRejectionMessage($userMessage);
+            
             try {
-                $aiResponse = $this->aiService->chat($messages, $context);
-                
-                // Get model from config
-                $modelUsed = config('ai.groq_model', 'llama-3.1-8b-instant');
-                
-                // Check if response is empty
-                if (empty(trim($aiResponse))) {
-                    throw new \Exception(trans('ai.errors.empty_response', [], $locale));
+                // If user is confirming or rejecting, skip AI call and handle directly
+                if ($pendingAction && ($isConfirmation || $isRejection)) {
+                    $aiResponse = '';
+                    $modelUsed = config('ai.groq_model', 'llama-3.1-8b-instant');
+                } else {
+                    // Normal flow - call AI service
+                    $aiResponse = $this->aiService->chat($messages, $context);
+                    
+                    // Get model from config
+                    $modelUsed = config('ai.groq_model', 'llama-3.1-8b-instant');
+                    
+                    // Check if response is empty
+                    if (empty(trim($aiResponse))) {
+                        throw new \Exception(trans('ai.errors.empty_response', [], $locale));
+                    }
                 }
                 
-                // Check if user is confirming or rejecting a pending action
-                $pendingAction = $this->getPendingAction($conversation);
-                $isConfirmation = $this->isConfirmationMessage($userMessage);
-                $isRejection = $this->isRejectionMessage($userMessage);
+                // Store original response for parsing (before removing format tags)
+                $aiResponseOriginal = $aiResponse;
                 
                 if ($pendingAction) {
-                    if ($isConfirmation) {
+                    // Check if pending action is waiting for task name
+                    if ($pendingAction['type'] === 'task' && !empty($pendingAction['needs_task_name'])) {
+                        // User is providing task name
+                        $taskName = trim($userMessage);
+                        if (!empty($taskName) && strlen($taskName) > 0) {
+                            // Update pending action with task name
+                            $pendingAction['data']['name'] = $taskName;
+                            unset($pendingAction['needs_task_name']);
+                            
+                            // If project_id is missing, try to use conversation's project
+                            if (empty($pendingAction['data']['project_id']) && $conversation->project_id) {
+                                $pendingAction['data']['project_id'] = $conversation->project_id;
+                            }
+                            
+                            // Now ask for confirmation or project name if needed
+                            $aiResponse = $this->buildConfirmationPrompt($pendingAction, $conversation);
+                            
+                            // Save pending action again in case needs_project_name was set
+                            $this->savePendingAction($conversation, $pendingAction);
+                        } else {
+                            // Invalid task name, ask again
+                            $aiResponse = "Vui lòng nhập tên task hợp lệ. Tên task không được để trống.";
+                        }
+                    } elseif ($pendingAction['type'] === 'task' && !empty($pendingAction['needs_project_name'])) {
+                        // User is providing project name
+                        $projectName = trim($userMessage);
+                        if (!empty($projectName) && strlen($projectName) > 0) {
+                            // Find project by name from user's projects
+                            $project = $this->findProjectByName($conversation->user, $projectName);
+                            
+                            if ($project) {
+                                // Update pending action with project_id
+                                $pendingAction['data']['project_id'] = $project->id;
+                                unset($pendingAction['needs_project_name']);
+                                $this->savePendingAction($conversation, $pendingAction);
+                                
+                                // Now ask for confirmation with project name
+                                $aiResponse = $this->buildConfirmationPrompt($pendingAction, $conversation);
+                            } else {
+                                // Project not found, ask again
+                                $aiResponse = "Không tìm thấy project với tên '{$projectName}'. Vui lòng kiểm tra lại tên project hoặc thử tên khác.";
+                            }
+                        } else {
+                            // Invalid project name, ask again
+                            $aiResponse = "Vui lòng nhập tên project hợp lệ. Tên project không được để trống.";
+                        }
+                    } elseif ($isConfirmation) {
                         // User confirmed, proceed with creation
                         $createdTasks = [];
                         $createdProjects = [];
@@ -213,44 +273,54 @@ class AIConversationService
                         // User sent other message while pending action exists
                         // Keep pending action and let AI respond normally
                         // But remind user about pending action
+                        
+                        // Remove CREATE tags from AI response (in case AI included them)
+                        $aiResponse = preg_replace(self::CREATE_TASK_PATTERN, '', $aiResponseOriginal);
+                        $aiResponse = preg_replace(self::CREATE_PROJECT_PATTERN, '', $aiResponse);
+                        $aiResponse = trim($aiResponse);
+                        
                         $reminder = $this->buildPendingActionReminder($pendingAction);
                         if (!empty($reminder)) {
                             $aiResponse = $reminder . "\n\n" . $aiResponse;
                         }
                     }
                 } else {
-                    // Check if AI wants to create something
-                    $creationIntent = $this->detectCreationIntent($aiResponse, $userMessage);
+                    // Check if AI wants to create something (use original response for detection)
+                    $creationIntent = $this->detectCreationIntent($aiResponseOriginal, $userMessage);
                     
                     if ($creationIntent) {
+                        // If task intent but missing project_id, try to use conversation's project
+                        if ($creationIntent['type'] === 'task' && empty($creationIntent['data']['project_id']) && $conversation->project_id) {
+                            $creationIntent['data']['project_id'] = $conversation->project_id;
+                        }
+                        
                         // Save pending action and ask for confirmation
                         $this->savePendingAction($conversation, $creationIntent);
-                        $aiResponse = $this->buildConfirmationPrompt($creationIntent);
+                        $aiResponse = $this->buildConfirmationPrompt($creationIntent, $conversation);
                         $createdTasks = [];
                         $createdProjects = [];
                     } else {
-                        // Normal flow - parse and create if format found
-                        $createdTasks = $this->parseAndCreateTasks($aiResponse, $conversation);
-                        $createdProjects = $this->parseAndCreateProjects($aiResponse, $conversation);
+                        // Normal flow - parse and create if format found (use original response)
+                        $createdTasks = $this->parseAndCreateTasks($aiResponseOriginal, $conversation);
+                        $createdProjects = $this->parseAndCreateProjects($aiResponseOriginal, $conversation);
                         
                         // Fallback: If AI says "đã tạo" but no format found, try to extract and create
-                        if (empty($createdProjects) && $this->isProjectCreationIntent($aiResponse)) {
-                            $fallbackProjects = $this->extractAndCreateProjectFromText($aiResponse, $conversation);
+                        if (empty($createdProjects) && $this->isProjectCreationIntent($aiResponseOriginal)) {
+                            $fallbackProjects = $this->extractAndCreateProjectFromText($aiResponseOriginal, $conversation);
                             if (!empty($fallbackProjects)) {
                                 $createdProjects = array_merge($createdProjects, $fallbackProjects);
                             }
                         }
                         
                         // Remove CREATE tags from response for display (but keep other content)
-                        $aiResponseBefore = $aiResponse;
-                        $aiResponse = preg_replace(self::CREATE_TASK_PATTERN, '', $aiResponse);
+                        $aiResponse = preg_replace(self::CREATE_TASK_PATTERN, '', $aiResponseOriginal);
                         $aiResponse = preg_replace(self::CREATE_PROJECT_PATTERN, '', $aiResponse);
                         $aiResponse = trim($aiResponse);
                         
                         // If response becomes empty after removing tags, restore original or use default
                         if (empty($aiResponse)) {
                             // Try to extract meaningful text from original response
-                            $aiResponse = $this->extractMeaningfulText($aiResponseBefore);
+                            $aiResponse = $this->extractMeaningfulText($aiResponseOriginal);
                             if (empty($aiResponse)) {
                                 $aiResponse = trans('ai.response.cancelled', [], $locale);
                             }
@@ -402,32 +472,20 @@ class AIConversationService
     {
         $createdTasks = [];
         
-        // Match [CREATE_TASK]...[/CREATE_TASK] pattern
         preg_match_all(self::CREATE_TASK_PATTERN, $aiResponse, $matches);
-        
-        // Log only if matches found
-        if (!empty($matches[1])) {
-            Log::debug('AI Response parsing for tasks', [
-                'matches_count' => count($matches[1]),
-                'conversation_id' => $conversation->id,
-            ]);
-        }
         
         if (empty($matches[1])) {
             return $createdTasks;
         }
         
+        Log::debug('AI Response parsing for tasks', [
+            'matches_count' => count($matches[1]),
+            'conversation_id' => $conversation->id,
+        ]);
+        
         foreach ($matches[1] as $taskData) {
             try {
-                // Parse task data: project_id=1|name=Task Name|content=Description|memberIds=1,2
-                $params = [];
-                $parts = explode('|', trim($taskData));
-                
-                foreach ($parts as $part) {
-                    if (strpos($part, '=') === false) continue;
-                    [$key, $value] = explode('=', $part, 2);
-                    $params[trim($key)] = trim($value);
-                }
+                $params = $this->parseTaskParams($taskData);
                 
                 // Validate required fields
                 if (empty($params['project_id']) || empty($params['name'])) {
@@ -449,20 +507,8 @@ class AIConversationService
                     continue;
                 }
                 
-                // Parse member IDs
-                $memberIds = [];
-                if (!empty($params['memberIds'])) {
-                    $memberIds = array_map('intval', explode(',', $params['memberIds']));
-                    // Filter to only include members that are in the project
-                    $memberIds = array_filter($memberIds, function($id) use ($project) {
-                        return $project->users->contains($id);
-                    });
-                }
-                
-                // If no members specified, assign to current user
-                if (empty($memberIds)) {
-                    $memberIds = [$conversation->user_id];
-                }
+                // Parse and validate member IDs
+                $memberIds = $this->parseTaskMemberIds($params['memberIds'] ?? null, $project, $conversation->user_id);
                 
                 // Create task
                 $result = $this->taskService->createTask([
@@ -473,13 +519,16 @@ class AIConversationService
                 ]);
                 
                 if (isset($result['task'])) {
+                    $task = $result['task'];
+                    $this->broadcastTaskCreation($task, $projectId, $conversation->user_id);
+                    
                     $createdTasks[] = [
-                        'id' => $result['task']->id,
-                        'name' => $result['task']->name,
+                        'id' => $task->id,
+                        'name' => $task->name,
                         'project_id' => $projectId,
                     ];
                     Log::info('AI created task successfully', [
-                        'task_id' => $result['task']->id,
+                        'task_id' => $task->id,
                         'conversation_id' => $conversation->id,
                     ]);
                 }
@@ -506,48 +555,22 @@ class AIConversationService
     {
         $createdProjects = [];
         
-        // Match [CREATE_PROJECT]...[/CREATE_PROJECT] pattern (non-greedy, case-insensitive)
         preg_match_all(self::CREATE_PROJECT_PATTERN, $aiResponse, $matches);
-        
-        // Log only if matches found
-        if (!empty($matches[1])) {
-            Log::debug('AI Response parsing for projects', [
-                'matches_count' => count($matches[1]),
-                'conversation_id' => $conversation->id,
-            ]);
-        }
         
         if (empty($matches[1])) {
             return $createdProjects;
         }
         
+        Log::debug('AI Response parsing for projects', [
+            'matches_count' => count($matches[1]),
+            'conversation_id' => $conversation->id,
+        ]);
+        
         foreach ($matches[1] as $projectData) {
             try {
-                // Clean the project data - remove any newlines and extra whitespace
                 $projectData = trim($projectData);
-                $projectData = preg_replace('/\s+/', ' ', $projectData); // Replace multiple spaces/newlines with single space
-                
-                // Parse project data: name=Project Name|content=Description|startDate=2025-01-01|endDate=2025-12-31|members=1,2
-                $params = [];
-                $parts = explode('|', $projectData);
-                
-                foreach ($parts as $part) {
-                    $part = trim($part);
-                    if (strpos($part, '=') === false) continue;
-                    
-                    [$key, $value] = explode('=', $part, 2);
-                    $key = trim($key);
-                    $value = trim($value);
-                    
-                    // Skip if key is empty or contains invalid characters
-                    if (empty($key) || preg_match('/[^a-zA-Z0-9_]/', $key)) {
-                        continue;
-                    }
-                    
-                    $params[$key] = $value;
-                }
-                
-                // Params parsed successfully (no need to log)
+                $projectData = preg_replace('/\s+/', ' ', $projectData);
+                $params = $this->parseProjectParams($projectData);
                 
                 // Validate required fields
                 if (empty($params['name'])) {
@@ -567,23 +590,8 @@ class AIConversationService
                     $params['endDate'] ?? null
                 );
                 
-                // Parse member IDs (will be validated after project creation)
-                $memberIds = [];
-                if (!empty($params['members'])) {
-                    $memberIds = array_map('intval', explode(',', $params['members']));
-                    // Remove current user from members list (will be added as creator)
-                    $memberIds = array_filter($memberIds, function($id) use ($conversation) {
-                        return $id != $conversation->user_id;
-                    });
-                }
-                
-                // Create project
-                Log::info('AI attempting to create project', [
-                    'name' => $projectName,
-                    'startDate' => $startDate,
-                    'endDate' => $endDate,
-                    'memberIds' => $memberIds,
-                ]);
+                // Parse member IDs
+                $memberIds = $this->parseProjectMemberIds($params['members'] ?? null, $conversation->user_id);
                 
                 $result = $this->projectService->createProject([
                     'name' => $projectName,
@@ -593,17 +601,8 @@ class AIConversationService
                     'members' => array_values($memberIds),
                 ], $conversation->user);
                 
-                Log::info('AI project creation result', [
-                    'result' => $result,
-                    'has_errors' => isset($result['errors']),
-                ]);
-                
                 if (!isset($result['errors'])) {
-                    // Get the created project (search by name and creator, ordered by latest)
-                    $project = Project::where('creator_id', $conversation->user_id)
-                        ->where('name', $projectName)
-                        ->orderBy('created_at', 'desc')
-                        ->first();
+                    $project = $this->findCreatedProject($projectName, $conversation->user_id);
                     
                     if ($project) {
                         $createdProjects[] = [
@@ -763,11 +762,7 @@ class AIConversationService
             ], $conversation->user);
             
             if (!isset($result['errors'])) {
-                // Get the created project
-                $project = Project::where('creator_id', $conversation->user_id)
-                    ->where('name', $projectName)
-                    ->orderBy('created_at', 'desc')
-                    ->first();
+                $project = $this->findCreatedProject($projectName, $conversation->user_id);
                 
                 if ($project) {
                     $createdProjects[] = [
@@ -823,12 +818,31 @@ class AIConversationService
             $taskData = trim($matches[1]);
             $params = $this->parseTaskParams($taskData);
             
-            if (!empty($params['name']) && !empty($params['project_id'])) {
+            // Always require task name - if missing, ask for it
+            if (empty($params['name'])) {
+                return [
+                    'type' => 'task',
+                    'data' => $params,
+                    'needs_task_name' => true,
+                ];
+            }
+            
+            if (!empty($params['project_id'])) {
                 return [
                     'type' => 'task',
                     'data' => $params,
                 ];
             }
+        }
+        
+        // Also check user message for task creation intent (without format)
+        if (preg_match('/tạo.*task|create.*task|thêm.*task|add.*task/i', $userMessage)) {
+            // User wants to create task but hasn't provided name yet
+            return [
+                'type' => 'task',
+                'data' => [],
+                'needs_task_name' => true,
+            ];
         }
         
         return null;
@@ -978,9 +992,10 @@ class AIConversationService
      * Build confirmation prompt
      * 
      * @param array $intent
+     * @param AIConversation|null $conversation
      * @return string
      */
-    protected function buildConfirmationPrompt(array $intent): string
+    protected function buildConfirmationPrompt(array $intent, ?AIConversation $conversation = null): string
     {
         if ($intent['type'] === 'project') {
             $data = $intent['data'];
@@ -997,14 +1012,41 @@ class AIConversationService
             }
             $prompt .= "\nVui lòng trả lời 'đồng ý', 'ok', 'tạo' hoặc 'có' để xác nhận tạo dự án.";
         } elseif ($intent['type'] === 'task') {
-            $data = $intent['data'];
-            $prompt = "Bạn có muốn tạo task mới với thông tin sau không?\n\n";
-            $prompt .= "📋 Tên task: {$data['name']}\n";
-            if (!empty($data['content'])) {
-                $prompt .= "📝 Mô tả: {$data['content']}\n";
+            // Check if we need to ask for task name first
+            if (!empty($intent['needs_task_name']) || empty($intent['data']['name'])) {
+                $prompt = "Bạn muốn tạo task mới. Vui lòng cho tôi biết tên task bạn muốn tạo là gì?";
+            } else {
+                $data = $intent['data'];
+                
+                // Check if project_id is missing
+                if (empty($data['project_id'])) {
+                    // Try to use conversation's project if available
+                    if ($conversation && $conversation->project_id) {
+                        $data['project_id'] = $conversation->project_id;
+                    } else {
+                        // Need to ask for project name
+                        $intent['needs_project_name'] = true;
+                        $prompt = "Bạn muốn tạo task '{$data['name']}'. Vui lòng cho tôi biết tên project bạn muốn tạo task này?";
+                        return $prompt;
+                    }
+                }
+                
+                $prompt = "Bạn có muốn tạo task mới với thông tin sau không?\n\n";
+                $prompt .= "📋 Tên task: {$data['name']}\n";
+                if (!empty($data['content'])) {
+                    $prompt .= "📝 Mô tả: {$data['content']}\n";
+                }
+                if (!empty($data['project_id'])) {
+                    // Get project name for display
+                    $project = Project::find($data['project_id']);
+                    if ($project) {
+                        $prompt .= "📁 Project: {$project->name}\n";
+                    } else {
+                        $prompt .= "📁 Project ID: {$data['project_id']}\n";
+                    }
+                }
+                $prompt .= "\nVui lòng trả lời 'đồng ý', 'ok', 'tạo' hoặc 'có' để xác nhận tạo task.";
             }
-            $prompt .= "📁 Project ID: {$data['project_id']}\n";
-            $prompt .= "\nVui lòng trả lời 'đồng ý', 'ok', 'tạo' hoặc 'có' để xác nhận tạo task.";
         } else {
             $prompt = "Bạn có muốn tiếp tục không?";
         }
@@ -1065,13 +1107,7 @@ class AIConversationService
                 $data['endDate'] ?? null
             );
             
-            $memberIds = [];
-            if (!empty($data['members'])) {
-                $memberIds = array_map('intval', explode(',', $data['members']));
-                $memberIds = array_filter($memberIds, function($id) use ($conversation) {
-                    return $id != $conversation->user_id;
-                });
-            }
+            $memberIds = $this->parseProjectMemberIds($data['members'] ?? null, $conversation->user_id);
             
             $result = $this->projectService->createProject([
                 'name' => $projectName,
@@ -1081,19 +1117,16 @@ class AIConversationService
                 'members' => array_values($memberIds),
             ], $conversation->user);
             
-            if (!isset($result['errors'])) {
-                $project = Project::where('creator_id', $conversation->user_id)
-                    ->where('name', $projectName)
-                    ->orderBy('created_at', 'desc')
-                    ->first();
-                
-                if ($project) {
-                    $createdProjects[] = [
-                        'id' => $project->id,
-                        'name' => $project->name,
-                    ];
+                if (!isset($result['errors'])) {
+                    $project = $this->findCreatedProject($projectName, $conversation->user_id);
+                    
+                    if ($project) {
+                        $createdProjects[] = [
+                            'id' => $project->id,
+                            'name' => $project->name,
+                        ];
+                    }
                 }
-            }
         } catch (\Exception $e) {
             Log::error('AI create project from pending action failed: ' . $e->getMessage());
         }
@@ -1124,17 +1157,7 @@ class AIConversationService
                 return $createdTasks;
             }
             
-            $memberIds = [];
-            if (!empty($data['memberIds'])) {
-                $memberIds = array_map('intval', explode(',', $data['memberIds']));
-                $memberIds = array_filter($memberIds, function($id) use ($project) {
-                    return $project->users->contains($id);
-                });
-            }
-            
-            if (empty($memberIds)) {
-                $memberIds = [$conversation->user_id];
-            }
+            $memberIds = $this->parseTaskMemberIds($data['memberIds'] ?? null, $project, $conversation->user_id);
             
             $result = $this->taskService->createTask([
                 'projectId' => $projectId,
@@ -1144,9 +1167,12 @@ class AIConversationService
             ]);
             
             if (isset($result['task'])) {
+                $task = $result['task'];
+                $this->broadcastTaskCreation($task, $projectId, $conversation->user_id);
+                
                 $createdTasks[] = [
-                    'id' => $result['task']->id,
-                    'name' => $result['task']->name,
+                    'id' => $task->id,
+                    'name' => $task->name,
                     'project_id' => $projectId,
                 ];
             }
@@ -1231,6 +1257,121 @@ class AIConversationService
         }
         
         return '';
+    }
+
+    /**
+     * Find project by name from user's projects
+     * 
+     * @param User $user
+     * @param string $projectName
+     * @return Project|null
+     */
+    protected function findProjectByName(User $user, string $projectName): ?Project
+    {
+        $projectName = trim($projectName);
+        $projects = $user->projects()
+            ->where('name', 'like', '%' . $projectName . '%')
+            ->get();
+        
+        if ($projects->isEmpty()) {
+            return null;
+        }
+        
+        // Try exact match first
+        $exactMatch = $projects->firstWhere('name', $projectName);
+        if ($exactMatch) {
+            return $exactMatch;
+        }
+        
+        // Try case-insensitive match
+        $caseInsensitiveMatch = $projects->first(function ($project) use ($projectName) {
+            return strcasecmp($project->name, $projectName) === 0;
+        });
+        
+        return $caseInsensitiveMatch ?: $projects->first();
+    }
+
+    /**
+     * Broadcast task creation event with progress data
+     * 
+     * @param Task $task
+     * @param int $projectId
+     * @param int $userId
+     * @return void
+     */
+    protected function broadcastTaskCreation(Task $task, int $projectId, int $userId): void
+    {
+        try {
+            $task->load(['task_members.user']);
+            $progressData = Task::handleProjectProgress($projectId, $userId, $task->id, false);
+            
+            broadcast(new TaskStatusChanged(
+                $task,
+                $projectId,
+                $task->status,
+                $userId,
+                $progressData['progress'] ?? 0,
+                $progressData['counts'] ?? [0, 0]
+            ))->toOthers();
+        } catch (\Exception $e) {
+            Log::warning('Failed to broadcast task creation: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Find created project by name and creator
+     * 
+     * @param string $projectName
+     * @param int $userId
+     * @return Project|null
+     */
+    protected function findCreatedProject(string $projectName, int $userId): ?Project
+    {
+        return Project::where('creator_id', $userId)
+            ->where('name', $projectName)
+            ->orderBy('created_at', 'desc')
+            ->first();
+    }
+
+    /**
+     * Parse and validate member IDs for project
+     * 
+     * @param string|null $membersString
+     * @param int $currentUserId
+     * @return array
+     */
+    protected function parseProjectMemberIds(?string $membersString, int $currentUserId): array
+    {
+        if (empty($membersString)) {
+            return [];
+        }
+        
+        $memberIds = array_map('intval', explode(',', $membersString));
+        return array_filter($memberIds, function($id) use ($currentUserId) {
+            return $id != $currentUserId;
+        });
+    }
+
+    /**
+     * Parse and validate member IDs for task
+     * 
+     * @param string|null $memberIdsString
+     * @param Project $project
+     * @param int $currentUserId
+     * @return array
+     */
+    protected function parseTaskMemberIds(?string $memberIdsString, Project $project, int $currentUserId): array
+    {
+        if (empty($memberIdsString)) {
+            return [$currentUserId];
+        }
+        
+        $memberIds = array_map('intval', explode(',', $memberIdsString));
+        $memberIds = array_filter($memberIds, function($id) use ($project) {
+            return $project->users->contains($id);
+        });
+        
+        return empty($memberIds) ? [$currentUserId] : array_values($memberIds);
     }
 
     /**

@@ -25,13 +25,25 @@
               <div class="ai-chat-window-subtitle">Trợ lý ảo thông minh</div>
             </div>
           </div>
-          <button 
-            class="ai-chat-window-minimize" 
-            @click="toggleChat"
-            title="Thu gọn"
-          >
-            <i class="fas fa-minus"></i>
-          </button>
+          <div class="ai-chat-window-header-actions">
+            <button 
+              v-if="activeConversation"
+              class="ai-chat-window-action-btn ai-chat-window-delete-btn" 
+              @click="handleDeleteConversation"
+              title="Xóa cuộc hội thoại"
+              :disabled="deleting"
+            >
+              <i v-if="deleting" class="fas fa-spinner fa-spin"></i>
+              <i v-else class="fas fa-broom"></i>
+            </button>
+            <button 
+              class="ai-chat-window-minimize" 
+              @click="toggleChat"
+              title="Thu gọn"
+            >
+              <i class="fas fa-minus"></i>
+            </button>
+          </div>
         </div>
 
         <!-- Messages Area -->
@@ -96,7 +108,7 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from "vue";
 import { makeHttpReq } from "../helper/makeHttpReq";
-import { showError } from "../helper/alert";
+import { showError, showConfirm, showSuccess } from "../helper/alert";
 
 interface AIConversation {
   id: number;
@@ -121,6 +133,7 @@ const activeConversation = ref<AIConversation | null>(null);
 const newMessage = ref("");
 const sending = ref(false);
 const loading = ref(false);
+const deleting = ref(false);
 const messageContainer = ref<HTMLElement | null>(null);
 const inputRef = ref<HTMLTextAreaElement | null>(null);
 
@@ -347,6 +360,36 @@ function handleNewLine() {
   // Allow Shift+Enter to add new line
   // Do nothing, let browser handle it
 }
+
+async function handleDeleteConversation() {
+  if (!activeConversation.value || deleting.value) return;
+  
+  const confirmed = await showConfirm(
+    'Bạn có chắc chắn muốn xóa cuộc hội thoại này?',
+    'Xóa cuộc hội thoại'
+  );
+  
+  if (!confirmed) return;
+
+  deleting.value = true;
+
+  try {
+    await makeHttpReq<never, any>(`/ai/conversations/${activeConversation.value.id}`, 'DELETE');
+    
+    showSuccess('Đã xóa cuộc hội thoại thành công', 'Thành công');
+    
+    // Clear current conversation and create new one
+    activeConversation.value = null;
+    messages.value = [];
+    
+    // Create new conversation
+    await createNewConversation();
+  } catch (e: any) {
+    showError(e?.message || 'Không thể xóa cuộc hội thoại');
+  } finally {
+    deleting.value = false;
+  }
+}
 </script>
 
 <style scoped>
@@ -442,6 +485,41 @@ function handleNewLine() {
   opacity: 0.9;
 }
 
+.ai-chat-window-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-chat-window-action-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.ai-chat-window-action-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ai-chat-window-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-chat-window-delete-btn:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.3);
+}
+
 .ai-chat-window-minimize {
   background: transparent;
   border: none;
@@ -451,6 +529,11 @@ function handleNewLine() {
   border-radius: 4px;
   transition: background 0.2s;
   font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
 }
 
 .ai-chat-window-minimize:hover {
@@ -596,6 +679,7 @@ function handleNewLine() {
   align-items: flex-end;
   background: white;
 }
+
 
 .ai-chat-window-input {
   flex: 1;

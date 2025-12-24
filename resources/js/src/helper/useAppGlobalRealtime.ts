@@ -96,6 +96,8 @@ export function useAppGlobalRealtime() {
             taskId: e.taskId,
             status: e.status,
             userId: e.userId,
+            progress: e.progress,
+            counts: e.counts,
             timestamp: e.updatedAt || Date.now(),
           });
         })
